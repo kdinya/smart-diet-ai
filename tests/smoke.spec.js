@@ -1,7 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-const SUPABASE_URL = 'https://smoke-test.supabase.co';
-const ANON_KEY = 'smoke-anon-key';
+const SUPABASE_URL = 'https://wscprmtjjbevesrchhjr.supabase.co';
 const PASSWORD = 'correct-horse-battery';
 const USERS = {
   'alice@example.test': 'user-alice',
@@ -196,9 +195,6 @@ async function openView(page, view) {
 
 async function connectSupabase(page) {
   await openView(page, 'settings');
-  await page.fill('#sb-url', SUPABASE_URL);
-  await page.fill('#sb-anon', ANON_KEY);
-  await page.click('#connect-sb');
   await expect(page.locator('#auth-panel')).toBeVisible();
 }
 
