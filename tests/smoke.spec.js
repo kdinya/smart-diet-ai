@@ -307,6 +307,34 @@ test.describe('Smoke: food deletion', () => {
     await expect(page.locator('#diary-meals')).not.toContainText('Smoke oats');
   });
 
+  test('every change while signed in reaches the cloud at once', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+
+    await openView(page, 'diary');
+    await addFood(page, 'Instant rice');
+    await expect.poll(() => backend.tables.food_entries.map((row) => row.name)).toEqual(['Instant rice']);
+
+    await foodRow(page, 'Instant rice').locator('[data-edit-food]').first().click();
+    await page.fill('#food-name', 'Instant brown rice');
+    await page.click('#food-save');
+    await expect.poll(() => backend.tables.food_entries.map((row) => row.name)).toEqual(['Instant brown rice']);
+
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '71.5');
+    await page.click('#weight-save');
+    await expect.poll(() => backend.tables.weight_entries.map((row) => Number(row.value))).toEqual([71.5]);
+
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '71.2');
+    await page.click('#weight-save');
+    await expect.poll(() => backend.tables.weight_entries.map((row) => Number(row.value))).toEqual([71.2]);
+    expect(backend.tables.weight_entries).toHaveLength(1);
+  });
+
   test('a failed cloud delete keeps the entry and reports the error', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
