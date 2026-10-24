@@ -1,0 +1,11 @@
+{
+  "name": "smart-diet-ai",
+  "private": true,
+  "description": "Client-side nutrition tracker. Browser smoke tests only; the app itself has no build step.",
+  "scripts": {
+    "test:smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

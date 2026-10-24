@@ -68,6 +68,9 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 ├── manifest.json       # PWA metadata and icons configuration
 ├── sw.js               # Service Worker caching logic
 ├── icon.svg            # Application vector icon
+├── package.json        # Dev dependency for browser smoke tests
+├── playwright.config.js
+├── tests/              # Browser smoke tests
 ├── supabase/
 │   └── schema.sql      # Supabase database tables and RLS policies
 ├── AGENTS.md           # Guidelines for AI agents
@@ -85,6 +88,16 @@ Because Smart Diet AI is built as a single-file client application, no build too
    python3 -m http.server 8080
    ```
    Navigate to `http://localhost:8080`.
+
+### Browser Smoke Tests (optional)
+
+Playwright checks the main flows in Chromium: saving goals, deleting entries (local and synced), and switching accounts. Supabase is mocked, so no project or keys are needed.
+
+```bash
+npm install
+npx playwright install chromium
+npm run test:smoke
+```
 
 ### Configuration
 
@@ -160,6 +173,9 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 ├── manifest.json       # Маніфест PWA та метадані
 ├── sw.js               # Service Worker для офлайн-роботи
 ├── icon.svg            # Векторна іконка застосунку
+├── package.json        # Dev-залежність для браузерних смоук-тестів
+├── playwright.config.js
+├── tests/              # Браузерні смоук-тести
 ├── supabase/
 │   └── schema.sql      # Таблиці бази даних та політики RLS
 ├── AGENTS.md           # Інструкції для AI-асистентів
@@ -177,6 +193,16 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
    python3 -m http.server 8080
    ```
    Перейдіть на `http://localhost:8080`.
+
+### Браузерні смоук-тести (необов’язково)
+
+Playwright перевіряє основні сценарії в Chromium: збереження цілей, видалення записів (локальних і синхронізованих) і перемикання акаунтів. Supabase замінено моком, тож проєкт і ключі не потрібні.
+
+```bash
+npm install
+npx playwright install chromium
+npm run test:smoke
+```
 
 ### Налаштування
 
