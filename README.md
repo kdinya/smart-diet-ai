@@ -106,6 +106,7 @@ npm run test:smoke
   1. The app is already connected to the shared Supabase project. Users only register or log in under **Settings → Account & cloud sync**; no SQL or keys are needed.
   2. To run your own copy: create a Supabase project, run `supabase/schema.sql` once in the SQL Editor, then set `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top of the script in `index.html`. Never put a `service_role` key in the app.
   3. Email confirmation links use the site address. In Supabase, set **Authentication → URL Configuration → Site URL** to your deployed address (for example `https://smart-diet-ai-psi.vercel.app`) and add `<your address>/**` to **Redirect URLs**. Otherwise links point to `localhost`.
+  4. After updating from an older version, run `supabase/schema.sql` again in the SQL Editor (it is safe to repeat); the Snack meal category needs the updated constraint.
 
 ---
 
@@ -211,6 +212,7 @@ npm run test:smoke
   1. Застосунок уже підключений до спільного проєкту Supabase. Користувачам достатньо зареєструватися або увійти в **Налаштування → Акаунт та синхронізація**; SQL і ключі не потрібні.
   2. Для власної копії: створіть проєкт на [supabase.com](https://supabase.com), один раз застосуйте `supabase/schema.sql` у SQL Editor, потім вкажіть `SUPABASE_URL` і `SUPABASE_ANON_KEY` на початку скрипта в `index.html`. Ключ `service_role` у застосунку не використовуйте.
   3. Посилання для підтвердження пошти ведуть на адресу сайту. У Supabase встановіть **Authentication → URL Configuration → Site URL** на адресу вашого застосунку (наприклад, `https://smart-diet-ai-psi.vercel.app`) і додайте `<адреса>/**` у **Redirect URLs**. Інакше посилання вестимуть на `localhost`.
+  4. Після оновлення зі старої версії ще раз виконайте `supabase/schema.sql` у SQL Editor (це безпечно); для категорії «Перекус» потрібне оновлене обмеження.
 
 ## Ліцензія
 

@@ -5,7 +5,7 @@ create table if not exists public.food_entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 180),
-  meal_type text not null default 'breakfast' check (meal_type in ('breakfast', 'lunch', 'dinner')),
+  meal_type text not null default 'breakfast' check (meal_type in ('breakfast', 'lunch', 'dinner', 'snack')),
   grams numeric(9,2) not null default 0 check (grams >= 0),
   kcal numeric(9,2) not null default 0 check (kcal >= 0),
   protein numeric(9,2) not null default 0 check (protein >= 0),
@@ -16,7 +16,11 @@ create table if not exists public.food_entries (
 );
 
 -- Safe migration for existing installations created before meal categories.
-alter table public.food_entries add column if not exists meal_type text not null default 'breakfast' check (meal_type in ('breakfast', 'lunch', 'dinner'));
+alter table public.food_entries add column if not exists meal_type text not null default 'breakfast' check (meal_type in ('breakfast', 'lunch', 'dinner', 'snack'));
+
+-- Allow the snack category on installations created before it existed.
+alter table public.food_entries drop constraint if exists food_entries_meal_type_check;
+alter table public.food_entries add constraint food_entries_meal_type_check check (meal_type in ('breakfast', 'lunch', 'dinner', 'snack'));
 
 create table if not exists public.weight_entries (
   id uuid primary key default gen_random_uuid(),

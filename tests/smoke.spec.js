@@ -641,3 +641,83 @@ test.describe('Smoke: sign-out and data transfer', () => {
     await expect.poll(() => backend.tables.food_entries.filter((row) => row.user_id === 'user-bob').length).toBe(1);
   });
 });
+
+test.describe('Smoke: meals, balance layout and weight picker', () => {
+  test('a snack can be added and shows up in the diary and on the overview', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals .meal-card')).toHaveCount(4);
+    await addFood(page, 'Apple', 'snack');
+    await expect.poll(() => backend.tables.food_entries.map((row) => row.meal_type)).toEqual(['snack']);
+
+    await openView(page, 'home');
+    await expect(page.locator('#home-meals .meal-card')).toHaveCount(4);
+    await expect(page.locator('#home-meals')).toContainText('Apple');
+    await expect(page.locator('#chat-meal option[value="snack"]')).toHaveCount(1);
+  });
+
+  test('today balance shows two blocks per row', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const boxes = await page.locator('#view-home .stats .metric').evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { id: el.querySelector('strong').id, top: Math.round(r.top), left: Math.round(r.left) };
+    }));
+    expect(boxes.map((b) => b.id)).toEqual(['home-kcal', 'home-protein', 'home-fat', 'home-carbs']);
+    expect(boxes[0].top).toBe(boxes[1].top);
+    expect(boxes[2].top).toBe(boxes[3].top);
+    expect(boxes[2].top).toBeGreaterThan(boxes[0].top);
+    expect(boxes[0].left).toBe(boxes[2].left);
+  });
+
+  test('diary shows eaten against the daily target, red above and green at or below', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const food = (id, kcal) => ({ id, name: `Item ${id}`, meal: 'lunch', grams: 100, kcal, protein: 10, fat: 70, carbs: 300, date: today, createdAt: Date.now() });
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, kcal: 2000, protein: 10, fat: 70, carbs: 242 },
+      foods: [food('11111111-1111-4111-8111-111111111111', 2000), food('22222222-2222-4222-8222-222222222222', 0)],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const totals = page.locator('#diary-summary .day-total');
+    await expect(totals).toHaveCount(4);
+    await expect(totals.nth(0)).toContainText('2000 / 2000');
+    await expect(totals.nth(0)).toHaveClass(/ok/);
+    await expect(totals.nth(1)).toContainText('20 / 10');
+    await expect(totals.nth(1)).toHaveClass(/over/);
+    await expect(totals.nth(2)).toContainText('140 / 70');
+    await expect(totals.nth(2)).toHaveClass(/over/);
+    await expect(totals.nth(3)).toContainText('600 / 242');
+    await expect(totals.nth(3)).toHaveClass(/over/);
+    const colors = await totals.evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
+    expect(colors[0]).not.toBe(colors[1]);
+  });
+
+  test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
+    const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.goto('/');
+    await page.evaluate((data) => localStorage.setItem('smartdiet-v1', JSON.stringify(data)), { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.reload();
+    await expect(page.locator('#mobile-nav')).toBeVisible();
+    await page.evaluate(() => openModal('weight'));
+    await page.locator('#weight-value').click();
+    await expect(page.locator('#wheel-back')).toHaveClass(/open/);
+    await page.evaluate(() => {
+      const [ints, decs] = document.querySelectorAll('#wheel-cols .wheel-col');
+      ints.scrollTop = (72 - 30) * 44;
+      decs.scrollTop = 5 * 44;
+    });
+    await page.waitForTimeout(200);
+    await page.click('#wheel-done');
+    await expect(page.locator('#weight-value')).toHaveValue('72.5');
+    await page.click('#weight-save');
+    await expect.poll(async () => (await readStore(page)).weights.map((w) => w.value)).toEqual([72.5]);
+    await context.close();
+  });
+});
