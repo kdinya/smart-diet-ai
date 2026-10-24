@@ -1,4 +1,4 @@
-const CACHE='smart-diet-shell-v7';
+const CACHE='smart-diet-shell-v8';
 const SHELL=['./','./index.html','./manifest.json','./icon.svg'];
 
 self.addEventListener('install',event=>event.waitUntil(
