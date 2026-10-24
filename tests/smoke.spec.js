@@ -501,6 +501,29 @@ test.describe('Smoke: sign-out and data transfer', () => {
     await expect(page.locator('#auth-status')).toHaveText('Signed out.');
   });
 
+  test('signed-in state shows the account, hides the form, and survives reload', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await expect(page.locator('#auth-form')).toBeVisible();
+
+    await signIn(page, 'alice@example.test');
+    await expect(page.locator('#auth-form')).toBeHidden();
+    await expect(page.locator('#auth-signed')).toBeVisible();
+    await expect(page.locator('#auth-who')).toContainText('alice@example.test');
+
+    await page.reload();
+    await openView(page, 'settings');
+    await expect(page.locator('#auth-signed')).toBeVisible();
+    await expect(page.locator('#auth-form')).toBeHidden();
+    await expect(page.locator('#auth-who')).toContainText('alice@example.test');
+
+    await signOut(page);
+    await expect(page.locator('#auth-form')).toBeVisible();
+    await expect(page.locator('#auth-signed')).toBeHidden();
+  });
+
   test('accepting the transfer moves local entries into the new account', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
