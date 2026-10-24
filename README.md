@@ -14,15 +14,16 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 
 ### Features
 
-- **AI Dietitian (Gemini & OpenAI)**:
+- **AI Dietitian (Gemini, OpenAI, Claude & Groq)**:
   - Estimates portion weights in grams, calories, and macronutrients (protein, fats, carbs) for raw food inputs (e.g., "cottage cheese, eggs").
   - Dynamically accounts for daily calorie limits, consumed calories, remaining calories, and selected meal categories (Breakfast, Lunch, Dinner, Snack).
   - Offers nutritional recommendations when meals lack balance or key nutrients.
   - Uses `gemini-3.8-flash` with low thinking effort; switches to `gemini-3.5-flash-lite` only when the daily or per-minute quota of the main model is exhausted. Automatic retry on temporary errors, timeout handling, and retry button.
+  - Several AI providers can be configured at once; if one is unavailable, rejects the key, or runs out of quota, the next one with a key is used automatically.
   - Direct one-click import of calculated items into the food diary.
 
 - **Daily Overview & Goals**:
-  - **Today's Balance:** Real-time summary of consumed vs. remaining calories, progress bar, and total protein, fat, and carb grams.
+  - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
   - **Calorie Goals:** Displays recommended daily intake (based on profile metrics) alongside user-defined targets with quick-edit support.
   - **Meal Cards:** Breakdown of today's meals with calorie subtotals and item counts.
   - **Quick Actions:** Instant access to the AI Dietitian, manual meal entry, full diary, and weight logger.
@@ -44,7 +45,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
   - **Local-first:** Complete offline capability using browser `localStorage` (`smartdiet-v1`).
   - **Backup:** Single-click JSON export of all logged meals, weight data, and goals.
   - **Cloud Sync:** Optional multi-device synchronization via Supabase Auth (email/password) and PostgreSQL with Row Level Security (RLS).
-  - **Privacy:** Gemini/OpenAI API keys are saved exclusively in client-side storage.
+  - **Privacy:** AI provider API keys are saved exclusively in client-side storage.
   - **Statistics:** Charts and daily totals are calculated from saved food and weight records; statistics are not a separate data store.
   - **Data safety:** Clearing browser/site data, using private browsing, losing a browser profile, deleting a Supabase account, or losing an unexported local dataset can remove records. Export a JSON backup before clearing storage or switching accounts.
 
@@ -82,7 +83,7 @@ Because Smart Diet AI is built as a single-file client application, no build too
 
 ### Configuration
 
-- **AI Provider:** In **Settings → AI provider**, choose Google Gemini or OpenAI and enter your API key. Keys remain in your local browser storage.
+- **AI Provider:** In **Settings → AI provider**, enter API keys for Google Gemini, OpenAI, Anthropic Claude, or Groq and arrange them in priority order with the arrows. Keys remain in your local browser storage.
 - **Supabase Cloud Sync (Optional):**
   1. Create a Supabase project at [supabase.com](https://supabase.com).
   2. Run `supabase/schema.sql` in the Supabase SQL Editor.
@@ -98,7 +99,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 ### Можливості
 
-- **ШІ-дієтолог (Gemini та OpenAI)**:
+- **ШІ-дієтолог (Gemini, OpenAI, Claude та Groq)**:
   - Автоматичний розрахунок ваги продуктів у грамах, калорій та БЖВ за простим списком страв (наприклад, «Твердий сир, кава з молоком»).
   - Врахування добової цілі калорій, уже спожитого за день, залишку та вибраного прийому їжі (сніданок, обід, вечеря, перекус).
   - Поради щодо збалансованості раціону, якщо в прийомі бракує білків або інших нутрієнтів.
@@ -106,7 +107,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
   - Додавання розрахованих продуктів у щоденник в один клік.
 
 - **Головна панель та цілі**:
-  - **Баланс на сьогодні:** Поточний стан спожитих калорій проти залишку, візуальний прогрес і підсумок білків, жирів та вуглеводів у грамах.
+  - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / залишилось».
   - **Ціль калорій:** Відображення рекомендованої норми за формулою та встановленої користувачем цілі з можливістю швидкої зміни.
   - **Прийоми їжі:** Списки страв на сніданок, обід, вечерю та перекус із підсумком калорій.
   - **Швидкі дії:** Виклик ШІ-дієтолога, ручне додавання страви, перегляд щоденника та запис ваги.
@@ -133,7 +134,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
   - **Локальний режим:** Повна автономна робота у сховищі браузера (`localStorage` / `smartdiet-v1`).
   - **Резервна копія:** Експорт усіх записів і цілей у JSON-файл.
   - **Хмарна синхронізація:** Підключення Supabase (Auth + PostgreSQL з RLS) для збереження даних на кількох пристроях.
-  - **Приватність:** Ключі API Gemini/OpenAI зберігаються лише на поточному пристрої.
+  - **Приватність:** Ключі API провайдерів ШІ зберігаються лише на поточному пристрої.
 
 - **PWA та мобільна оптимізація**:
   - Можливість встановлення як автономний застосунок на смартфони та ПК.
@@ -169,7 +170,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 ### Налаштування
 
-- **AI-провайдер:** У **Налаштування → AI-провайдер** вкажіть API-ключ для Google Gemini або OpenAI.
+- **AI-провайдер:** У **Налаштування → AI-провайдер** вкажіть API-ключі для Google Gemini, OpenAI, Anthropic Claude або Groq і стрілками задайте порядок пріоритету. Якщо провайдер недоступний або ліміти вичерпано, автоматично використовується наступний.
 - **Хмарна синхронізація (Supabase):**
   1. Створіть проєкт на [supabase.com](https://supabase.com).
   2. Застосуйте `supabase/schema.sql` у розділі SQL Editor.
