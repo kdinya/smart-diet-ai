@@ -43,3 +43,18 @@ create policy "Users manage their own weight entries" on public.weight_entries
 
 grant select, insert, update, delete on public.food_entries to authenticated;
 grant select, insert, update, delete on public.weight_entries to authenticated;
+
+-- Goals and profile synced across devices (one row per user).
+create table if not exists public.user_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_profiles enable row level security;
+
+drop policy if exists "Users manage their own profile" on public.user_profiles;
+create policy "Users manage their own profile" on public.user_profiles
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.user_profiles to authenticated;
