@@ -18,7 +18,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
   - Estimates portion weights in grams, calories, and macronutrients (protein, fats, carbs) for raw food inputs (e.g., "cottage cheese, eggs").
   - Dynamically accounts for daily calorie limits, consumed calories, remaining calories, and selected meal categories (Breakfast, Lunch, Dinner, Snack).
   - Offers nutritional recommendations when meals lack balance or key nutrients.
-  - Automatic model fallback (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`), timeout handling, and retry button for slow network responses.
+  - Automatic model fallback (`gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`), timeout handling, and retry button for slow network responses.
   - Direct one-click import of calculated items into the food diary.
 
 - **Daily Overview & Goals**:
@@ -102,7 +102,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
   - Автоматичний розрахунок ваги продуктів у грамах, калорій та БЖВ за простим списком страв (наприклад, «Твердий сир, кава з молоком»).
   - Врахування добової цілі калорій, уже спожитого за день, залишку та вибраного прийому їжі (сніданок, обід, вечеря, перекус).
   - Поради щодо збалансованості раціону, якщо в прийомі бракує білків або інших нутрієнтів.
-  - Швидкий резервний перехід між моделями (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`), контроль таймаутів та повторна спроба при затримці відповіді.
+  - Швидкий резервний перехід між моделями (`gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`), контроль таймаутів та повторна спроба при затримці відповіді.
   - Додавання розрахованих продуктів у щоденник в один клік.
 
 - **Головна панель та цілі**:
