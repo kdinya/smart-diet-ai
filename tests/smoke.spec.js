@@ -425,7 +425,7 @@ test.describe('Smoke: backup import', () => {
 
     await page.setInputFiles('#import-file', backupFile(IMPORT_BACKUP));
 
-    expect(dialogs).toHaveLength(1);
+    await expect.poll(() => dialogs.length).toBe(1);
     expect(dialogs[0]).toContain('Replace the data on this device');
     await expect(page.locator('#toast')).toHaveText('Imported 2 entries and 1 weigh-ins.');
 
@@ -485,5 +485,39 @@ test.describe('Smoke: backup import', () => {
     const stored = await readStore(page);
     expect(stored.foods.map((food) => food.name)).toEqual(['Old local entry']);
     expect(stored.prefs.kcal).toBe(2000);
+  });
+});
+
+test.describe('Smoke: sign-out and data transfer', () => {
+  test('sign out hides the button and shows a status', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+
+    await signOut(page);
+    await expect(page.locator('#auth-out')).toBeHidden();
+    await expect(page.locator('#auth-status')).toHaveText('Signed out.');
+  });
+
+  test('accepting the transfer moves local entries into the new account', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+
+    await signIn(page, 'alice@example.test');
+    await openView(page, 'diary');
+    await addFood(page, 'Shared lunch', 'lunch');
+    await expect.poll(() => backend.tables.food_entries.length).toBe(1);
+
+    await signOut(page);
+    page.once('dialog', (dialog) => dialog.accept());
+    await signIn(page, 'bob@example.test');
+
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals')).toContainText('Shared lunch');
+    await expect.poll(() => backend.tables.food_entries.filter((row) => row.user_id === 'user-bob').length).toBe(1);
   });
 });
