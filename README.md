@@ -25,11 +25,11 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 - **Daily Overview & Goals**:
   - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
   - **Meal Cards:** Breakdown of meals with calories, protein, fat, and carb subtotals and item counts (on the overview and for every day in the diary).
-  - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is based on target body weight. A target weight with BMI below 18.5 is rejected.
+  - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is 1.8 g per kg of reference weight (target weight × 1.15 when losing, never above current weight), capped at 2.2 g per kg of current weight. Changing age, sex, height, weight, activity, or pace recalculates the target automatically once a plan exists. A target weight with BMI below 18.5 is rejected.
   - **Body Weight Check (Statistics):** A semicircle BMI gauge (underweight / healthy / overweight / obesity) based on the latest logged weight, height, age and sex, with the healthy weight range, a recommended weight, and how many kilograms are above or below the range.
   - **Meal Guides:** The calorie guide for each meal accounts for what was already eaten in other meals during the day (unused budget of skipped meals carries forward, up to 1.5× the base share).
   - **Progress & Forecast (Statistics):** 7-day trend weight (dashed line on the chart), weekly rate, kilograms to goal, forecast date, plan vs. actual pace, and a plateau warning after 3+ weeks without progress.
-  - **Adaptive Target:** After 2+ weeks of weigh-ins and diary logging, real maintenance calories are estimated from average intake and weight trend, and an updated target is suggested (applied only on tap).
+  - **Adaptive Target:** After 2+ weeks of weigh-ins and complete diary days (breakfast, lunch and dinner all logged), real maintenance calories are estimated from average intake and weight trend, and an updated target is suggested (applied only on tap).
   - **Weekly Balance:** Under/over target for the current week and a softened guide for today (within ±15%, never below the minimum).
   - **Quick Actions:** Instant access to the AI Dietitian, manual meal entry, full diary, and weight logger.
 
@@ -113,11 +113,11 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 - **Головна панель та цілі**:
   - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / залишилось».
-  - **План за темпом:** Добова ціль калорій розраховується за обраним темпом (0,25 / 0,5 / 0,75 кг на тиждень) з обмеженням безпечного дефіциту (до 25% від підтримки, не нижче мінімуму калорій); білок рахується від цільової ваги. Цільова вага з ІМТ нижче 18,5 відхиляється.
+  - **План за темпом:** Добова ціль калорій розраховується за обраним темпом (0,25 / 0,5 / 0,75 кг на тиждень) з обмеженням безпечного дефіциту (до 25% від підтримки, не нижче мінімуму калорій); білок рахується як 1,8 г на кг опорної ваги (цільова × 1,15 під час схуднення, але не вище поточної), не більше 2,2 г на кг поточної ваги. Зміна віку, статі, зросту, ваги, активності чи темпу автоматично перераховує ціль, якщо план уже створено. Цільова вага з ІМТ нижче 18,5 відхиляється.
   - **Перевірка ваги тіла (Статистика):** Півколо ІМТ (недостатня / нормальна / надмірна вага / ожиріння) за останньою внесеною вагою, зростом, віком і статтю, зі здоровим діапазоном ваги, рекомендованою вагою та різницею в кілограмах.
   - **Орієнтири по прийомах:** Орієнтир калорій для кожного прийому враховує вже з’їдене в інших прийомах за день (невикористаний бюджет пропущених прийомів переноситься, максимум 1,5× від базової частки).
   - **Прогрес і прогноз (Статистика):** Трендова вага за 7 днів (пунктир на графіку), темп на тиждень, кілограми до цілі, прогноз дати, порівняння плану з фактом і попередження про плато після 3+ тижнів без прогресу.
-  - **Адаптивна ціль:** Після 2+ тижнів зважувань і обліку їжі оцінюється реальна підтримка за середнім споживанням і трендом ваги та пропонується оновлена ціль (застосовується лише за натисканням).
+  - **Адаптивна ціль:** Після 2+ тижнів зважувань і повних днів обліку (зафіксовані сніданок, обід і вечеря) оцінюється реальна підтримка за середнім споживанням і трендом ваги та пропонується оновлена ціль (застосовується лише за натисканням).
   - **Баланс тижня:** Недобір або перебір за поточний тиждень і м’якший орієнтир на сьогодні (в межах ±15%, не нижче мінімуму).
   - **Прийоми їжі:** Списки страв на сніданок, обід, вечерю та перекус із підсумком калорій, білків, жирів і вуглеводів (на «Огляді» та в щоденнику за кожен день). ШІ-дієтолог розраховує лише названі користувачем продукти, а пропозиції подає текстом у пораді.
   - **Швидкі дії:** Виклик ШІ-дієтолога, ручне додавання страви, перегляд щоденника та запис ваги.
