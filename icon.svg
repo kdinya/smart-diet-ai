@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="34" fill="#28754f"/><path d="M64 20c8 0 13 7 13 16v15h15c9 0 16 5 16 13s-7 13-16 13H77v15c0 9-5 16-13 16s-13-7-13-16V77H36c-9 0-16-5-16-13s7-13 16-13h15V36c0-9 5-16 13-16z" fill="#e7f1dc"/><circle cx="94" cy="35" r="10" fill="#d9ed8e"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Healthy meal">
+  <rect width="128" height="128" rx="34" fill="#28754f"/>
+  <path d="M24 61c2 24 18 39 40 39s38-15 40-39H24Z" fill="#fffdf5"/>
+  <path d="M20 59h88c0 4-3 7-7 7H27c-4 0-7-3-7-7Z" fill="#d9ed8e"/>
+  <path d="M48 57c-8-14-4-28 11-35 4 13 1 25-11 35Z" fill="#b6d86b"/>
+  <path d="M61 57c1-18 11-28 27-30 0 16-9 27-27 30Z" fill="#e7f1dc"/>
+  <path d="M73 57c-4-11 0-20 11-25 3 11 0 20-11 25Z" fill="#f2a65a"/>
+  <path d="M37 75c8 7 17 10 27 10s19-3 27-10" fill="none" stroke="#28754f" stroke-linecap="round" stroke-width="4" opacity=".55"/>
+</svg>
