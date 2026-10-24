@@ -25,7 +25,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 - **Daily Overview & Goals**:
   - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
   - **Meal Cards:** Breakdown of meals with calories, protein, fat, and carb subtotals and item counts (on the overview and for every day in the diary).
-  - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is 1.8 g per kg of reference weight (target weight × 1.15 when losing, never above current weight), capped at 2.2 g per kg of current weight. Changing age, sex, height, weight, activity, or pace recalculates the target automatically once a plan exists. A target weight with BMI below 18.5 is rejected.
+  - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is 1.8 g per kg of reference weight (target weight × 1.15 when losing, never above current weight), capped at 2.2 g per kg of current weight. Changing date of birth, sex, height, weight, activity, or pace recalculates the target automatically once a plan exists. A target weight with BMI below 18.5 is rejected.
   - **Body Weight Check (Statistics):** A semicircle BMI gauge (underweight / healthy / overweight / obesity) based on the latest logged weight, height, age and sex, with the healthy weight range, a recommended weight, and how many kilograms are above or below the range.
   - **Meal Guides:** The calorie guide for each meal accounts for what was already eaten in other meals during the day (unused budget of skipped meals carries forward, up to 1.5× the base share).
   - **Progress & Forecast (Statistics):** 7-day trend weight (dashed line on the chart), weekly rate, kilograms to goal, forecast date, plan vs. actual pace, and a plateau warning after 3+ weeks without progress.
@@ -151,7 +151,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 - **Профіль та безпечний план**:
   - Стартове вікно при першому запуску з миттєвим вибором мови (українська / English) та можливістю закриття.
-  - Розрахунок рекомендованої добової калорійності за параметрами (вік, стать, зріст, поточна вага, цільова вага, рівень активності).
+  - Розрахунок рекомендованої добової калорійності за параметрами (дата народження, стать, зріст, поточна вага, цільова вага, рівень активності).
 
 - **Збереження та синхронізація**:
   - **Локальний режим:** Повна автономна робота у сховищі браузера (`localStorage` / `smartdiet-v1`).
