@@ -91,7 +91,7 @@ Because Smart Diet AI is built as a single-file client application, no build too
 - **AI Provider:** In **Settings → AI provider**, enter API keys for Google Gemini, OpenAI, Anthropic Claude, or Groq and arrange them in priority order with the arrows. Keys remain in your local browser storage.
 - **Supabase Cloud Sync (Optional):**
   1. Create a Supabase project at [supabase.com](https://supabase.com).
-  2. Run `supabase/schema.sql` in the Supabase SQL Editor.
+  2. Run `supabase/schema.sql` in the Supabase SQL Editor. On an existing project, run it again: it is safe to repeat and adds the `user_profiles` table for synced goals.
   3. Enter your Project URL and public `anon` key in **Settings → Account & cloud sync**, then register or log in.
 
 ---
@@ -183,7 +183,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 - **AI-провайдер:** У **Налаштування → AI-провайдер** вкажіть API-ключі для Google Gemini, OpenAI, Anthropic Claude або Groq і стрілками задайте порядок пріоритету. Якщо провайдер недоступний або ліміти вичерпано, автоматично використовується наступний.
 - **Хмарна синхронізація (Supabase):**
   1. Створіть проєкт на [supabase.com](https://supabase.com).
-  2. Застосуйте `supabase/schema.sql` у розділі SQL Editor.
+  2. Застосуйте `supabase/schema.sql` у розділі SQL Editor. У вже налаштованому проєкті запустіть його ще раз: скрипт безпечний для повторного запуску і додає таблицю `user_profiles` для синхронізації цілей.
   3. Введіть Project URL та публічний `anon` ключ у розділі **Налаштування → Акаунт та синхронізація**.
 
 ## Ліцензія
