@@ -1,1 +1,12 @@
-ewogICJuYW1lIjogIlNtYXJ0IERpZXQgQUkiLAogICJzaG9ydF9uYW1lIjogIlNtYXJ0IERpZXQiLAogICJkZXNjcmlwdGlvbiI6ICLQqNCGLdC00ZbRlNGC0L7Qu9C+0LMsINGJ0L7QtNC10L3QvdC40Log0YXQsNGA0YfRg9Cy0LDQvdC90Y8g0YLQsCDRgdGC0LDRgtC40YHRgtC40LrQsCIsCiAgImxhbmciOiAidWsiLAogICJzdGFydF91cmwiOiAiLiIsCiAgInNjb3BlIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmNmY3ZjIiLAogICJ0aGVtZV9jb2xvciI6ICIjZjZmN2YyIiwKICAiaWNvbnMiOiBbeyJzcmMiOiJpY29uLnN2ZyIsInNpemVzIjoiYW55IiwidHlwZSI6ImltYWdlL3N2Zyt4bWwiLCJwdXJwb3NlIjoiYW55IG1hc2thYmxlIn1dCn0K
+{
+  "name": "Smart Diet AI",
+  "short_name": "Smart Diet",
+  "description": "ШІ-дієтолог, щоденник харчування та статистика",
+  "lang": "uk",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f6f7f2",
+  "theme_color": "#f6f7f2",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

@@ -1,1 +1,41 @@
-LS0gUnVuIG9uY2UgaW4gU3VwYWJhc2UgU1FMIEVkaXRvci4KY3JlYXRlIGV4dGVuc2lvbiBpZiBub3QgZXhpc3RzIHBnY3J5cHRvOwoKY3JlYXRlIHRhYmxlIGlmIG5vdCBleGlzdHMgcHVibGljLmZvb2RfZW50cmllcyAoCiAgaWQgdXVpZCBwcmltYXJ5IGtleSBkZWZhdWx0IGdlbl9yYW5kb21fdXVpZCgpLAogIHVzZXJfaWQgdXVpZCBub3QgbnVsbCByZWZlcmVuY2VzIGF1dGgudXNlcnMoaWQpIG9uIGRlbGV0ZSBjYXNjYWRlLAogIG5hbWUgdGV4dCBub3QgbnVsbCBjaGVjayAoY2hhcl9sZW5ndGgobmFtZSkgYmV0d2VlbiAxIGFuZCAxODApLAogIGdyYW1zIG51bWVyaWMoOSwyKSBub3QgbnVsbCBkZWZhdWx0IDAgY2hlY2sgKGdyYW1zID49IDApLAogIGtjYWwgbnVtZXJpYyg5LDIpIG5vdCBudWxsIGRlZmF1bHQgMCBjaGVjayAoa2NhbCA+PSAwKSwKICBwcm90ZWluIG51bWVyaWMoOSwyKSBub3QgbnVsbCBkZWZhdWx0IDAgY2hlY2sgKHByb3RlaW4gPj0gMCksCiAgZmF0IG51bWVyaWMoOSwyKSBub3QgbnVsbCBkZWZhdWx0IDAgY2hlY2sgKGZhdCA+PSAwKSwKICBjYXJicyBudW1lcmljKDksMikgbm90IG51bGwgZGVmYXVsdCAwIGNoZWNrIChjYXJicyA+PSAwKSwKICBlbnRyeV9kYXRlIGRhdGUgbm90IG51bGwgZGVmYXVsdCBjdXJyZW50X2RhdGUsCiAgY3JlYXRlZF9hdCB0aW1lc3RhbXB0eiBub3QgbnVsbCBkZWZhdWx0IG5vdygpCik7CgpjcmVhdGUgdGFibGUgaWYgbm90IGV4aXN0cyBwdWJsaWMud2VpZ2h0X2VudHJpZXMgKAogIGlkIHV1aWQgcHJpbWFyeSBrZXkgZGVmYXVsdCBnZW5fcmFuZG9tX3V1aWQoKSwKICB1c2VyX2lkIHV1aWQgbm90IG51bGwgcmVmZXJlbmNlcyBhdXRoLnVzZXJzKGlkKSBvbiBkZWxldGUgY2FzY2FkZSwKICB2YWx1ZSBudW1lcmljKDcsMikgbm90IG51bGwgY2hlY2sgKHZhbHVlID4gMCBhbmQgdmFsdWUgPCAxMDAwKSwKICBlbnRyeV9kYXRlIGRhdGUgbm90IG51bGwgZGVmYXVsdCBjdXJyZW50X2RhdGUsCiAgY3JlYXRlZF9hdCB0aW1lc3RhbXB0eiBub3QgbnVsbCBkZWZhdWx0IG5vdygpLAogIHVuaXF1ZSAodXNlcl9pZCwgZW50cnlfZGF0ZSkKKTsKCmNyZWF0ZSBpbmRleCBpZiBub3QgZXhpc3RzIGZvb2RfZW50cmllc191c2VyX2RhdGVfaWR4IG9uIHB1YmxpYy5mb29kX2VudHJpZXMgKHVzZXJfaWQsIGVudHJ5X2RhdGUgZGVzYyk7CmNyZWF0ZSBpbmRleCBpZiBub3QgZXhpc3RzIHdlaWdodF9lbnRyaWVzX3VzZXJfZGF0ZV9pZHggb24gcHVibGljLndlaWdodF9lbnRyaWVzICh1c2VyX2lkLCBlbnRyeV9kYXRlIGRlc2MpOwoKYWx0ZXIgdGFibGUgcHVibGljLmZvb2RfZW50cmllcyBlbmFibGUgcm93IGxldmVsIHNlY3VyaXR5OwphbHRlciB0YWJsZSBwdWJsaWMud2VpZ2h0X2VudHJpZXMgZW5hYmxlIHJvdyBsZXZlbCBzZWN1cml0eTsKCmRyb3AgcG9saWN5IGlmIGV4aXN0cyAiVXNlcnMgbWFuYWdlIHRoZWlyIG93biBmb29kIGVudHJpZXMiIG9uIHB1YmxpYy5mb29kX2VudHJpZXM7CmNyZWF0ZSBwb2xpY3kgIlVzZXJzIG1hbmFnZSB0aGVpciBvd24gZm9vZCBlbnRyaWVzIiBvbiBwdWJsaWMuZm9vZF9lbnRyaWVzCiAgZm9yIGFsbCB0byBhdXRoZW50aWNhdGVkIHVzaW5nIChhdXRoLnVpZCgpID0gdXNlcl9pZCkgd2l0aCBjaGVjayAoYXV0aC51aWQoKSA9IHVzZXJfaWQpOwoKZHJvcCBwb2xpY3kgaWYgZXhpc3RzICJVc2VycyBtYW5hZ2UgdGhlaXIgb3duIHdlaWdodCBlbnRyaWVzIiBvbiBwdWJsaWMud2VpZ2h0X2VudHJpZXM7CmNyZWF0ZSBwb2xpY3kgIlVzZXJzIG1hbmFnZSB0aGVpciBvd24gd2VpZ2h0IGVudHJpZXMiIG9uIHB1YmxpYy53ZWlnaHRfZW50cmllcwogIGZvciBhbGwgdG8gYXV0aGVudGljYXRlZCB1c2luZyAoYXV0aC51aWQoKSA9IHVzZXJfaWQpIHdpdGggY2hlY2sgKGF1dGgudWlkKCkgPSB1c2VyX2lkKTsKCmdyYW50IHNlbGVjdCwgaW5zZXJ0LCB1cGRhdGUsIGRlbGV0ZSBvbiBwdWJsaWMuZm9vZF9lbnRyaWVzIHRvIGF1dGhlbnRpY2F0ZWQ7CmdyYW50IHNlbGVjdCwgaW5zZXJ0LCB1cGRhdGUsIGRlbGV0ZSBvbiBwdWJsaWMud2VpZ2h0X2VudHJpZXMgdG8gYXV0aGVudGljYXRlZDsK
+-- Run once in Supabase SQL Editor.
+create extension if not exists pgcrypto;
+
+create table if not exists public.food_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 180),
+  grams numeric(9,2) not null default 0 check (grams >= 0),
+  kcal numeric(9,2) not null default 0 check (kcal >= 0),
+  protein numeric(9,2) not null default 0 check (protein >= 0),
+  fat numeric(9,2) not null default 0 check (fat >= 0),
+  carbs numeric(9,2) not null default 0 check (carbs >= 0),
+  entry_date date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.weight_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  value numeric(7,2) not null check (value > 0 and value < 1000),
+  entry_date date not null default current_date,
+  created_at timestamptz not null default now(),
+  unique (user_id, entry_date)
+);
+
+create index if not exists food_entries_user_date_idx on public.food_entries (user_id, entry_date desc);
+create index if not exists weight_entries_user_date_idx on public.weight_entries (user_id, entry_date desc);
+
+alter table public.food_entries enable row level security;
+alter table public.weight_entries enable row level security;
+
+drop policy if exists "Users manage their own food entries" on public.food_entries;
+create policy "Users manage their own food entries" on public.food_entries
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "Users manage their own weight entries" on public.weight_entries;
+create policy "Users manage their own weight entries" on public.weight_entries
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.food_entries to authenticated;
+grant select, insert, update, delete on public.weight_entries to authenticated;

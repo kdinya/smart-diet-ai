@@ -1,1 +1,6 @@
-LkRTX1N0b3JlCi5lbnYKLmVudi4qCiEuZW52LmV4YW1wbGUKbm9kZV9tb2R1bGVzLwpkaXN0Lwo=
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+dist/

@@ -1,1 +1,9 @@
-Y29uc3QgQ0FDSEU9J3NtYXJ0LWRpZXQtc2hlbGwtdjEnOwpjb25zdCBTSEVMTD1bJy4vJywnLi9pbmRleC5odG1sJywnLi9tYW5pZmVzdC5qc29uJywnLi9pY29uLnN2ZyddOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2luc3RhbGwnLGV2ZW50PT5ldmVudC53YWl0VW50aWwoY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oY2FjaGU9PmNhY2hlLmFkZEFsbChTSEVMTCkpKSk7CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignYWN0aXZhdGUnLGV2ZW50PT5ldmVudC53YWl0VW50aWwoY2FjaGVzLmtleXMoKS50aGVuKGtleXM9PlByb21pc2UuYWxsKGtleXMuZmlsdGVyKGtleT0+a2V5IT09Q0FDSEUpLm1hcChrZXk9PmNhY2hlcy5kZWxldGUoa2V5KSkpKSkpOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2ZldGNoJyxldmVudD0+ewogIGNvbnN0IHVybD1uZXcgVVJMKGV2ZW50LnJlcXVlc3QudXJsKTsKICBpZihldmVudC5yZXF1ZXN0Lm1ldGhvZCE9PSdHRVQnfHx1cmwub3JpZ2luIT09c2VsZi5sb2NhdGlvbi5vcmlnaW4pcmV0dXJuOwogIGV2ZW50LnJlc3BvbmRXaXRoKGNhY2hlcy5tYXRjaChldmVudC5yZXF1ZXN0KS50aGVuKGNhY2hlZD0+Y2FjaGVkfHxmZXRjaChldmVudC5yZXF1ZXN0KS50aGVuKHJlc3BvbnNlPT57aWYocmVzcG9uc2Uub2spe2NvbnN0IGNvcHk9cmVzcG9uc2UuY2xvbmUoKTtjYWNoZXMub3BlbihDQUNIRSkudGhlbihjYWNoZT0+Y2FjaGUucHV0KGV2ZW50LnJlcXVlc3QsY29weSkpfXJldHVybiByZXNwb25zZX0pLmNhdGNoKCgpPT5jYWNoZXMubWF0Y2goJy4vaW5kZXguaHRtbCcpKSkpOwp9KTsK
+const CACHE='smart-diet-shell-v1';
+const SHELL=['./','./index.html','./manifest.json','./icon.svg'];
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL))));
+self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))));
+self.addEventListener('fetch',event=>{
+  const url=new URL(event.request.url);
+  if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
+  event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy))}return response}).catch(()=>caches.match('./index.html'))));
+});
