@@ -25,7 +25,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 - **Daily Overview & Goals**:
   - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
   - **Calorie Goals:** Displays recommended daily intake (based on profile metrics) alongside user-defined targets with quick-edit support.
-  - **Meal Cards:** Breakdown of today's meals with calorie subtotals and item counts.
+  - **Meal Cards:** Breakdown of meals with calories, protein, fat, and carb subtotals and item counts (on the overview and for every day in the diary).
   - **Quick Actions:** Instant access to the AI Dietitian, manual meal entry, full diary, and weight logger.
 
 - **Food Diary**:
@@ -109,7 +109,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 - **Головна панель та цілі**:
   - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / залишилось».
   - **Ціль калорій:** Відображення рекомендованої норми за формулою та встановленої користувачем цілі з можливістю швидкої зміни.
-  - **Прийоми їжі:** Списки страв на сніданок, обід, вечерю та перекус із підсумком калорій.
+  - **Прийоми їжі:** Списки страв на сніданок, обід, вечерю та перекус із підсумком калорій, білків, жирів і вуглеводів (на «Огляді» та в щоденнику за кожен день). ШІ-дієтолог розраховує лише названі користувачем продукти, а пропозиції подає текстом у пораді.
   - **Швидкі дії:** Виклик ШІ-дієтолога, ручне додавання страви, перегляд щоденника та запис ваги.
 
 - **Щоденник харчування**:
