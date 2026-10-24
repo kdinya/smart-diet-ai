@@ -48,7 +48,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 
 - **Storage & Synchronization**:
   - **Local-first:** Complete offline capability using browser `localStorage` (`smartdiet-v1`).
-  - **Backup:** Single-click JSON export of all logged meals, weight data, and goals.
+  - **Backup:** Export all meals, weight data, and goals to a JSON file, then import it on another device. Import replaces the data on the device where it runs. AI keys are not exported.
   - **Cloud Sync:** Optional multi-device synchronization via Supabase Auth (email/password) and PostgreSQL with Row Level Security (RLS).
   - **Privacy:** AI provider API keys are saved exclusively in client-side storage.
   - **Statistics:** Charts and daily totals are calculated from saved food and weight records; statistics are not a separate data store.
@@ -154,7 +154,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 - **Збереження та синхронізація**:
   - **Локальний режим:** Повна автономна робота у сховищі браузера (`localStorage` / `smartdiet-v1`).
-  - **Резервна копія:** Експорт усіх записів і цілей у JSON-файл.
+  - **Резервна копія:** Експорт усіх записів і цілей у JSON-файл та імпорт на іншому пристрої. Імпорт замінює дані на цьому пристрої. API-ключі у файл не потрапляють.
   - **Хмарна синхронізація:** Підключення Supabase (Auth + PostgreSQL з RLS) для збереження даних на кількох пристроях.
   - **Приватність:** Ключі API провайдерів ШІ зберігаються лише на поточному пристрої.
 
