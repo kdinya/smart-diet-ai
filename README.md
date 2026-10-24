@@ -18,7 +18,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
   - Estimates portion weights in grams, calories, and macronutrients (protein, fats, carbs) for raw food inputs (e.g., "cottage cheese, eggs").
   - Dynamically accounts for daily calorie limits, consumed calories, remaining calories, and selected meal categories (Breakfast, Lunch, Dinner, Snack).
   - Offers nutritional recommendations when meals lack balance or key nutrients.
-  - Automatic model fallback (`gemini-3.8-flash` to `gemini-3.1-flash-lite`), timeout handling, and retry button for slow network responses.
+  - Automatic model fallback (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`), timeout handling, and retry button for slow network responses.
   - Direct one-click import of calculated items into the food diary.
 
 - **Daily Overview & Goals**:
@@ -45,6 +45,8 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
   - **Backup:** Single-click JSON export of all logged meals, weight data, and goals.
   - **Cloud Sync:** Optional multi-device synchronization via Supabase Auth (email/password) and PostgreSQL with Row Level Security (RLS).
   - **Privacy:** Gemini/OpenAI API keys are saved exclusively in client-side storage.
+  - **Statistics:** Charts and daily totals are calculated from saved food and weight records; statistics are not a separate data store.
+  - **Data safety:** Clearing browser/site data, using private browsing, losing a browser profile, deleting a Supabase account, or losing an unexported local dataset can remove records. Export a JSON backup before clearing storage or switching accounts.
 
 - **PWA & Mobile Optimization**:
   - Installable Progressive Web App (iOS, Android, Chromium desktop).
@@ -100,7 +102,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
   - Автоматичний розрахунок ваги продуктів у грамах, калорій та БЖВ за простим списком страв (наприклад, «Твердий сир, кава з молоком»).
   - Врахування добової цілі калорій, уже спожитого за день, залишку та вибраного прийому їжі (сніданок, обід, вечеря, перекус).
   - Поради щодо збалансованості раціону, якщо в прийомі бракує білків або інших нутрієнтів.
-  - Швидкий резервний перехід між моделями (`gemini-3.8-flash` → `gemini-3.1-flash-lite`), контроль таймаутів та повторна спроба при затримці відповіді.
+  - Швидкий резервний перехід між моделями (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`), контроль таймаутів та повторна спроба при затримці відповіді.
   - Додавання розрахованих продуктів у щоденник в один клік.
 
 - **Головна панель та цілі**:
@@ -117,6 +119,11 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 - **Історія ваги та статистика**:
   - Внесення показників ваги з фіксацією дати та часу.
   - Графік динаміки ваги та щотижневий розподіл калорій.
+
+- **Зберігання даних і безпека**:
+  - У локальному режимі записи зберігаються в `localStorage` браузера під ключем `smartdiet-v1`; статистика не є окремою копією, а щоразу обчислюється з журналу їжі та історії ваги.
+  - Очищення даних сайту/браузера, приватний режим, втрата профілю браузера або видалення акаунта Supabase можуть видалити записи. Перед очищенням сховища чи зміною акаунта експортуй JSON-резервну копію.
+  - Після підключення Supabase харчові записи та вага зберігаються в PostgreSQL у таблицях `food_entries` і `weight_entries`; RLS обмежує доступ рядками поточного користувача.
 
 - **Профіль та безпечний план**:
   - Стартове вікно при першому запуску з миттєвим вибором мови (українська / English) та можливістю закриття.
