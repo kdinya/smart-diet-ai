@@ -754,6 +754,14 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#weight-value')).toHaveValue('80.4');
   });
 
+  test('dietitian chat picks the meal by time of day', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const meals = await page.evaluate(() => [8, 12, 15, 16, 21].map((h) => autoMeal(h)));
+    expect(meals).toEqual(['breakfast', 'lunch', 'lunch', 'dinner', 'dinner']);
+    await page.click('#chat-fab');
+    await expect(page.locator('#chat-meal')).toHaveValue(await page.evaluate(() => autoMeal()));
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
