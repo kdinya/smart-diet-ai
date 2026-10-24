@@ -364,3 +364,126 @@ test.describe('Smoke: account switching', () => {
     expect(backend.tables.food_entries.filter((row) => row.user_id === 'user-alice')).toHaveLength(1);
   });
 });
+
+const OLD_FOOD = {
+  id: 'old-food',
+  name: 'Old local entry',
+  meal: 'dinner',
+  grams: 100,
+  kcal: 500,
+  protein: 20,
+  fat: 10,
+  carbs: 40,
+  date: '2026-10-20',
+  createdAt: 1,
+};
+
+const IMPORT_BACKUP = {
+  app: 'smart-diet-ai',
+  version: 1,
+  exportedAt: '2026-10-24T10:00:00.000Z',
+  foods: [
+    { id: 'import-food-1', name: 'Imported oatmeal', meal: 'breakfast', grams: 200, kcal: 300, protein: 10, fat: 5, carbs: 50, date: '2026-10-24', createdAt: 1 },
+    { id: 'import-food-2', name: 'Imported soup', meal: 'lunch', grams: 300, kcal: 250, protein: 12, fat: 8, carbs: 30, date: '2026-10-23', createdAt: 2 },
+  ],
+  weights: [{ id: 'import-weight-1', value: 80.2, date: '2026-10-24' }],
+  prefs: {
+    ...BASE_PREFS,
+    name: 'Imported',
+    kcal: 1800,
+    protein: 120,
+    carbs: 200,
+    fat: 60,
+    birthDate: '1990-05-01',
+    sex: 'male',
+    height: 180,
+    currentWeight: 80.2,
+    targetWeight: 75,
+    activity: 'light',
+    pace: 0.5,
+  },
+};
+
+function backupFile(content) {
+  return {
+    name: 'smart-diet-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)),
+  };
+}
+
+test.describe('Smoke: backup import', () => {
+  test('confirmed import replaces local data and keeps it after reload', async ({ page }) => {
+    const dialogs = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      dialog.accept();
+    });
+
+    await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [{ id: 'old-weight', value: 90, date: '2026-10-20' }] });
+    await openView(page, 'settings');
+
+    await page.setInputFiles('#import-file', backupFile(IMPORT_BACKUP));
+
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0]).toContain('Replace the data on this device');
+    await expect(page.locator('#toast')).toHaveText('Imported 2 entries and 1 weigh-ins.');
+
+    const imported = await readStore(page);
+    expect(imported.foods.map((food) => food.name).sort()).toEqual(['Imported oatmeal', 'Imported soup']);
+    expect(imported.weights.map((weight) => [weight.date, weight.value])).toEqual([['2026-10-24', 80.2]]);
+    expect(imported.prefs.kcal).toBe(1800);
+    expect(imported.prefs.name).toBe('Imported');
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    const reloaded = await readStore(page);
+    expect(reloaded.foods.map((food) => food.name)).not.toContain('Old local entry');
+    expect(reloaded.foods).toHaveLength(2);
+
+    await openView(page, 'settings');
+    await expect(page.locator('#pref-kcal')).toHaveValue('1800');
+  });
+
+  test('declining the confirmation keeps the current local data', async ({ page }) => {
+    const dialogs = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      dialog.dismiss();
+    });
+
+    await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [] });
+    await openView(page, 'settings');
+
+    await page.setInputFiles('#import-file', backupFile(IMPORT_BACKUP));
+
+    await expect.poll(() => dialogs.length).toBe(1);
+    const stored = await readStore(page);
+    expect(stored.foods.map((food) => food.name)).toEqual(['Old local entry']);
+    expect(stored.prefs.kcal).toBe(2000);
+  });
+
+  test('a file that is not a backup is rejected without changing data', async ({ page }) => {
+    const dialogs = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      dialog.accept();
+    });
+
+    await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [] });
+    await openView(page, 'settings');
+
+    await page.setInputFiles('#import-file', backupFile({ hello: 'world' }));
+    await expect(page.locator('#toast')).toHaveText('This file is not a Smart Diet AI backup.');
+    expect(dialogs).toHaveLength(0);
+    expect((await readStore(page)).foods.map((food) => food.name)).toEqual(['Old local entry']);
+
+    await page.setInputFiles('#import-file', backupFile('{"foods": [ broken'));
+    await expect(page.locator('#toast')).toHaveText('This file is not a Smart Diet AI backup.');
+    expect(dialogs).toHaveLength(0);
+
+    const stored = await readStore(page);
+    expect(stored.foods.map((food) => food.name)).toEqual(['Old local entry']);
+    expect(stored.prefs.kcal).toBe(2000);
+  });
+});
