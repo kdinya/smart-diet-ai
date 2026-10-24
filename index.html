@@ -108,6 +108,8 @@ function openModal(kind,meal,foodToEdit=null){
     editingFoodId=null;
     $('#modal-title').textContent=t('weightTitle');
     $('#weight-date-input').value=iso();
+    let lw=[...state.weights].sort((a,b)=>b.date.localeCompare(a.date))[0],lv=lw?+lw.value:+state.prefs.currentWeight||0;
+    $('#weight-value').value=lv>0?lv.toFixed(1):'';
   }
 }
 function addBubble(text,who){let d=document.createElement('div');d.className='bubble '+who;d.textContent=text;$('#chatbox').appendChild(d);$('#chatbox').scrollTop=$('#chatbox').scrollHeight;return d}

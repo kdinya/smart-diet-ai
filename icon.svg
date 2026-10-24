@@ -1,9 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Healthy meal">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Apple with a measuring tape and an AI sparkle">
+  <defs>
+    <clipPath id="apple"><path d="M64 50C56 40 32 40 30 66C28 86 42 106 54 106C60 106 61 103 64 103C67 103 68 106 74 106C86 106 100 86 98 66C96 40 72 40 64 50Z"/></clipPath>
+  </defs>
   <rect width="128" height="128" rx="34" fill="#28754f"/>
-  <path d="M24 61c2 24 18 39 40 39s38-15 40-39H24Z" fill="#fffdf5"/>
-  <path d="M20 59h88c0 4-3 7-7 7H27c-4 0-7-3-7-7Z" fill="#d9ed8e"/>
-  <path d="M48 57c-8-14-4-28 11-35 4 13 1 25-11 35Z" fill="#b6d86b"/>
-  <path d="M61 57c1-18 11-28 27-30 0 16-9 27-27 30Z" fill="#e7f1dc"/>
-  <path d="M73 57c-4-11 0-20 11-25 3 11 0 20-11 25Z" fill="#f2a65a"/>
-  <path d="M37 75c8 7 17 10 27 10s19-3 27-10" fill="none" stroke="#28754f" stroke-linecap="round" stroke-width="4" opacity=".55"/>
+  <path d="M64 50C56 40 32 40 30 66C28 86 42 106 54 106C60 106 61 103 64 103C67 103 68 106 74 106C86 106 100 86 98 66C96 40 72 40 64 50Z" fill="#ef6f5b"/>
+  <g clip-path="url(#apple)">
+    <g transform="rotate(-14 64 80)">
+      <rect x="10" y="72" width="108" height="17" fill="#fffdf5"/>
+      <path d="M18 72v6M26 72v9M34 72v6M42 72v9M50 72v6M58 72v9M66 72v6M74 72v9M82 72v6M90 72v9M98 72v6M106 72v9" stroke="#28754f" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </g>
+  <path d="M64 50C64 42 65 36 69 31" fill="none" stroke="#fffdf5" stroke-width="4" stroke-linecap="round"/>
+  <path d="M61 38C55 26 43 26 39 30C43 42 55 44 61 38Z" fill="#d9ed8e"/>
+  <path d="M97 14L101 26L113 30L101 34L97 46L93 34L81 30L93 26Z" fill="#d9ed8e"/>
 </svg>

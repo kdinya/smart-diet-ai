@@ -741,6 +741,19 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect.poll(async () => (await readStore(page)).ai.order[0]).toBe('groq');
   });
 
+  test('weight form starts from the latest recorded weight', async ({ page }) => {
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [],
+      weights: [
+        { id: '44444444-4444-4444-8444-444444444444', value: 82.3, date: '2026-10-01' },
+        { id: '55555555-5555-4555-8555-555555555555', value: 80.4, date: '2026-10-20' },
+      ],
+    });
+    await page.evaluate(() => openModal('weight'));
+    await expect(page.locator('#weight-value')).toHaveValue('80.4');
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
