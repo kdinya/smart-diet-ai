@@ -762,6 +762,31 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#chat-meal')).toHaveValue(await page.evaluate(() => autoMeal()));
   });
 
+  test('dietitian input grows up to five lines and then scrolls', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.click('#chat-fab');
+    const input = page.locator('#chat-input');
+    const one = (await input.boundingBox()).height;
+    await input.fill('1\n2\n3');
+    const three = (await input.boundingBox()).height;
+    expect(three).toBeGreaterThan(one);
+    await input.fill('1\n2\n3\n4\n5\n6\n7\n8');
+    const many = (await input.boundingBox()).height;
+    expect(many).toBeLessThanOrEqual(133);
+    expect(await input.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await expect(page.locator('#chat-send')).toHaveText('');
+  });
+
+  test('overview shows the profile weight until a weight is logged, then the latest one', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, currentWeight: 77 }, foods: [], weights: [] });
+    await expect(page.locator('#home-weight')).toHaveText('77.0');
+    await page.evaluate(() => {
+      state.weights.push({ id: '66666666-6666-4666-8666-666666666666', value: 75.2, date: iso() });
+      save();
+    });
+    await expect(page.locator('#home-weight')).toHaveText('75.2');
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
