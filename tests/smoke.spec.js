@@ -724,6 +724,23 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#chat-panel .dd')).not.toHaveClass(/open/);
   });
 
+  test('diary info popup explains the colors', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await page.click('#diary-summary [data-day-info]');
+    await expect(page.locator('#info-modal')).toHaveClass(/open/);
+    await expect(page.locator('#info-body .info-row')).toHaveCount(4);
+    await page.click('#info-close');
+    await expect(page.locator('#info-modal')).not.toHaveClass(/open/);
+  });
+
+  test('AI provider order is saved as soon as it is changed', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    for (let i = 0; i < 3; i++) await page.click('.ai-row[data-prov="groq"] [data-ai-move="-1"]');
+    await expect.poll(async () => (await readStore(page)).ai.order[0]).toBe('groq');
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
