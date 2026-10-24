@@ -1,12 +1,20 @@
 {
   "name": "Smart Diet AI",
   "short_name": "Smart Diet",
-  "description": "ШІ-дієтолог, щоденник харчування та статистика",
-  "lang": "uk",
-  "start_url": ".",
-  "scope": ".",
+  "description": "AI dietitian, meal diary and progress tracking",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f6f7f2",
   "theme_color": "#f6f7f2",
-  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
