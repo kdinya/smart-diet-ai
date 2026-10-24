@@ -674,7 +674,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(boxes[0].left).toBe(boxes[2].left);
   });
 
-  test('diary shows eaten against the daily target, red above and green at or below', async ({ page }) => {
+  test('diary shows eaten against the daily target, green in range and red well above', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     const food = (id, kcal) => ({ id, name: `Item ${id}`, meal: 'lunch', grams: 100, kcal, protein: 10, fat: 70, carbs: 300, date: today, createdAt: Date.now() });
     await openApp(page, {
@@ -695,6 +695,33 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(totals.nth(3)).toHaveClass(/over/);
     const colors = await totals.evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
     expect(colors[0]).not.toBe(colors[1]);
+  });
+
+  test('diary colors tell apart below, within and above the daily target', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, kcal: 2000, protein: 100, fat: 70, carbs: 242 },
+      foods: [{ id: '33333333-3333-4333-8333-333333333333', name: 'Mixed', meal: 'lunch', grams: 100, kcal: 1500, protein: 100, fat: 90, carbs: 300, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const totals = page.locator('#diary-summary .day-total');
+    await expect(totals.nth(0)).toHaveClass(/under/);
+    await expect(totals.nth(1)).toHaveClass(/ok/);
+    await expect(totals.nth(2)).toHaveClass(/over/);
+    await expect(totals.nth(3)).toHaveClass(/high/);
+    const colors = await totals.evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
+    expect(new Set(colors).size).toBe(4);
+  });
+
+  test('meal is picked from a styled dropdown in the dietitian chat', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.click('#chat-fab');
+    await page.click('#chat-panel .dd-btn');
+    await expect(page.locator('#chat-panel .dd')).toHaveClass(/open/);
+    await page.click('#chat-panel .dd-opt[data-value="snack"]');
+    await expect(page.locator('#chat-meal')).toHaveValue('snack');
+    await expect(page.locator('#chat-panel .dd')).not.toHaveClass(/open/);
   });
 
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
