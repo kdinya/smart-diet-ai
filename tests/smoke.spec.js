@@ -362,6 +362,48 @@ test.describe('Smoke: food deletion', () => {
     await expect.poll(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-sync-queue') || '{}'))).foods).toEqual([]);
   });
 
+  test('goals saved on one device are loaded on a fresh device after sign-in', async ({ page, browser }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    await page.fill('#pref-kcal', '1800');
+    await page.click('#save-prefs');
+    await expect.poll(() => backend.tables.user_profiles.map((row) => row.data.kcal)).toEqual([1800]);
+
+    const other = await browser.newContext({ serviceWorkers: 'block' });
+    const second = await other.newPage();
+    await mockSupabase(second, backend);
+    await openApp(second, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await connectSupabase(second);
+    await signIn(second, 'alice@example.test');
+    await expect.poll(async () => (await readStore(second)).prefs.kcal).toBe(1800);
+    expect(backend.tables.user_profiles[0].data.kcal).toBe(1800);
+    await other.close();
+  });
+
+  test('a new device that was touched before sign-in does not overwrite the saved profile', async ({ page, browser }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    await page.fill('#pref-kcal', '1800');
+    await page.click('#save-prefs');
+    await expect.poll(() => backend.tables.user_profiles.map((row) => row.data.kcal)).toEqual([1800]);
+
+    const other = await browser.newContext({ serviceWorkers: 'block' });
+    const second = await other.newPage();
+    await mockSupabase(second, backend);
+    await openApp(second, { prefs: { ...BASE_PREFS, updatedAt: new Date(Date.now() + 60000).toISOString() }, foods: [], weights: [] });
+    await connectSupabase(second);
+    await signIn(second, 'alice@example.test');
+    await expect.poll(async () => (await readStore(second)).prefs.kcal).toBe(1800);
+    expect(backend.tables.user_profiles[0].data.kcal).toBe(1800);
+    await other.close();
+  });
+
   test('a failed cloud delete keeps the entry and reports the error', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
