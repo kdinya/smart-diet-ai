@@ -75,6 +75,7 @@ function createBackend() {
   return {
     tables: { food_entries: [], weight_entries: [], user_profiles: [] },
     failDeletes: false,
+    failProfiles: false,
   };
 }
 
@@ -134,6 +135,9 @@ async function handleRest(route, req, url, backend, json) {
   const rows = backend.tables[table];
   const uid = userIdFromRequest(req);
   if (!rows) return json(404, { message: `Unknown table ${table}` });
+  if (table === 'user_profiles' && backend.failProfiles) {
+    return json(404, { code: 'PGRST205', message: "Could not find the table 'public.user_profiles' in the schema cache" });
+  }
   if (!uid) return json(401, { message: 'JWT required' });
 
   const params = [...url.searchParams.entries()];
@@ -333,6 +337,29 @@ test.describe('Smoke: food deletion', () => {
     await page.click('#weight-save');
     await expect.poll(() => backend.tables.weight_entries.map((row) => Number(row.value))).toEqual([71.2]);
     expect(backend.tables.weight_entries).toHaveLength(1);
+  });
+
+  test('entries and weigh-ins still reach the cloud when the profile cannot be saved', async ({ page }) => {
+    const backend = createBackend();
+    backend.failProfiles = true;
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+
+    await page.fill('#pref-kcal', '1800');
+    await page.click('#save-prefs');
+    await expect.poll(async () => (await readStore(page)).prefs.kcal).toBe(1800);
+
+    await openView(page, 'diary');
+    await addFood(page, 'Buckwheat');
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '70.4');
+    await page.click('#weight-save');
+
+    await expect.poll(() => backend.tables.food_entries.map((row) => row.name)).toEqual(['Buckwheat']);
+    await expect.poll(() => backend.tables.weight_entries.map((row) => Number(row.value))).toEqual([70.4]);
+    await expect.poll(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-sync-queue') || '{}'))).foods).toEqual([]);
   });
 
   test('a failed cloud delete keeps the entry and reports the error', async ({ page }) => {

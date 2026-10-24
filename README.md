@@ -91,7 +91,7 @@ Because Smart Diet AI is built as a single-file client application, no build too
 
 ### Browser Smoke Tests (optional)
 
-Playwright checks the main flows in Chromium: saving goals, deleting entries (local and synced), switching accounts, and importing backups (confirmation, declining, and invalid files). Supabase is mocked, so no project or keys are needed.
+Playwright checks the main flows in Chromium: saving goals, deleting entries (local and synced), uploading entries when the profile cannot be saved, switching accounts, and importing backups (confirmation, declining, and invalid files). Supabase is mocked, so no project or keys are needed.
 
 ```bash
 npm install
@@ -196,7 +196,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 ### Браузерні смоук-тести (необов’язково)
 
-Playwright перевіряє основні сценарії в Chromium: збереження цілей, видалення записів (локальних і синхронізованих), перемикання акаунтів та імпорт резервних копій (підтвердження, відмова й некоректні файли). Supabase замінено моком, тож проєкт і ключі не потрібні.
+Playwright перевіряє основні сценарії в Chromium: збереження цілей, видалення записів (локальних і синхронізованих), вивантаження записів, коли профіль не вдалося зберегти, перемикання акаунтів та імпорт резервних копій (підтвердження, відмова й некоректні файли). Supabase замінено моком, тож проєкт і ключі не потрібні.
 
 ```bash
 npm install
