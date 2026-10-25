@@ -55,6 +55,11 @@ create table if not exists public.user_profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Cap the synced profile document; NOT VALID keeps existing rows untouched and checks every new write.
+alter table public.user_profiles drop constraint if exists user_profiles_data_size_check;
+alter table public.user_profiles add constraint user_profiles_data_size_check
+  check (octet_length(data::text) <= 16384) not valid;
+
 alter table public.user_profiles enable row level security;
 
 drop policy if exists "Users manage their own profile" on public.user_profiles;
@@ -258,6 +263,10 @@ declare
   pending_count integer;
 begin
   perform pg_advisory_xact_lock(hashtextextended(new.from_user::text || ':' || new.to_user::text, 0));
+  -- Shares nobody answered within 30 days expire, so an idle recipient cannot block the sender forever.
+  delete from public.product_shares
+    where from_user = new.from_user and to_user = new.to_user
+      and created_at < now() - interval '30 days';
   select count(*) into pending_count from public.product_shares
     where from_user = new.from_user and to_user = new.to_user;
   if pending_count >= 20 then
@@ -299,7 +308,7 @@ create policy "Participants delete friendship" on public.friendships for delete 
 
 drop policy if exists "Participants read product shares" on public.product_shares;
 create policy "Participants read product shares" on public.product_shares for select to authenticated
-  using (from_user = auth.uid() or to_user = auth.uid());
+  using ((from_user = auth.uid() or to_user = auth.uid()) and created_at > now() - interval '30 days');
 drop policy if exists "Friends share products" on public.product_shares;
 create policy "Friends share products" on public.product_shares for insert to authenticated
   with check (from_user = auth.uid() and exists (
@@ -311,6 +320,9 @@ create policy "Friends share products" on public.product_shares for insert to au
 drop policy if exists "Recipients delete product shares" on public.product_shares;
 create policy "Recipients delete product shares" on public.product_shares for delete to authenticated
   using (to_user = auth.uid());
+drop policy if exists "Senders recall product shares" on public.product_shares;
+create policy "Senders recall product shares" on public.product_shares for delete to authenticated
+  using (from_user = auth.uid());
 
 revoke all on public.profiles, public.friendships, public.product_shares from public, anon, authenticated;
 grant select, update (display_name) on public.profiles to authenticated;

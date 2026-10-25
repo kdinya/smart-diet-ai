@@ -23,7 +23,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
   - Direct one-click import of calculated items into the food diary.
 
 - **Daily Overview & Goals**:
-  - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
+  - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing eaten / daily target with the remaining amount in smaller text below.
   - **Meal Cards:** Breakdown of meals with calories, protein, fat, and carb subtotals and item counts (on the overview and for every day in the diary).
   - **Portions:** A saved product defines one portion. When adding it to the diary (and when editing an entry), choose the number of portions from a dropdown (0.25 – 5) or type the amount in grams; the other value and the nutrients update automatically. Entries show the portion count when it differs from one.
   - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is 1.8 g per kg of reference weight (target weight × 1.15 when losing, never above current weight), capped at 2.2 g per kg of current weight. Changing date of birth, sex, height, weight, activity, or pace recalculates the target automatically once a plan exists. A target weight with BMI below 18.5 is rejected.
@@ -69,9 +69,11 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 ├── manifest.json       # PWA metadata and icons configuration
 ├── sw.js               # Service Worker caching logic
 ├── icon.svg            # Application vector icon
+├── icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png  # PNG icons for installing on Android and iOS
 ├── package.json        # Dev dependency for browser smoke tests
 ├── playwright.config.js
 ├── tests/              # Browser smoke tests
+├── .github/workflows/ci.yml  # Runs the smoke tests on every push and pull request
 ├── supabase/
 │   └── schema.sql      # Supabase database tables and RLS policies
 ├── AGENTS.md           # Guidelines for AI agents
@@ -92,7 +94,7 @@ Because Smart Diet AI is built as a single-file client application, no build too
 
 ### Browser Smoke Tests (optional)
 
-Playwright checks the main flows in Chromium: saving goals, deleting entries (local and synced), uploading entries when the profile cannot be saved, switching accounts, and importing backups (confirmation, declining, and invalid files). Supabase is mocked, so no project or keys are needed.
+Playwright checks the main flows in Chromium: saving goals, deleting entries (local and synced), uploading entries when the profile cannot be saved, switching accounts, importing backups (confirmation, declining, and invalid files), friends and product sharing (requests, inbox, recall, limits), and the AI provider fallback. Supabase is mocked, so no project or keys are needed.
 
 ```bash
 npm install
@@ -107,7 +109,7 @@ npm run test:smoke
   1. The app is already connected to the shared Supabase project. Users only register or log in under **Settings → Account & cloud sync**; no SQL or keys are needed.
   2. To run your own copy: create a Supabase project, run `supabase/schema.sql` once in the SQL Editor, then set `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top of the script in `index.html`. Never put a `service_role` key in the app.
   3. Email confirmation links use the site address. In Supabase, set **Authentication → URL Configuration → Site URL** to your deployed address (for example `https://smart-diet-ai-psi.vercel.app`) and add `<your address>/**` to **Redirect URLs**. Otherwise links point to `localhost`.
-  4. After updating from an older version, run `supabase/schema.sql` again in the SQL Editor (it is safe to repeat). Friends and product sharing use cloud-only `profiles`, `friendships`, and `product_shares` tables protected by RLS; no shared product is copied into local storage until its recipient accepts it. The Snack meal category needs the updated constraint and My products sync needs the `products` table.
+  4. After updating from an older version, run `supabase/schema.sql` again in the SQL Editor (it is safe to repeat). Friends and product sharing use cloud-only `profiles`, `friendships`, and `product_shares` tables protected by RLS; no shared product is copied into local storage until its recipient accepts it. The sender can recall an unanswered product in Settings → Friends → Sent products, and shares nobody answers expire after 30 days, so an idle recipient never blocks the 20-product limit for good. The Snack meal category needs the updated constraint and My products sync needs the `products` table.
 
 ---
 
@@ -127,7 +129,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
   - Додавання розрахованих продуктів у щоденник в один клік.
 
 - **Головна панель та цілі**:
-  - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / залишилось».
+  - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / норма за добу» і меншим рядком із залишком нижче.
   - **Порції:** Збережений продукт задає одну порцію. Під час додавання в щоденник (і при редагуванні запису) кількість порцій обирається зі списку (0,25 – 5) або вводиться вага в грамах; друге значення й нутрієнти перераховуються автоматично. У записах показується кількість порцій, якщо вона відрізняється від одиниці.
   - **План за темпом:** Добова ціль калорій розраховується за обраним темпом (0,25 / 0,5 / 0,75 кг на тиждень) з обмеженням безпечного дефіциту (до 25% від підтримки, не нижче мінімуму калорій); білок рахується як 1,8 г на кг опорної ваги (цільова × 1,15 під час схуднення, але не вище поточної), не більше 2,2 г на кг поточної ваги. Зміна віку, статі, зросту, ваги, активності чи темпу автоматично перераховує ціль, якщо план уже створено. Цільова вага з ІМТ нижче 18,5 відхиляється.
   - **Перевірка ваги тіла (Статистика):** Півколо ІМТ (недостатня / нормальна / надмірна вага / ожиріння) за останньою внесеною вагою, зростом, віком і статтю, зі здоровим діапазоном ваги, рекомендованою вагою та різницею в кілограмах.
@@ -176,9 +178,11 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 ├── manifest.json       # Маніфест PWA та метадані
 ├── sw.js               # Service Worker для офлайн-роботи
 ├── icon.svg            # Векторна іконка застосунку
+├── icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png  # PNG-іконки для встановлення на Android і iOS
 ├── package.json        # Dev-залежність для браузерних смоук-тестів
 ├── playwright.config.js
 ├── tests/              # Браузерні смоук-тести
+├── .github/workflows/ci.yml  # Запускає смоук-тести на кожен push і pull request
 ├── supabase/
 │   └── schema.sql      # Таблиці бази даних та політики RLS
 ├── AGENTS.md           # Інструкції для AI-асистентів
@@ -199,7 +203,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 ### Браузерні смоук-тести (необов’язково)
 
-Playwright перевіряє основні сценарії в Chromium: збереження цілей, видалення записів (локальних і синхронізованих), вивантаження записів, коли профіль не вдалося зберегти, перемикання акаунтів та імпорт резервних копій (підтвердження, відмова й некоректні файли). Supabase замінено моком, тож проєкт і ключі не потрібні.
+Playwright перевіряє основні сценарії в Chromium: збереження цілей, видалення записів (локальних і синхронізованих), вивантаження записів, коли профіль не вдалося зберегти, перемикання акаунтів, імпорт резервних копій (підтвердження, відмова й некоректні файли), друзі та обмін продуктами (запити, вхідні, відкликання, ліміти) і перемикання ШІ-провайдерів. Supabase замінено моком, тож проєкт і ключі не потрібні.
 
 ```bash
 npm install
@@ -214,7 +218,7 @@ npm run test:smoke
   1. Застосунок уже підключений до спільного проєкту Supabase. Користувачам достатньо зареєструватися або увійти в **Налаштування → Акаунт та синхронізація**; SQL і ключі не потрібні.
   2. Для власної копії: створіть проєкт на [supabase.com](https://supabase.com), один раз застосуйте `supabase/schema.sql` у SQL Editor, потім вкажіть `SUPABASE_URL` і `SUPABASE_ANON_KEY` на початку скрипта в `index.html`. Ключ `service_role` у застосунку не використовуйте.
   3. Посилання для підтвердження пошти ведуть на адресу сайту. У Supabase встановіть **Authentication → URL Configuration → Site URL** на адресу вашого застосунку (наприклад, `https://smart-diet-ai-psi.vercel.app`) і додайте `<адреса>/**` у **Redirect URLs**. Інакше посилання вестимуть на `localhost`.
-  4. Після оновлення зі старої версії ще раз виконайте `supabase/schema.sql` у SQL Editor (це безпечно). Друзі та обмін продуктами використовують хмарні таблиці `profiles`, `friendships` і `product_shares` із RLS; надісланий продукт не копіюється в localStorage, доки отримувач його не прийме. Для категорії «Перекус» потрібне оновлене обмеження, а для синхронізації «Моїх продуктів» — таблиця `products`.
+  4. Після оновлення зі старої версії ще раз виконайте `supabase/schema.sql` у SQL Editor (це безпечно). Друзі та обмін продуктами використовують хмарні таблиці `profiles`, `friendships` і `product_shares` із RLS; надісланий продукт не копіюється в localStorage, доки отримувач його не прийме. Відправник може відкликати продукт без відповіді в Налаштування → Друзі → Надіслані продукти, а продукти, на які ніхто не відповів, зникають через 30 днів, тому неактивний отримувач не блокує ліміт у 20 продуктів назавжди. Для категорії «Перекус» потрібне оновлене обмеження, а для синхронізації «Моїх продуктів» — таблиця `products`.
 
 ## Ліцензія
 
