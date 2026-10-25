@@ -14,7 +14,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 
 ### Features
 
-- **AI Dietitian (Gemini, OpenAI, Claude & Groq)**:
+- **AI Dietitian (Gemini, OpenAI, Claude, Groq & xAI Grok)**:
   - Estimates portion weights in grams, calories, and macronutrients (protein, fats, carbs) for raw food inputs (e.g., "cottage cheese, eggs").
   - Dynamically accounts for daily calorie limits, consumed calories, remaining calories, and selected meal categories (Breakfast, Lunch, Dinner, Snack).
   - Offers nutritional recommendations when meals lack balance or key nutrients.
@@ -101,7 +101,7 @@ npm run test:smoke
 
 ### Configuration
 
-- **AI Provider:** In **Settings → AI provider**, enter API keys for Google Gemini, OpenAI, Anthropic Claude, or Groq and arrange them in priority order with the arrows. Keys remain in your local browser storage.
+- **AI Provider:** In **Settings → AI provider**, enter API keys for Google Gemini, OpenAI, Anthropic Claude, Groq, or xAI Grok and arrange them in priority order with the arrows. Keys remain in your local browser storage.
 - **Supabase Cloud Sync (Optional):**
   1. The app is already connected to the shared Supabase project. Users only register or log in under **Settings → Account & cloud sync**; no SQL or keys are needed.
   2. To run your own copy: create a Supabase project, run `supabase/schema.sql` once in the SQL Editor, then set `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top of the script in `index.html`. Never put a `service_role` key in the app.
@@ -118,7 +118,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 ### Можливості
 
-- **ШІ-дієтолог (Gemini, OpenAI, Claude та Groq)**:
+- **ШІ-дієтолог (Gemini, OpenAI, Claude, Groq та xAI Grok)**:
   - Автоматичний розрахунок ваги продуктів у грамах, калорій та БЖВ за простим списком страв (наприклад, «Твердий сир, кава з молоком»).
   - Врахування добової цілі калорій, уже спожитого за день, залишку та вибраного прийому їжі (сніданок, обід, вечеря, перекус).
   - Поради щодо збалансованості раціону, якщо в прийомі бракує білків або інших нутрієнтів.
@@ -207,7 +207,7 @@ npm run test:smoke
 
 ### Налаштування
 
-- **AI-провайдер:** У **Налаштування → AI-провайдер** вкажіть API-ключі для Google Gemini, OpenAI, Anthropic Claude або Groq і стрілками задайте порядок пріоритету. Якщо провайдер недоступний або ліміти вичерпано, автоматично використовується наступний.
+- **AI-провайдер:** У **Налаштування → AI-провайдер** вкажіть API-ключі для Google Gemini, OpenAI, Anthropic Claude, Groq або xAI Grok і стрілками задайте порядок пріоритету. Якщо провайдер недоступний або ліміти вичерпано, автоматично використовується наступний.
 - **Хмарна синхронізація (Supabase):**
   1. Застосунок уже підключений до спільного проєкту Supabase. Користувачам достатньо зареєструватися або увійти в **Налаштування → Акаунт та синхронізація**; SQL і ключі не потрібні.
   2. Для власної копії: створіть проєкт на [supabase.com](https://supabase.com), один раз застосуйте `supabase/schema.sql` у SQL Editor, потім вкажіть `SUPABASE_URL` і `SUPABASE_ANON_KEY` на початку скрипта в `index.html`. Ключ `service_role` у застосунку не використовуйте.
