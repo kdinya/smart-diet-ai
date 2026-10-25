@@ -44,8 +44,9 @@
    - The browser's own install prompt (`beforeinstallprompt`) is the only exception, because the browser controls it.
 7. **Report Defects Found During Any Edit:**
    - If an agent notices a bug, risk, or inconsistency in the application while working on any edit, it must report it to the repository owner in its reply, even when the issue is outside the current task.
-8. **Language of This File:**
-   - This instruction file and all repository documentation must be written in English.
+8. **Language of This File & Documentation:**
+   - This instruction file must be written in English.
+   - All repository documentation must be provided in two languages: English (`README.md`) and Ukrainian (`README.uk.md`). Both versions must describe the same features and be kept in sync.
 
 ---
 
@@ -58,7 +59,7 @@
      - `manifest.json`: Web app manifest (PWA metadata, icons, theme color).
      - `sw.js`: Service worker caching logic.
      - `supabase/schema.sql`: Database tables, indexes, and Row Level Security policies.
-     - `README.md`: Setup guide and operational instructions.
+     - `README.md` (English) and `README.uk.md` (Ukrainian): user-facing description of the app with screenshots in `docs/screenshots/`. Keep both files in sync.
 
 2. **Full Localization Coverage (`I` Dictionary):**
    - The application strictly supports bilingual interface: Ukrainian (`uk`) and English (`en`).

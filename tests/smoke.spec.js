@@ -1616,7 +1616,134 @@ test.describe('Smoke: calendar', () => {
     await page.click('#diary-date');
     await expect(page.locator('#cal-modal')).toHaveClass(/open/);
     await expect(page.locator(`[data-cal-date="${today}"]`)).toHaveClass(/has-entries/);
-    await page.locator('#cal-close').click();
+    await page.locator('#cal-done').click();
     await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+  });
+});
+
+test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', () => {
+  test('calendar keeps the chosen day until Done, and Cancel discards it', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    const before = await page.locator('#diary-date').inputValue();
+    await page.click('#diary-date');
+    const first = await page.locator('.cal-day:not(.today)').first().getAttribute('data-cal-date');
+    await page.locator(`[data-cal-date="${first}"]`).click();
+    await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+    await expect(page.locator('#diary-date')).toHaveValue(before);
+    await page.click('#cal-done');
+    await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#diary-date')).toHaveValue(first);
+
+    await page.click('#diary-date');
+    const second = await page.locator(`.cal-day:not(.today):not([data-cal-date="${first}"])`).first().getAttribute('data-cal-date');
+    await page.locator(`[data-cal-date="${second}"]`).click();
+    await page.click('#cal-cancel');
+    await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#diary-date')).toHaveValue(first);
+  });
+
+  test('overview expands only the meal where food was added last, and survives reload', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [
+        { id: '11111111-1111-4111-8111-111111111111', name: 'Oats', meal: 'breakfast', grams: 80, kcal: 300, protein: 10, fat: 5, carbs: 50, date: today, createdAt: 1000 },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'Soup', meal: 'lunch', grams: 300, kcal: 200, protein: 8, fat: 6, carbs: 25, date: today, createdAt: 2000 },
+      ],
+      weights: [],
+    });
+    const card = (meal) => page.locator(`#home-meals .meal-card[data-meal-key="home|${today}|${meal}"]`);
+    await expect(card('lunch')).not.toHaveClass(/collapsed/);
+    await expect(card('breakfast')).toHaveClass(/collapsed/);
+
+    await page.evaluate((date) => {
+      state.foods = state.foods.filter((f) => !(f.meal === 'lunch' && f.date === date));
+      save();
+    }, today);
+    await expect(card('breakfast')).not.toHaveClass(/collapsed/);
+    await expect(card('lunch')).toHaveClass(/collapsed/);
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await expect(card('breakfast')).not.toHaveClass(/collapsed/);
+    await expect(card('lunch')).toHaveClass(/collapsed/);
+  });
+
+  test('meal and whole-day analysis send only today’s entries and show the answer', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      ...AI_STORE(['groq']),
+      foods: [
+        { id: '33333333-3333-4333-8333-333333333333', name: 'Rice bowl', meal: 'lunch', grams: 250, kcal: 420, protein: 12, fat: 8, carbs: 70, date: today, createdAt: 3000 },
+        { id: '44444444-4444-4444-8444-444444444444', name: 'Old tea', meal: 'lunch', grams: 200, kcal: 5, protein: 0, fat: 0, carbs: 1, date: '2020-01-01', createdAt: 1 },
+      ],
+    });
+    let body = '';
+    await page.route('https://api.groq.com/**', (route) => {
+      body = route.request().postData() || '';
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Balanced lunch. Add vegetables.' } }] }) });
+    });
+
+    await page.click('[data-analyze="lunch"]');
+    await expect(page.locator('#analysis-modal')).toHaveClass(/open/);
+    await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
+    expect(body).toContain('Rice bowl');
+    expect(body).not.toContain('Old tea');
+    await page.click('#analysis-close');
+    await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
+
+    await page.click('[data-analyze="dinner"]');
+    await expect(page.locator('#analysis-body')).toContainText('Nothing is logged here yet');
+    await page.click('#analysis-close');
+
+    await page.click('[data-analyze="day"]');
+    await expect(page.locator('#analysis-title')).toHaveText('Analysis: Whole day');
+    await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
+    expect(body).toContain('Rice bowl');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
+  });
+
+  test('Ask the Dietitian sends no diary or profile data and keeps its history', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      ...AI_STORE(['groq']),
+      prefs: { ...BASE_PREFS, name: 'Denys', birthDate: '1990-01-01' },
+      foods: [{ id: '55555555-5555-4555-8555-555555555555', name: 'Secret pear', meal: 'snack', grams: 100, kcal: 60, protein: 1, fat: 0, carbs: 15, date: today, createdAt: 4000 }],
+    });
+    let body = '';
+    await page.route('https://api.groq.com/**', (route) => {
+      body = route.request().postData() || '';
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Aim for protein at every meal.' } }] }) });
+    });
+
+    await page.click('[data-action="open-ask"]');
+    await expect(page.locator('#ask-panel')).toHaveClass(/open/);
+    await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
+    await page.fill('#ask-input', 'How much protein do I need?');
+    await page.click('#ask-send');
+    await expect(page.locator('#ask-box')).toContainText('Aim for protein at every meal.');
+    expect(body).toContain('How much protein do I need?');
+    expect(body).not.toContain('Secret pear');
+    expect(body).not.toContain('1990-01-01');
+    expect(body).not.toContain('Denys');
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await page.click('[data-action="open-ask"]');
+    await expect(page.locator('#ask-box')).toContainText('How much protein do I need?');
+    await expect(page.locator('#ask-box')).toContainText('Aim for protein at every meal.');
+
+    await page.click('#ask-clear');
+    await page.locator('#confirm-ok').click();
+    await expect(page.locator('#ask-box .bubble:not(#ask-welcome)')).toHaveCount(0);
+  });
+
+  test('the launch intro shows the app mark and then leaves the screen', async ({ page }) => {
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.goto('/');
+    await expect(page.locator('#intro .intro-word')).toHaveText('Smart Diet AI');
+    await expect(page.locator('#intro')).toHaveCount(0, { timeout: 6000 });
   });
 });
