@@ -869,6 +869,57 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#weight-history [data-delete-weight] svg')).toHaveCount(1);
   });
 
+  test('editing the weight recalculates calories and macros proportionally', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Oats', meal: 'breakfast', grams: 200, kcal: 300, protein: 10, fat: 5, carbs: 50, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-edit-food]').first().click();
+    await page.fill('#food-grams', '100');
+    await expect(page.locator('#food-kcal')).toHaveValue('150');
+    await expect(page.locator('#food-protein')).toHaveValue('5');
+    await expect(page.locator('#food-fat')).toHaveValue('2.5');
+    await expect(page.locator('#food-carbs')).toHaveValue('25');
+  });
+
+  test('a diary food can be saved to My products, highlighted, and added back', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', name: 'Oats', meal: 'breakfast', grams: 200, kcal: 300, protein: 10, fat: 5, carbs: 50, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const row = page.locator('#diary-meals .meal-item', { hasText: 'Oats' });
+    await expect(row).not.toHaveClass(/saved/);
+    await row.locator('[data-save-product]').click();
+    await expect(page.locator('#diary-meals .meal-item', { hasText: 'Oats' })).toHaveClass(/saved/);
+    await openView(page, 'products');
+    await expect(page.locator('#products-list')).toContainText('Oats');
+    await page.locator('#products-list [data-add-product]').first().click();
+    await page.fill('#food-grams', '100');
+    await expect(page.locator('#food-kcal')).toHaveValue('150');
+    await page.click('#food-save');
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals .meal-item', { hasText: 'Oats' })).toHaveCount(2);
+  });
+
+  test('a new product can be created and deleted in My products', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Buckwheat');
+    await page.fill('#food-kcal', '110');
+    await page.click('#food-save');
+    await expect(page.locator('#products-list')).toContainText('Buckwheat');
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#products-list [data-delete-product]').first().click();
+    await expect(page.locator('#products-list')).not.toContainText('Buckwheat');
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
