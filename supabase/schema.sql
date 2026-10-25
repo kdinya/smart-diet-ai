@@ -177,6 +177,7 @@ declare
   existing public.friendships%rowtype;
   current_window timestamptz;
   current_count integer;
+  inserted_rows integer;
   normalized_code text := upper(btrim(coalesce(code, '')));
 begin
   if caller is null then
@@ -186,16 +187,19 @@ begin
   insert into public.friend_request_limits (user_id, window_started_at, attempt_count)
   values (caller, now(), 1)
   on conflict (user_id) do nothing;
+  get diagnostics inserted_rows = row_count;
   select window_started_at, attempt_count into current_window, current_count
     from public.friend_request_limits where user_id = caller for update;
-  if current_window <= now() - interval '1 hour' then
-    update public.friend_request_limits
-      set window_started_at = now(), attempt_count = 1 where user_id = caller;
-  elsif current_count >= 10 then
-    return 'already';
-  else
-    update public.friend_request_limits
-      set attempt_count = attempt_count + 1 where user_id = caller;
+  if inserted_rows = 0 then
+    if current_window <= now() - interval '1 hour' then
+      update public.friend_request_limits
+        set window_started_at = now(), attempt_count = 1 where user_id = caller;
+    elsif current_count >= 10 then
+      return 'rate_limited';
+    else
+      update public.friend_request_limits
+        set attempt_count = attempt_count + 1 where user_id = caller;
+    end if;
   end if;
 
   if normalized_code !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$' then
@@ -214,7 +218,7 @@ begin
   if found then
     if existing.status = 'pending' and existing.requester = target then
       update public.friendships set status = 'accepted' where id = existing.id;
-      return 'ok';
+      return 'accepted';
     end if;
     return 'already';
   end if;
