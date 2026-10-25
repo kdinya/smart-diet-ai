@@ -38,6 +38,14 @@
    - Communicate with the repository owner in Ukrainian.
    - Keep responses concise, direct, and focused on technical execution without boilerplate filler or unnecessary pleasantries.
    - Follow conventional commits (`feat:`, `fix:`, `docs:`, `perf:`, `refactor:`, `test:`, `chore:`).
+6. **Styled Interface Only (MANDATORY):**
+   - Every popup, confirmation, notice, and picker must use the application's own styled components: `.modal-back` dialogs, the wheel picker, the in-app calendar, and the styled confirmation dialog (`askConfirm`).
+   - Native browser dialogs (`window.confirm`, `window.alert`, `window.prompt`) and native date or time picker popups are forbidden.
+   - The browser's own install prompt (`beforeinstallprompt`) is the only exception, because the browser controls it.
+7. **Report Defects Found During Any Edit:**
+   - If an agent notices a bug, risk, or inconsistency in the application while working on any edit, it must report it to the repository owner in its reply, even when the issue is outside the current task.
+8. **Language of This File:**
+   - This instruction file and all repository documentation must be written in English.
 
 ---
 
