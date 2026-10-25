@@ -633,12 +633,48 @@ test.describe('Smoke: sign-out and data transfer', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
     await signOut(page);
-    page.once('dialog', (dialog) => dialog.accept());
+    await expect(page.locator('#local-owner')).toContainText('alice@example.test');
+    const dialogs = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      dialog.accept();
+    });
     await signIn(page, 'bob@example.test');
 
+    expect(dialogs).toHaveLength(3);
+    expect(dialogs[0]).toContain('alice@example.test');
+    expect(dialogs[0]).toContain('bob@example.test');
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals')).toContainText('Shared lunch');
     await expect.poll(() => backend.tables.food_entries.filter((row) => row.user_id === 'user-bob').length).toBe(1);
+    await expect(page.locator('#local-owner')).toContainText('bob@example.test');
+  });
+
+  test('declining any confirmation uploads nothing and keeps the data separate', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+
+    await signIn(page, 'alice@example.test');
+    await openView(page, 'diary');
+    await addFood(page, 'Private dinner', 'dinner');
+    await expect.poll(() => backend.tables.food_entries.length).toBe(1);
+
+    await signOut(page);
+    let asked = 0;
+    page.on('dialog', (dialog) => {
+      asked += 1;
+      if (asked < 3) dialog.accept();
+      else dialog.dismiss();
+    });
+    await signIn(page, 'bob@example.test');
+
+    expect(asked).toBe(3);
+    expect(backend.tables.food_entries.filter((row) => row.user_id === 'user-bob')).toHaveLength(0);
+    expect((await readStore(page)).foods).toHaveLength(0);
+    const setAside = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('smartdiet-foreign-user-alice-')).length);
+    expect(setAside).toBe(1);
   });
 });
 
