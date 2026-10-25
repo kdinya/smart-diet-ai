@@ -50,7 +50,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 - **Storage & Synchronization**:
   - **Local-first:** Complete offline capability using browser `localStorage` (`smartdiet-v1`).
   - **Backup:** Export all meals, weight data, and goals to a JSON file, then import it on another device. Import replaces the data on the device where it runs. AI keys are not exported.
-  - **Cloud Sync:** Optional multi-device synchronization via Supabase Auth (email/password) and PostgreSQL with Row Level Security (RLS). Every change (food, edits, deletions, weight, goals, My products) is sent to the cloud right away; changes that cannot be sent yet stay on the device and are retried automatically. The status is shown in Settings → Account & cloud sync.
+  - **Cloud Sync:** Optional multi-device synchronization via Supabase Auth (email/password) and PostgreSQL with Row Level Security (RLS). Every change (food, edits, deletions, weight, goals, My products) is sent to the cloud right away; signed-in users can also add friends by code and share saved products through the recipient-only Inbox; changes that cannot be sent yet stay on the device and are retried automatically. The status is shown in Settings → Account & cloud sync.
   - **Privacy:** AI provider API keys are saved exclusively in client-side storage.
   - **Statistics:** Charts and daily totals are calculated from saved food and weight records; statistics are not a separate data store.
   - **Data safety:** Clearing browser/site data, using private browsing, losing a browser profile, deleting a Supabase account, or losing an unexported local dataset can remove records. Export a JSON backup before clearing storage or switching accounts.
@@ -107,7 +107,7 @@ npm run test:smoke
   1. The app is already connected to the shared Supabase project. Users only register or log in under **Settings → Account & cloud sync**; no SQL or keys are needed.
   2. To run your own copy: create a Supabase project, run `supabase/schema.sql` once in the SQL Editor, then set `SUPABASE_URL` and `SUPABASE_ANON_KEY` at the top of the script in `index.html`. Never put a `service_role` key in the app.
   3. Email confirmation links use the site address. In Supabase, set **Authentication → URL Configuration → Site URL** to your deployed address (for example `https://smart-diet-ai-psi.vercel.app`) and add `<your address>/**` to **Redirect URLs**. Otherwise links point to `localhost`.
-  4. After updating from an older version, run `supabase/schema.sql` again in the SQL Editor (it is safe to repeat); the Snack meal category needs the updated constraint and My products sync needs the `products` table.
+  4. After updating from an older version, run `supabase/schema.sql` again in the SQL Editor (it is safe to repeat). Friends and product sharing use cloud-only `profiles`, `friendships`, and `product_shares` tables protected by RLS; no shared product is copied into local storage until its recipient accepts it. The Snack meal category needs the updated constraint and My products sync needs the `products` table.
 
 ---
 
@@ -150,7 +150,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 - **Зберігання даних і безпека**:
   - У локальному режимі записи зберігаються в `localStorage` браузера під ключем `smartdiet-v1`; статистика не є окремою копією, а щоразу обчислюється з журналу їжі та історії ваги.
   - Очищення даних сайту/браузера, приватний режим, втрата профілю браузера або видалення акаунта Supabase можуть видалити записи. Перед очищенням сховища чи зміною акаунта експортуй JSON-резервну копію.
-  - Після підключення Supabase харчові записи та вага зберігаються в PostgreSQL у таблицях `food_entries` і `weight_entries`; RLS обмежує доступ рядками поточного користувача.
+  - Після підключення Supabase харчові записи та вага зберігаються в PostgreSQL у таблицях `food_entries` і `weight_entries`; RLS обмежує доступ рядками поточного користувача. Увійшлі користувачі також можуть додавати друзів за кодом і надсилати збережені продукти через «Вхідні» отримувача.
 
 - **Профіль та безпечний план**:
   - Стартове вікно при першому запуску з миттєвим вибором мови (українська / English) та можливістю закриття.
@@ -214,7 +214,7 @@ npm run test:smoke
   1. Застосунок уже підключений до спільного проєкту Supabase. Користувачам достатньо зареєструватися або увійти в **Налаштування → Акаунт та синхронізація**; SQL і ключі не потрібні.
   2. Для власної копії: створіть проєкт на [supabase.com](https://supabase.com), один раз застосуйте `supabase/schema.sql` у SQL Editor, потім вкажіть `SUPABASE_URL` і `SUPABASE_ANON_KEY` на початку скрипта в `index.html`. Ключ `service_role` у застосунку не використовуйте.
   3. Посилання для підтвердження пошти ведуть на адресу сайту. У Supabase встановіть **Authentication → URL Configuration → Site URL** на адресу вашого застосунку (наприклад, `https://smart-diet-ai-psi.vercel.app`) і додайте `<адреса>/**` у **Redirect URLs**. Інакше посилання вестимуть на `localhost`.
-  4. Після оновлення зі старої версії ще раз виконайте `supabase/schema.sql` у SQL Editor (це безпечно); для категорії «Перекус» потрібне оновлене обмеження, а для синхронізації «Моїх продуктів» — таблиця `products`.
+  4. Після оновлення зі старої версії ще раз виконайте `supabase/schema.sql` у SQL Editor (це безпечно). Друзі та обмін продуктами використовують хмарні таблиці `profiles`, `friendships` і `product_shares` із RLS; надісланий продукт не копіюється в localStorage, доки отримувач його не прийме. Для категорії «Перекус» потрібне оновлене обмеження, а для синхронізації «Моїх продуктів» — таблиця `products`.
 
 ## Ліцензія
 

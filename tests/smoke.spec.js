@@ -899,6 +899,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#diary-meals .meal-item', { hasText: 'Oats' })).toHaveClass(/saved/);
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Oats');
+    await page.locator('#products-list [data-toggle-product]').first().click();
     await page.locator('#products-list [data-add-product]').first().click();
     await page.fill('#food-grams', '100');
     await expect(page.locator('#food-kcal')).toHaveValue('150');
@@ -915,9 +916,29 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.fill('#food-kcal', '110');
     await page.click('#food-save');
     await expect(page.locator('#products-list')).toContainText('Buckwheat');
+    await page.locator('#products-list [data-toggle-product]').first().click();
     page.once('dialog', (dialog) => dialog.accept());
     await page.locator('#products-list [data-delete-product]').first().click();
     await expect(page.locator('#products-list')).not.toContainText('Buckwheat');
+  });
+
+
+  test('saved products start collapsed and reveal details and actions when toggled', async ({ page }) => {
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [],
+      weights: [],
+      products: [{ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25 }],
+    });
+    await openView(page, 'products');
+    const card = page.locator('.product-item');
+    await expect(card).toHaveClass(/collapsed/);
+    await expect(card.locator('.product-name')).toHaveText('Oats');
+    await expect(card.locator('.product-row')).toBeHidden();
+    await card.locator('[data-toggle-product]').click();
+    await expect(card).not.toHaveClass(/collapsed/);
+    await expect(card.locator('.product-row')).toBeVisible();
+    await expect(card.locator('[data-share-product]')).toBeVisible();
   });
 
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
