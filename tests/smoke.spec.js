@@ -331,6 +331,34 @@ async function signOut(page) {
   ]);
 }
 
+function setupConfirmWatch(plan) {
+  window.__confirmPlan = plan;
+  if (window.__confirmWatchInstalled) return true;
+  const install = () => {
+    if (window.__confirmWatchInstalled) return true;
+    const modal = document.getElementById('confirm-modal');
+    if (!modal) return false;
+    window.__confirmWatchInstalled = true;
+    new MutationObserver(() => {
+      if (!modal.classList.contains('open')) return;
+      const current = window.__confirmPlan || { queue: [], fallback: false };
+      const accept = current.queue.length ? current.queue.shift() : current.fallback;
+      if (window.__confirmAsked) window.__confirmAsked(document.getElementById('confirm-message').textContent);
+      document.getElementById(accept ? 'confirm-ok' : 'confirm-cancel').click();
+    }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+    return true;
+  };
+  if (!install()) document.addEventListener('DOMContentLoaded', install);
+  return true;
+}
+
+async function autoConfirm(page, answers = true, log = null) {
+  const plan = Array.isArray(answers) ? { queue: [...answers], fallback: false } : { queue: [], fallback: answers };
+  if (log) await page.exposeFunction('__confirmAsked', (message) => log.push(message)).catch(() => {});
+  await page.addInitScript(setupConfirmWatch, plan);
+  await page.evaluate(setupConfirmWatch, plan);
+}
+
 async function addFood(page, name, meal = 'lunch') {
   await page.locator(`#diary-meals [data-action="add-food"][data-meal="${meal}"]`).click();
   await page.fill('#food-name', name);
@@ -393,9 +421,9 @@ test.describe('Smoke: food deletion', () => {
     await addFood(page, 'Smoke rice');
 
     const dialogs = [];
-    page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
+    await autoConfirm(page, true, dialogs);
     await foodRow(page, 'Smoke rice').locator('[data-delete-food]').click();
-    expect(dialogs).toHaveLength(1);
+    await expect.poll(() => dialogs.length).toBe(1);
     expect(dialogs[0]).toBe('Delete “Smoke rice” from the diary (lunch)?');
     await expect(page.locator('#toast')).toHaveText('Entry deleted.');
     await expect(foodRow(page, 'Smoke rice')).toHaveCount(0);
@@ -418,7 +446,7 @@ test.describe('Smoke: food deletion', () => {
     await addFood(page, 'Smoke oats');
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
-    page.once('dialog', (d) => d.accept());
+    await autoConfirm(page, true);
     await foodRow(page, 'Smoke oats').locator('[data-delete-food]').click();
     await expect(page.locator('#toast')).toHaveText('Entry deleted.');
     await expect.poll(() => backend.tables.food_entries.length).toBe(0);
@@ -534,7 +562,7 @@ test.describe('Smoke: food deletion', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
     backend.failDeletes = true;
-    page.once('dialog', (d) => d.accept());
+    await autoConfirm(page, true);
     await foodRow(page, 'Smoke eggs').locator('[data-delete-food]').click();
     await expect(page.locator('#toast')).toContainText('Saved locally; sync failed:');
     await expect(foodRow(page, 'Smoke eggs')).toHaveCount(1);
@@ -631,10 +659,7 @@ function backupFile(content) {
 test.describe('Smoke: backup import', () => {
   test('confirmed import replaces local data and keeps it after reload', async ({ page }) => {
     const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.message());
-      dialog.accept();
-    });
+    await autoConfirm(page, true, dialogs);
 
     await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [{ id: 'old-weight', value: 90, date: '2026-10-20' }] });
     await openView(page, 'settings');
@@ -663,10 +688,7 @@ test.describe('Smoke: backup import', () => {
 
   test('declining the confirmation keeps the current local data', async ({ page }) => {
     const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.message());
-      dialog.dismiss();
-    });
+    await autoConfirm(page, false, dialogs);
 
     await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [] });
     await openView(page, 'settings');
@@ -681,10 +703,7 @@ test.describe('Smoke: backup import', () => {
 
   test('a file that is not a backup is rejected without changing data', async ({ page }) => {
     const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.message());
-      dialog.accept();
-    });
+    await autoConfirm(page, true, dialogs);
 
     await openApp(page, { prefs: BASE_PREFS, foods: [OLD_FOOD], weights: [] });
     await openView(page, 'settings');
@@ -868,13 +887,10 @@ test.describe('Smoke: sign-out and data transfer', () => {
     await signOut(page);
     await expect(page.locator('#local-owner')).toContainText('alice@example.test');
     const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.message());
-      dialog.accept();
-    });
+    await autoConfirm(page, true, dialogs);
     await signIn(page, 'bob@example.test');
 
-    expect(dialogs).toHaveLength(3);
+    await expect.poll(() => dialogs.length).toBe(3);
     expect(dialogs[0]).toContain('alice@example.test');
     expect(dialogs[0]).toContain('bob@example.test');
     await openView(page, 'diary');
@@ -895,15 +911,11 @@ test.describe('Smoke: sign-out and data transfer', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
     await signOut(page);
-    let asked = 0;
-    page.on('dialog', (dialog) => {
-      asked += 1;
-      if (asked < 3) dialog.accept();
-      else dialog.dismiss();
-    });
+    const asked = [];
+    await autoConfirm(page, [true, true, false], asked);
     await signIn(page, 'bob@example.test');
 
-    expect(asked).toBe(3);
+    await expect.poll(() => asked.length).toBe(3);
     expect(backend.tables.food_entries.filter((row) => row.user_id === 'user-bob')).toHaveLength(0);
     expect((await readStore(page)).foods).toHaveLength(0);
     const setAside = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('smartdiet-foreign-user-alice-')).length);
@@ -1094,7 +1106,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     });
     await openView(page, 'stats');
     await expect(page.locator('#weight-history .food-row')).toHaveCount(2);
-    page.once('dialog', (dialog) => dialog.accept());
+    await autoConfirm(page, true);
     await page.locator('#weight-history [data-delete-weight="2026-10-20"]').click();
     await expect(page.locator('#weight-history .food-row')).toHaveCount(1);
     await expect(page.locator('#weight-history')).not.toContainText('80.4');
@@ -1117,7 +1129,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(first).toHaveClass(/collapsed/);
     await expect(first.locator('.meal-item')).toBeHidden();
     await expect(first.locator('.meal-kcal')).toContainText('300');
-    await page.fill('#diary-date', past);
+    await page.evaluate((value) => { const el = document.getElementById('diary-date'); el.value = value; el.dispatchEvent(new Event('change')); }, past);
     await page.locator('#diary-date').dispatchEvent('change');
     await expect(page.locator('#diary-meals .meal-card').first()).toHaveClass(/collapsed/);
     await page.locator('#diary-meals .meal-card').first().locator('.meal-head').click();
@@ -1188,12 +1200,9 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#products-list')).toContainText('Buckwheat');
     await page.locator('#products-list [data-toggle-product]').first().click();
     const prodDialogs = [];
-    page.on('dialog', (dialog) => {
-      prodDialogs.push(dialog.message());
-      dialog.accept();
-    });
+    await autoConfirm(page, true, prodDialogs);
     await page.locator('#products-list [data-delete-product]').first().click();
-    expect(prodDialogs).toHaveLength(1);
+    await expect.poll(() => prodDialogs.length).toBe(1);
     expect(prodDialogs[0]).toBe('Delete “Buckwheat” from My products?');
     await expect(page.locator('#products-list')).not.toContainText('Buckwheat');
   });
@@ -1203,7 +1212,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
     await addFood(page, 'Cancel apple');
-    page.once('dialog', (d) => d.dismiss());
+    await autoConfirm(page, false);
     await foodRow(page, 'Cancel apple').locator('[data-delete-food]').click();
     await expect(foodRow(page, 'Cancel apple')).toHaveCount(1);
   });
@@ -1217,7 +1226,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     });
     await openView(page, 'products');
     await page.locator('#products-list [data-toggle-product]').first().click();
-    page.once('dialog', (d) => d.dismiss());
+    await autoConfirm(page, false);
     await page.locator('#products-list [data-delete-product]').first().click();
     await expect(page.locator('#products-list')).toContainText('Keep oatmeal');
   });
@@ -1385,7 +1394,7 @@ test.describe('Smoke: friends', () => {
     await expect(page.locator('#nav')).toBeVisible();
     await openView(page, 'settings');
     await expect(page.locator('#friends-list')).toContainText('Bob');
-    page.once('dialog', (dialog) => dialog.accept());
+    await autoConfirm(page, true);
     await page.click('[data-friend-remove]');
     await expect(page.locator('#friends-list')).toContainText('Add a friend before sharing a product.');
     expect(backend.tables.friendships).toHaveLength(0);
@@ -1482,11 +1491,11 @@ test.describe('Smoke: product sharing', () => {
     const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
     await addProduct(bob.page, 'Oats', '90');
     await bob.page.click('#inbox-open');
-    bob.page.once('dialog', (dialog) => dialog.dismiss());
+    await autoConfirm(bob.page, false);
     await bob.page.click('[data-share-accept]');
     expect(backend.tables.product_shares).toHaveLength(1);
     expect((await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([90]);
-    bob.page.once('dialog', (dialog) => dialog.accept());
+    await autoConfirm(bob.page, true);
     await bob.page.click('[data-share-accept]');
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([150]);
     expect(backend.tables.product_shares).toHaveLength(0);
@@ -1589,5 +1598,22 @@ test.describe('Smoke: AI provider fallback', () => {
     expect(error).not.toContain('Groq');
     expect(error).not.toContain('xAI Grok');
     expect(calls).toEqual(['gemini', 'openai', 'anthropic']);
+  });
+});
+
+test.describe('Smoke: calendar', () => {
+  test('calendar uses the app style and marks days with saved entries', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: '77777777-7777-4777-8777-777777777777', name: 'Calendar pear', meal: 'lunch', grams: 100, kcal: 60, protein: 1, fat: 0, carbs: 15, date: today, createdAt: 1 }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    await page.click('#diary-date');
+    await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+    await expect(page.locator(`[data-cal-date="${today}"]`)).toHaveClass(/has-entries/);
+    await page.locator('#cal-close').click();
+    await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
   });
 });
