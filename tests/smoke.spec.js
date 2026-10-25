@@ -1882,6 +1882,29 @@ test.describe('Smoke: weigh-in deletion in the cloud', () => {
     await openView(page, 'home');
     await expect(page.locator('#home-weight')).toHaveText('97.0');
   });
+
+  test('a weigh-in deleted before a relaunch is not restored from the local safety copy', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, currentWeight: 97 }, foods: [], weights: [{ id: 'safety-96', value: 96, date: '2026-10-24' }] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+    await expect.poll(() => backend.tables.weight_entries.length).toBe(1);
+
+    await openView(page, 'stats');
+    await autoConfirm(page, true);
+    await page.locator('#weight-history [data-delete-weight]').first().click();
+    await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
+    await expect.poll(async () => (await readStore(page)).weights.length).toBe(0);
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
+    await openView(page, 'stats');
+    await expect(page.locator('#weight-history')).not.toContainText('96');
+    expect((await readStore(page)).weights).toHaveLength(0);
+  });
 });
 
 test.describe('Smoke: AI character', () => {
