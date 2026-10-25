@@ -73,7 +73,19 @@ function userIdFromRequest(req) {
  */
 function createBackend() {
   return {
-    tables: { food_entries: [], weight_entries: [], user_profiles: [] },
+    tables: {
+      food_entries: [],
+      weight_entries: [],
+      user_profiles: [],
+      products: [],
+      profiles: [
+        { user_id: 'user-alice', friend_code: 'AAAA2222', display_name: 'Alice' },
+        { user_id: 'user-bob', friend_code: 'BBBB3333', display_name: 'Bob' },
+      ],
+      friendships: [],
+      product_shares: [],
+    },
+    friendAttempts: {},
     failDeletes: false,
     failProfiles: false,
   };
@@ -113,6 +125,10 @@ async function mockSupabase(page, backend) {
       return id && email ? json(200, userObject(id, email)) : json(401, { message: 'invalid JWT' });
     }
 
+    if (url.pathname === '/rest/v1/rpc/request_friend') {
+      return handleRequestFriend(req, backend, json);
+    }
+
     if (url.pathname.startsWith('/rest/v1/')) {
       return handleRest(route, req, url, backend, json);
     }
@@ -124,10 +140,106 @@ async function mockSupabase(page, backend) {
 function matchesFilters(row, params) {
   for (const [key, value] of params) {
     if (['select', 'order', 'on_conflict', 'limit', 'offset'].includes(key)) continue;
+    if (value.startsWith('in.(')) {
+      if (!value.slice(4, -1).split(',').map((part) => part.replace(/^"|"$/g, '')).includes(String(row[key]))) return false;
+      continue;
+    }
     if (!value.startsWith('eq.')) continue;
     if (String(row[key]) !== value.slice(3)) return false;
   }
   return true;
+}
+
+const SOCIAL_TABLES = ['profiles', 'friendships', 'product_shares'];
+const FRIEND_CODE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/;
+
+function areFriends(backend, a, b, status) {
+  return backend.tables.friendships.some(
+    (f) => ((f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a)) && (!status || f.status === status),
+  );
+}
+
+function handleRequestFriend(req, backend, json) {
+  const uid = userIdFromRequest(req);
+  if (!uid) return json(401, { message: 'JWT required' });
+  const now = Date.now();
+  const attempts = backend.friendAttempts[uid];
+  if (!attempts || now - attempts.startedAt > 3600_000) backend.friendAttempts[uid] = { startedAt: now, count: 1 };
+  else if (attempts.count >= 10) return json(200, 'rate_limited');
+  else attempts.count += 1;
+
+  const code = String(req.postDataJSON().code || '').trim().toUpperCase();
+  const target = FRIEND_CODE.test(code) ? backend.tables.profiles.find((row) => row.friend_code === code) : null;
+  if (!target || target.user_id === uid) return json(200, 'not_found');
+  const existing = backend.tables.friendships.find(
+    (f) => (f.requester === uid && f.addressee === target.user_id) || (f.requester === target.user_id && f.addressee === uid),
+  );
+  if (existing) {
+    if (existing.status === 'pending' && existing.requester === target.user_id) {
+      existing.status = 'accepted';
+      return json(200, 'accepted');
+    }
+    return json(200, 'already');
+  }
+  backend.tables.friendships.push({ id: `friendship-${backend.tables.friendships.length + 1}`, requester: uid, addressee: target.user_id, status: 'pending', created_at: new Date().toISOString() });
+  return json(200, 'ok');
+}
+
+const SHARE_VALUE_KEYS = ['grams', 'kcal', 'protein', 'fat', 'carbs'];
+
+async function handleSocial(route, req, url, backend, json, table, uid) {
+  const rows = backend.tables[table];
+  const params = [...url.searchParams.entries()];
+  const visible = (row) => {
+    if (table === 'profiles') return row.user_id === uid || areFriends(backend, uid, row.user_id);
+    if (table === 'friendships') return row.requester === uid || row.addressee === uid;
+    return row.from_user === uid || row.to_user === uid;
+  };
+
+  if (req.method() === 'GET') {
+    const found = rows.filter((row) => visible(row) && matchesFilters(row, params));
+    if ((req.headers()['accept'] || '').includes('vnd.pgrst.object+json')) {
+      if (found.length === 1) return json(200, found[0]);
+      return json(406, { code: 'PGRST116', details: null, hint: null, message: 'JSON object requested, multiple (or no) rows returned' });
+    }
+    return json(200, found);
+  }
+
+  if (req.method() === 'PATCH') {
+    const body = req.postDataJSON();
+    for (const row of rows) {
+      if (!matchesFilters(row, params)) continue;
+      if (table === 'profiles' && row.user_id === uid && 'display_name' in body) row.display_name = String(body.display_name).slice(0, 40);
+      if (table === 'friendships' && row.addressee === uid && row.status === 'pending' && body.status === 'accepted') row.status = 'accepted';
+    }
+    return route.fulfill({ status: 204, headers: CORS, body: '' });
+  }
+
+  if (req.method() === 'POST' && table === 'product_shares') {
+    const item = req.postDataJSON();
+    if (item.from_user !== uid || !areFriends(backend, uid, item.to_user, 'accepted')) {
+      return json(403, { code: '42501', message: 'new row violates row-level security policy for table "product_shares"' });
+    }
+    if (!item.name || item.name.length > 120 || SHARE_VALUE_KEYS.some((key) => !(item[key] >= 0 && item[key] <= 10000))) {
+      return json(400, { code: '23514', message: 'new row for relation "product_shares" violates check constraint' });
+    }
+    if (rows.filter((row) => row.from_user === uid && row.to_user === item.to_user).length >= 20) {
+      return json(400, { code: 'P0001', message: 'Share limit reached' });
+    }
+    rows.push({ id: `share-${rows.length + 1}-${Date.now()}`, created_at: new Date().toISOString(), ...item });
+    return route.fulfill({ status: 201, headers: CORS, body: '' });
+  }
+
+  if (req.method() === 'DELETE') {
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const row = rows[i];
+      const allowed = table === 'product_shares' ? row.to_user === uid || row.from_user === uid : visible(row);
+      if (allowed && matchesFilters(row, params)) rows.splice(i, 1);
+    }
+    return route.fulfill({ status: 204, headers: CORS, body: '' });
+  }
+
+  return json(405, { message: 'Method not mocked' });
 }
 
 async function handleRest(route, req, url, backend, json) {
@@ -139,6 +251,7 @@ async function handleRest(route, req, url, backend, json) {
     return json(404, { code: 'PGRST205', message: "Could not find the table 'public.user_profiles' in the schema cache" });
   }
   if (!uid) return json(401, { message: 'JWT required' });
+  if (SOCIAL_TABLES.includes(table)) return handleSocial(route, req, url, backend, json, table, uid);
 
   const params = [...url.searchParams.entries()];
 
@@ -1114,5 +1227,332 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.click('#weight-save');
     await expect.poll(async () => (await readStore(page)).weights.map((w) => w.value)).toEqual([72.5]);
     await context.close();
+  });
+});
+
+const EMPTY_STORE = { prefs: BASE_PREFS, foods: [], weights: [] };
+
+async function setDisplayName(page, backend, userId, name) {
+  await openView(page, 'settings');
+  await page.fill('#pref-name', name);
+  await page.click('#save-profile');
+  await expect.poll(() => backend.tables.profiles.find((row) => row.user_id === userId).display_name).toBe(name);
+}
+
+async function startUser(page, backend, email, name) {
+  await mockSupabase(page, backend);
+  await openApp(page, EMPTY_STORE);
+  await connectSupabase(page);
+  await signIn(page, email);
+  await setDisplayName(page, backend, USERS[email], name);
+}
+
+const startAlice = (page, backend) => startUser(page, backend, 'alice@example.test', 'Alice');
+
+async function openAsUser(browser, backend, email, name) {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  await startUser(page, backend, email, name);
+  return { context, page };
+}
+
+function befriend(backend) {
+  backend.tables.friendships.push({ id: 'friendship-seed', requester: 'user-alice', addressee: 'user-bob', status: 'accepted', created_at: new Date().toISOString() });
+}
+
+async function addProduct(page, name, kcal) {
+  await openView(page, 'products');
+  await page.click('#product-new');
+  await page.fill('#food-name', name);
+  await page.fill('#food-kcal', kcal);
+  await page.click('#food-save');
+  await expect(page.locator('#products-list')).toContainText(name);
+}
+
+async function shareFirstProductWith(page, friend) {
+  await openView(page, 'settings');
+  await expect(page.locator('#friends-list')).toContainText(friend);
+  await openView(page, 'products');
+  await page.locator('#products-list [data-toggle-product]').first().click();
+  await page.locator('#products-list [data-share-product]').first().click();
+  await expect(page.locator('#share-modal')).toHaveClass(/open/);
+  await page.locator('#share-body label', { hasText: friend }).locator('input').check();
+  await page.click('#share-confirm');
+}
+
+test.describe('Smoke: friends', () => {
+  test('a request sent by code is accepted by the other person and both see each other', async ({ page, browser }) => {
+    const backend = createBackend();
+    await startAlice(page, backend);
+    await expect(page.locator('#my-friend-code')).toHaveText('AAAA2222');
+
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await bob.page.fill('#friend-code-input', 'aaaa2222');
+    await bob.page.click('#friend-add');
+    await expect(bob.page.locator('#toast')).toHaveText('Friend request sent.');
+    await expect(bob.page.locator('#sent-requests')).toContainText('Alice');
+    expect(backend.tables.friendships).toMatchObject([{ requester: 'user-bob', addressee: 'user-alice', status: 'pending' }]);
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await openView(page, 'settings');
+    await expect(page.locator('#friend-requests')).toContainText('Bob');
+    await page.click('[data-friend-accept]');
+    await expect(page.locator('#toast')).toHaveText('Request accepted.');
+    await expect(page.locator('#friends-list')).toContainText('Bob');
+    expect(backend.tables.friendships[0].status).toBe('accepted');
+    await bob.context.close();
+  });
+
+  test('unknown codes, own code and repeated requests are reported', async ({ page }) => {
+    const backend = createBackend();
+    await startAlice(page, backend);
+    await expect(page.locator('#my-friend-code')).toHaveText('AAAA2222');
+
+    for (const code of ['ZZZZ9999', 'AAAA2222', 'short']) {
+      await page.fill('#friend-code-input', code);
+      await page.click('#friend-add');
+      await expect(page.locator('#toast')).toHaveText('User not found.');
+      await expect(page.locator('#friend-code-input')).toHaveValue('');
+      expect(backend.tables.friendships).toHaveLength(0);
+    }
+
+    await page.fill('#friend-code-input', 'BBBB3333');
+    await page.click('#friend-add');
+    await expect(page.locator('#toast')).toHaveText('Friend request sent.');
+    await page.fill('#friend-code-input', 'BBBB3333');
+    await page.click('#friend-add');
+    await expect(page.locator('#toast')).toHaveText('Request or friendship already exists.');
+    expect(backend.tables.friendships).toHaveLength(1);
+  });
+
+  test('too many lookups are rate limited', async ({ page }) => {
+    const backend = createBackend();
+    backend.friendAttempts['user-alice'] = { startedAt: Date.now(), count: 10 };
+    await startAlice(page, backend);
+    await page.fill('#friend-code-input', 'BBBB3333');
+    await page.click('#friend-add');
+    await expect(page.locator('#toast')).toHaveText('Too many attempts. Try again later.');
+    expect(backend.tables.friendships).toHaveLength(0);
+  });
+
+  test('a pending request can be declined, and a friend can be removed', async ({ page, browser }) => {
+    const backend = createBackend();
+    backend.tables.friendships.push({ id: 'pending-1', requester: 'user-bob', addressee: 'user-alice', status: 'pending', created_at: new Date().toISOString() });
+    await startAlice(page, backend);
+    await expect(page.locator('#friend-requests')).toContainText('Bob');
+    await page.click('[data-friend-reject]');
+    await expect(page.locator('#friend-requests')).toContainText('No incoming requests.');
+    expect(backend.tables.friendships).toHaveLength(0);
+
+    befriend(backend);
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await openView(page, 'settings');
+    await expect(page.locator('#friends-list')).toContainText('Bob');
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.click('[data-friend-remove]');
+    await expect(page.locator('#friends-list')).toContainText('Add a friend before sharing a product.');
+    expect(backend.tables.friendships).toHaveLength(0);
+  });
+});
+
+test.describe('Smoke: product sharing', () => {
+  test('without friends a product cannot be sent', async ({ page }) => {
+    const backend = createBackend();
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list [data-share-product]').first().click();
+    await expect(page.locator('#share-body')).toContainText('Add a friend before sharing a product.');
+    await expect(page.locator('#share-confirm')).toBeDisabled();
+  });
+
+  test('a sent product reaches the inbox and is added to My products on accept', async ({ page, browser }) => {
+    const backend = createBackend();
+    befriend(backend);
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await shareFirstProductWith(page, 'Bob');
+    await expect(page.locator('#toast')).toHaveText('Product sent.');
+    expect(backend.tables.product_shares).toMatchObject([{ from_user: 'user-alice', to_user: 'user-bob', name: 'Oats', kcal: 150 }]);
+
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await openView(bob.page, 'products');
+    await expect(bob.page.locator('#inbox-open')).toHaveText('Inbox (1)');
+    await bob.page.click('#inbox-open');
+    await expect(bob.page.locator('#inbox-body')).toContainText('Alice');
+    await expect(bob.page.locator('#inbox-body')).toContainText('Oats');
+    await bob.page.click('[data-share-accept]');
+    await expect(bob.page.locator('#toast')).toHaveText('Product added to My products.');
+    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name)).toEqual(['Oats']);
+    expect(backend.tables.product_shares).toHaveLength(0);
+    await bob.context.close();
+  });
+
+  test('a declined product is removed from the inbox and not saved', async ({ page, browser }) => {
+    const backend = createBackend();
+    befriend(backend);
+    backend.tables.product_shares.push({ id: 'share-1', from_user: 'user-alice', to_user: 'user-bob', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, created_at: new Date().toISOString() });
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await openView(bob.page, 'products');
+    await bob.page.click('#inbox-open');
+    await bob.page.click('[data-share-decline]');
+    await expect(bob.page.locator('#toast')).toHaveText('Product declined.');
+    await expect(bob.page.locator('#inbox-body')).toContainText('No new products.');
+    expect(backend.tables.product_shares).toHaveLength(0);
+    expect((await readStore(bob.page)).products || []).toHaveLength(0);
+    await bob.context.close();
+  });
+
+  test('the sender can recall a product that has not been answered yet', async ({ page, browser }) => {
+    const backend = createBackend();
+    befriend(backend);
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await shareFirstProductWith(page, 'Bob');
+    await expect(page.locator('#toast')).toHaveText('Product sent.');
+
+    await openView(page, 'settings');
+    await expect(page.locator('#sent-shares')).toContainText('Bob');
+    await expect(page.locator('#sent-shares')).toContainText('Oats');
+    await page.click('[data-share-recall]');
+    await expect(page.locator('#toast')).toHaveText('Product recalled.');
+    await expect(page.locator('#sent-shares')).toContainText('No sent products.');
+    expect(backend.tables.product_shares).toHaveLength(0);
+
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await openView(bob.page, 'products');
+    await expect(bob.page.locator('#inbox-banner')).toBeHidden();
+    await bob.context.close();
+  });
+
+  test('the twenty-product limit per friend is reported to the sender', async ({ page }) => {
+    const backend = createBackend();
+    befriend(backend);
+    for (let i = 0; i < 20; i += 1) {
+      backend.tables.product_shares.push({ id: `queued-${i}`, from_user: 'user-alice', to_user: 'user-bob', name: `Item ${i}`, grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, created_at: new Date().toISOString() });
+    }
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await shareFirstProductWith(page, 'Bob');
+    await expect(page.locator('#toast')).toHaveText('Could not send: this friend already has 20 products waiting in the inbox.');
+    expect(backend.tables.product_shares).toHaveLength(20);
+  });
+
+  test('an incoming product with a name that already exists asks before replacing it', async ({ page, browser }) => {
+    const backend = createBackend();
+    befriend(backend);
+    backend.tables.product_shares.push({ id: 'share-1', from_user: 'user-alice', to_user: 'user-bob', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, created_at: new Date().toISOString() });
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await addProduct(bob.page, 'Oats', '90');
+    await bob.page.click('#inbox-open');
+    bob.page.once('dialog', (dialog) => dialog.dismiss());
+    await bob.page.click('[data-share-accept]');
+    expect(backend.tables.product_shares).toHaveLength(1);
+    expect((await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([90]);
+    bob.page.once('dialog', (dialog) => dialog.accept());
+    await bob.page.click('[data-share-accept]');
+    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([150]);
+    expect(backend.tables.product_shares).toHaveLength(0);
+    await bob.context.close();
+  });
+});
+
+test.describe('Smoke: today balance', () => {
+  test('shows eaten over the daily target with the remainder below in a smaller font', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Rice', meal: 'lunch', grams: 200, kcal: 500, protein: 20, fat: 10, carbs: 80, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await expect(page.locator('#home-kcal')).toHaveText('500');
+    await expect(page.locator('#home-kcal-total')).toHaveText('2000');
+    await expect(page.locator('#home-kcal-left')).toHaveText('1500');
+    await expect(page.locator('#home-protein')).toHaveText('20');
+    await expect(page.locator('#home-protein-total')).toHaveText('100');
+    await expect(page.locator('#home-protein-left')).toHaveText('80');
+    const metric = page.locator('#view-home .stats .metric').first();
+    await expect(metric.locator('.left-line')).toHaveText('left 1500 kcal');
+    const sizes = await metric.evaluate((el) => ({
+      main: parseFloat(getComputedStyle(el.querySelector('#home-kcal')).fontSize),
+      left: parseFloat(getComputedStyle(el.querySelector('.left-line')).fontSize),
+    }));
+    expect(sizes.left).toBeLessThan(sizes.main);
+    const order = await metric.evaluate((el) => {
+      const line = el.querySelector('.left-line').getBoundingClientRect().top;
+      return { main: el.querySelector('#home-kcal').getBoundingClientRect().top, line };
+    });
+    expect(order.line).toBeGreaterThan(order.main);
+  });
+
+  test('the remainder never goes below zero and the text follows the language', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'uk' },
+      foods: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Cake', meal: 'snack', grams: 300, kcal: 2400, protein: 10, fat: 90, carbs: 300, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await expect(page.locator('#home-kcal')).toHaveText('2400');
+    await expect(page.locator('#home-kcal-total')).toHaveText('2000');
+    await expect(page.locator('#home-kcal-left')).toHaveText('0');
+    await expect(page.locator('#view-home .stats .metric').first().locator('.left-line')).toHaveText('залишилось 0 ккал');
+  });
+});
+
+const AI_STORE = (order) => ({
+  prefs: BASE_PREFS,
+  foods: [],
+  weights: [],
+  ai: { order, keys: { gemini: 'g-key', openai: 'sk-test', anthropic: 'a-key', groq: 'gsk_test', xai: 'xai-test' } },
+});
+
+test.describe('Smoke: AI provider fallback', () => {
+  test('a failing provider is skipped and the next one answers', async ({ page }) => {
+    await openApp(page, AI_STORE(['openai', 'groq']));
+    const calls = [];
+    await page.route('https://api.openai.com/**', (route) => {
+      calls.push('openai');
+      return route.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: JSON.stringify({ error: { message: 'upstream failure' } }) });
+    });
+    await page.route('https://api.groq.com/**', (route) => {
+      calls.push('groq');
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'answer from groq' } }] }) });
+    });
+    const out = await page.evaluate(() => callAi('hello', false));
+    expect(out).toBe('answer from groq');
+    expect(calls).toEqual(['openai', 'groq']);
+    expect(await page.evaluate(() => lastAi.name)).toBe('Groq');
+  });
+
+  test('providers that all hang give up within the shared time budget', async ({ page }) => {
+    await openApp(page, AI_STORE(['gemini', 'openai', 'anthropic', 'groq', 'xai']));
+    const calls = [];
+    for (const [name, pattern] of [
+      ['gemini', 'https://generativelanguage.googleapis.com/**'],
+      ['openai', 'https://api.openai.com/**'],
+      ['anthropic', 'https://api.anthropic.com/**'],
+      ['groq', 'https://api.groq.com/**'],
+      ['xai', 'https://api.x.ai/**'],
+    ]) {
+      await page.route(pattern, () => { calls.push(name); });
+    }
+    await page.clock.install();
+    const result = page.evaluate(() => callAi('hello', false).then((value) => ({ value }), (error) => ({ error: error.message })));
+    let settled = false;
+    result.then(() => { settled = true; });
+    for (let i = 0; i < 80 && !settled; i += 1) {
+      await page.clock.runFor(1000);
+      await page.waitForTimeout(25);
+    }
+    expect(settled).toBe(true);
+    const { error } = await result;
+    expect(error).toContain('Google Gemini');
+    expect(error).toContain('OpenAI');
+    expect(error).toContain('Anthropic Claude');
+    expect(error).not.toContain('Groq');
+    expect(error).not.toContain('xAI Grok');
+    expect(calls).toEqual(['gemini', 'openai', 'anthropic']);
   });
 });

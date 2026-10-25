@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check JSON and inline script syntax
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8'))"
+          node -e "const vm = require('vm'); const html = require('fs').readFileSync('index.html', 'utf8'); [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach((m) => new vm.Script(m[1]))"
+          node --check sw.js
+          node --check tests/smoke.spec.js
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:smoke
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: test-results/
