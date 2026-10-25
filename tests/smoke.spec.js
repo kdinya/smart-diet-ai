@@ -1685,7 +1685,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
       return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Balanced lunch. Add vegetables.' } }] }) });
     });
 
-    await page.click('[data-analyze="lunch"]');
+    await page.click('#view-home [data-analyze="lunch"]');
     await expect(page.locator('#analysis-modal')).toHaveClass(/open/);
     await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
     expect(body).toContain('Rice bowl');
@@ -1693,16 +1693,49 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await page.click('#analysis-close');
     await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
 
-    await page.click('[data-analyze="dinner"]');
+    await page.click('#view-home [data-analyze="dinner"]');
     await expect(page.locator('#analysis-body')).toContainText('Nothing is logged here yet');
     await page.click('#analysis-close');
 
-    await page.click('[data-analyze="day"]');
+    await page.click('#view-home [data-analyze="day"]');
     await expect(page.locator('#analysis-title')).toHaveText('Analysis: Whole day');
     await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
     expect(body).toContain('Rice bowl');
+    expect(body).toContain('Not logged yet');
+    expect(body).toContain('breakfast, dinner');
     await page.keyboard.press('Escape');
     await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
+  });
+
+  test('diary analysis buttons sit on each meal and the day, and analyze the selected date', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      ...AI_STORE(['groq']),
+      foods: [
+        { id: '55555555-5555-4555-8555-555555555555', name: 'Rice bowl', meal: 'lunch', grams: 250, kcal: 420, protein: 12, fat: 8, carbs: 70, date: today, createdAt: 3000 },
+        { id: '66666666-6666-4666-8666-666666666666', name: 'Old tea', meal: 'lunch', grams: 200, kcal: 5, protein: 0, fat: 0, carbs: 1, date: '2020-01-01', createdAt: 1 },
+      ],
+    });
+    let body = '';
+    await page.route('https://api.groq.com/**', (route) => {
+      body = route.request().postData() || '';
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Light lunch. Add protein.' } }] }) });
+    });
+
+    await openView(page, 'diary');
+    await page.evaluate(() => { $('#diary-date').value = '2020-01-01'; render(); });
+    await expect(page.locator('#diary-meals .meal-card[data-meal-key^="diary|2020-01-01|lunch"] .meal-head [data-analyze]')).toHaveCount(0);
+    await page.click('#diary-meals [data-analyze="lunch"]');
+    await expect(page.locator('#analysis-body')).toContainText('Light lunch. Add protein.');
+    expect(body).toContain('Old tea');
+    expect(body).not.toContain('Rice bowl');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
+
+    await page.click('#diary-summary [data-analyze="day"]');
+    await expect(page.locator('#analysis-title')).toHaveText('Analysis: Whole day');
+    expect(body).toContain('Old tea');
+    expect(body).not.toContain('Rice bowl');
   });
 
   test('Ask the Dietitian sends no diary or profile data and keeps its history', async ({ page }) => {
@@ -1738,6 +1771,15 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await page.click('#ask-clear');
     await page.locator('#confirm-ok').click();
     await expect(page.locator('#ask-box .bubble:not(#ask-welcome)')).toHaveCount(0);
+  });
+
+  test('the system launch screen uses the intro colour, so no light flash shows first', async ({ page }) => {
+    const manifest = await (await page.request.get('/manifest.json')).json();
+    expect(manifest.background_color).toBe('#0d4b2a');
+    expect(manifest.theme_color).toBe('#0d4b2a');
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.goto('/');
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0d4b2a');
   });
 
   test('the launch intro shows the app mark and then leaves the screen', async ({ page }) => {
