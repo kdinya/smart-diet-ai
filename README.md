@@ -25,6 +25,7 @@ Smart Diet AI helps users maintain a balanced diet without complicated math. It 
 - **Daily Overview & Goals**:
   - **Today's Balance:** Progress bars for calories, protein, fat, and carbs, each showing consumed / remaining.
   - **Meal Cards:** Breakdown of meals with calories, protein, fat, and carb subtotals and item counts (on the overview and for every day in the diary).
+  - **Portions:** A saved product defines one portion. When adding it to the diary (and when editing an entry), choose the number of portions from a dropdown (0.25 – 5) or type the amount in grams; the other value and the nutrients update automatically. Entries show the portion count when it differs from one.
   - **Pace-based Plan:** The daily calorie target is calculated from the chosen pace (0.25 / 0.5 / 0.75 kg per week), capped at a safe deficit (up to 25% of maintenance, never below the minimum calories); protein is 1.8 g per kg of reference weight (target weight × 1.15 when losing, never above current weight), capped at 2.2 g per kg of current weight. Changing date of birth, sex, height, weight, activity, or pace recalculates the target automatically once a plan exists. A target weight with BMI below 18.5 is rejected.
   - **Body Weight Check (Statistics):** A semicircle BMI gauge (underweight / healthy / overweight / obesity) based on the latest logged weight, height, age and sex, with the healthy weight range, a recommended weight, and how many kilograms are above or below the range.
   - **Meal Guides:** The calorie guide for each meal accounts for what was already eaten in other meals during the day (unused budget of skipped meals carries forward, up to 1.5× the base share).
@@ -127,6 +128,7 @@ Smart Diet AI — адаптивний PWA-застосунок для свід�
 
 - **Головна панель та цілі**:
   - **Баланс на сьогодні:** Прогрес-бари калорій, білків, жирів і вуглеводів з показником «з’їдено / залишилось».
+  - **Порції:** Збережений продукт задає одну порцію. Під час додавання в щоденник (і при редагуванні запису) кількість порцій обирається зі списку (0,25 – 5) або вводиться вага в грамах; друге значення й нутрієнти перераховуються автоматично. У записах показується кількість порцій, якщо вона відрізняється від одиниці.
   - **План за темпом:** Добова ціль калорій розраховується за обраним темпом (0,25 / 0,5 / 0,75 кг на тиждень) з обмеженням безпечного дефіциту (до 25% від підтримки, не нижче мінімуму калорій); білок рахується як 1,8 г на кг опорної ваги (цільова × 1,15 під час схуднення, але не вище поточної), не більше 2,2 г на кг поточної ваги. Зміна віку, статі, зросту, ваги, активності чи темпу автоматично перераховує ціль, якщо план уже створено. Цільова вага з ІМТ нижче 18,5 відхиляється.
   - **Перевірка ваги тіла (Статистика):** Півколо ІМТ (недостатня / нормальна / надмірна вага / ожиріння) за останньою внесеною вагою, зростом, віком і статтю, зі здоровим діапазоном ваги, рекомендованою вагою та різницею в кілограмах.
   - **Орієнтири по прийомах:** Орієнтир калорій для кожного прийому враховує вже з’їдене в інших прийомах за день (невикористаний бюджет пропущених прийомів переноситься, максимум 1,5× від базової частки).

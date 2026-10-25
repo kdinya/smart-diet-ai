@@ -71,6 +71,7 @@
      - For OpenAI: use current lightweight models (e.g., `gpt-4o-mini`).
    - API keys are stored solely on the client device in `localStorage`; never transmit user API keys to third-party proxy servers without explicit consent.
    - Always surface raw provider error messages in a user-friendly way so the user can easily diagnose missing keys, rate limits, or invalid model errors.
+   - **Periodic Model Version Check:** From time to time (and always when touching AI provider code), the agent must check the official documentation of every provider the app uses (Gemini, OpenAI, Anthropic Claude, Groq, xAI Grok) for the currently recommended and still-supported model identifiers. If any model hard-coded in the app is outdated, deprecated, or has a newer recommended replacement, the agent must tell the repository owner which models are outdated and propose the replacement. Model identifiers are changed only after the owner approves the proposal, unless a model is already discontinued and breaks the feature (then fix it and report it).
 
 5. **Dietary & Safety Guardrails:**
    - Calculations and AI estimations are approximate nutritional estimates and NOT medical advice.
