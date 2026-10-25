@@ -129,6 +129,9 @@ async function mockSupabase(page, backend) {
       return handleRequestFriend(req, backend, json);
     }
 
+    if (url.pathname === '/rest/v1/weight_entries' && req.method() === 'POST' && backend.delayWeightWrites) {
+      await new Promise((resolve) => setTimeout(resolve, backend.delayWeightWrites));
+    }
     if (url.pathname.startsWith('/rest/v1/')) {
       return handleRest(route, req, url, backend, json);
     }
@@ -1815,5 +1818,68 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await page.goto('/');
     await expect(page.locator('#intro .intro-word')).toHaveText('Smart Diet AI');
     await expect(page.locator('#intro')).toHaveCount(0, { timeout: 6000 });
+  });
+});
+
+test.describe('Smoke: dialog focus', () => {
+  test('opening the dietitian chat does not open the keyboard by itself', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.locator('#chat-fab').click();
+    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+    await expect(page.locator('#chat-input')).not.toBeFocused();
+  });
+});
+
+test.describe('Smoke: weigh-in deletion in the cloud', () => {
+  test('a weigh-in deleted while its upload is still in flight does not come back', async ({ page }) => {
+    const backend = createBackend();
+    backend.delayWeightWrites = 1500;
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, currentWeight: 97 }, foods: [], weights: [] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '96');
+    await page.click('#weight-save');
+    await openView(page, 'stats');
+    await page.locator('#weight-history [data-delete-weight]').first().click();
+    await expect(page.locator('#weight-history')).not.toContainText('96');
+    await page.waitForTimeout(2500);
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await openView(page, 'stats');
+    await expect(page.locator('#weight-history')).not.toContainText('96');
+    expect(backend.tables.weight_entries).toHaveLength(0);
+  });
+
+  test('a deleted weigh-in stays deleted after reload and the profile weight is shown again', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, currentWeight: 97 }, foods: [], weights: [] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '96');
+    await page.click('#weight-save');
+    await expect.poll(() => backend.tables.weight_entries.map((row) => Number(row.value))).toEqual([96]);
+
+    await openView(page, 'stats');
+    await autoConfirm(page, true);
+    await page.locator('#weight-history [data-delete-weight]').first().click();
+    await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
+    await expect(page.locator('#weight-history')).not.toContainText('96');
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
+    await openView(page, 'stats');
+    await expect(page.locator('#weight-history')).not.toContainText('96');
+    await openView(page, 'home');
+    await expect(page.locator('#home-weight')).toHaveText('97.0');
   });
 });
