@@ -20,6 +20,7 @@
 
 **Get help from AI**
 - **AI Dietitian:** type what you want to eat. The app estimates the grams and nutrition and suggests how much fits your calories for that meal. Add the result to your diary with one tap.
+- **Choose a character:** in **Settings → AI personality**, pick *Polite and cultured* or *Playful and cheeky*. The choice applies to the AI Dietitian, meal analysis and short messages in the app.
 - **Analyze buttons:** next to each meal and next to today's meals on the Overview and Diary screens, get a short review of that meal or of the whole day, with 2–3 tips.
 - **Ask the Dietitian:** ask any general nutrition question. These questions do not include your diary or your profile.
 
