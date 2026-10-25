@@ -621,7 +621,7 @@ async function approveLocalData(){let mine=!!(state.synced&&state.synced.uid===u
 async function loadRemote(){
   if(!await approveLocalData())return;
   syncApprovedUid=user.id;
-  let restored=recoverLocalBackup();backupLocalData();
+  let restored=stateRecovered?recoverLocalBackup():false;backupLocalData();
   await runSync(true);
   if(restored)toast(t('dataRestored'));
 }
