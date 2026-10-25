@@ -749,7 +749,7 @@ function analysisPrompt(date,meal,items){
         order=['breakfast','lunch','dinner'],has=m=>state.foods.some(f=>f.date===date&&f.meal===m),
         pending=order.filter(m=>!has(m)),
         laterLogged=m=>order.slice(order.indexOf(m)+1).some(has),
-        cut={breakfast:11,lunch:16,dinner:22},
+        cut={breakfast:12,lunch:16,dinner:24},
         skipped=pending.filter(laterLogged).map(m=>t(m).toLowerCase()),
         late=pending.filter(m=>!laterLogged(m)&&(!isToday||hour>=cut[m])).map(m=>t(m).toLowerCase()),
         ahead=pending.filter(m=>!laterLogged(m)&&isToday&&hour<cut[m]).map(m=>t(m).toLowerCase()),
