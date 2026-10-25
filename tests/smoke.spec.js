@@ -260,11 +260,11 @@ test.describe('Smoke: goals', () => {
     await openView(page, 'settings');
     await page.fill('#pref-kcal', '-500');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toHaveText('Values must be zero or positive numbers.');
+    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
 
     await page.fill('#pref-kcal', '0');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toHaveText('Values must be zero or positive numbers.');
+    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
 
     const stored = await readStore(page);
     expect(stored.prefs.kcal).toBe(1800);
@@ -582,6 +582,76 @@ test.describe('Smoke: backup import', () => {
     const stored = await readStore(page);
     expect(stored.foods.map((food) => food.name)).toEqual(['Old local entry']);
     expect(stored.prefs.kcal).toBe(2000);
+  });
+});
+
+test.describe('Smoke: input limits and resilience', () => {
+  test('values above the database limits are rejected in the forms', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Huge portion');
+    await page.fill('#food-kcal', '99999999');
+    await page.click('#food-save');
+    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
+    expect((await readStore(page)).foods).toHaveLength(0);
+
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await page.evaluate(() => openModal('weight'));
+    await page.fill('#weight-value', '1000');
+    await page.click('#weight-save');
+    await expect(page.locator('#toast')).toHaveText('Enter a weight from 1 to 500 kg.');
+    expect((await readStore(page)).weights).toHaveLength(0);
+  });
+
+  test('a long food name is cut to the database limit', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.locator('#food-name').evaluate((el) => { el.removeAttribute('maxlength'); });
+    await page.fill('#food-name', 'x'.repeat(300));
+    await page.fill('#food-kcal', '100');
+    await page.click('#food-save');
+    await expect.poll(async () => (await readStore(page)).foods.length).toBe(1);
+    expect((await readStore(page)).foods[0].name).toHaveLength(120);
+  });
+
+  test('unreadable saved data does not break the app and a copy is kept', async ({ page }) => {
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('seeded-broken')) {
+        sessionStorage.setItem('seeded-broken', '1');
+        localStorage.setItem('smartdiet-v1', '{broken json');
+      }
+    });
+    await page.goto('/');
+    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#toast')).toContainText('unreadable', { timeout: 20_000 });
+    const kept = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('smartdiet-corrupt-')).map((key) => localStorage.getItem(key)));
+    expect(kept).toEqual(['{broken json']);
+  });
+
+  test('wrongly shaped saved data is repaired instead of crashing', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: 'oops', weights: 5, products: { a: 1 } });
+    await expect(page.locator('#nav')).toBeVisible();
+    await openView(page, 'diary');
+    const shapes = await page.evaluate(() => [state.foods, state.weights, state.products].map((list) => Array.isArray(list)));
+    expect(shapes).toEqual([true, true, true]);
+  });
+
+  test('the app loads no scripts from other hosts and ships a content security policy', async ({ page }) => {
+    const external = [];
+    page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (req.resourceType() === 'script' && url.origin !== new URL(page.url() === 'about:blank' ? 'http://localhost' : page.url()).origin) external.push(req.url());
+    });
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.goto('/');
+    await expect(page.locator('#nav')).toBeVisible();
+    expect(external).toEqual([]);
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).not.toContain('cdn.jsdelivr.net');
+    expect(await page.evaluate(() => typeof window.supabase?.createClient)).toBe('function');
   });
 });
 
@@ -937,11 +1007,12 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#products-list')).toContainText('Oats');
     await page.locator('#products-list [data-toggle-product]').first().click();
     await page.locator('#products-list [data-add-product]').first().click();
-    await page.fill('#food-grams', '100');
-    await expect(page.locator('#food-kcal')).toHaveValue('150');
-    await page.click('#food-save');
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.fill('#pick-grams', '100');
+    await page.click('#pick-add');
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals .meal-item', { hasText: 'Oats' })).toHaveCount(2);
+    expect((await readStore(page)).foods.map((food) => food.kcal).sort((a, b) => a - b)).toEqual([150, 300]);
   });
 
   test('a new product can be created and deleted in My products', async ({ page }) => {
