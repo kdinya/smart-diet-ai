@@ -392,7 +392,11 @@ test.describe('Smoke: food deletion', () => {
     await openView(page, 'diary');
     await addFood(page, 'Smoke rice');
 
+    const dialogs = [];
+    page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
     await foodRow(page, 'Smoke rice').locator('[data-delete-food]').click();
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0]).toBe('Delete “Smoke rice” from the diary (lunch)?');
     await expect(page.locator('#toast')).toHaveText('Entry deleted.');
     await expect(foodRow(page, 'Smoke rice')).toHaveCount(0);
 
@@ -414,6 +418,7 @@ test.describe('Smoke: food deletion', () => {
     await addFood(page, 'Smoke oats');
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
+    page.once('dialog', (d) => d.accept());
     await foodRow(page, 'Smoke oats').locator('[data-delete-food]').click();
     await expect(page.locator('#toast')).toHaveText('Entry deleted.');
     await expect.poll(() => backend.tables.food_entries.length).toBe(0);
@@ -529,6 +534,7 @@ test.describe('Smoke: food deletion', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
     backend.failDeletes = true;
+    page.once('dialog', (d) => d.accept());
     await foodRow(page, 'Smoke eggs').locator('[data-delete-food]').click();
     await expect(page.locator('#toast')).toContainText('Saved locally; sync failed:');
     await expect(foodRow(page, 'Smoke eggs')).toHaveCount(1);
@@ -1181,11 +1187,40 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.click('#food-save');
     await expect(page.locator('#products-list')).toContainText('Buckwheat');
     await page.locator('#products-list [data-toggle-product]').first().click();
-    page.once('dialog', (dialog) => dialog.accept());
+    const prodDialogs = [];
+    page.on('dialog', (dialog) => {
+      prodDialogs.push(dialog.message());
+      dialog.accept();
+    });
     await page.locator('#products-list [data-delete-product]').first().click();
+    expect(prodDialogs).toHaveLength(1);
+    expect(prodDialogs[0]).toBe('Delete “Buckwheat” from My products?');
     await expect(page.locator('#products-list')).not.toContainText('Buckwheat');
   });
 
+
+    test('cancelling food deletion preserves the diary entry', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await addFood(page, 'Cancel apple');
+    page.once('dialog', (d) => d.dismiss());
+    await foodRow(page, 'Cancel apple').locator('[data-delete-food]').click();
+    await expect(foodRow(page, 'Cancel apple')).toHaveCount(1);
+  });
+
+  test('cancelling product deletion preserves the product in My products', async ({ page }) => {
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [],
+      weights: [],
+      products: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Keep oatmeal', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25 }],
+    });
+    await openView(page, 'products');
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    page.once('dialog', (d) => d.dismiss());
+    await page.locator('#products-list [data-delete-product]').first().click();
+    await expect(page.locator('#products-list')).toContainText('Keep oatmeal');
+  });
 
   test('saved products start collapsed and reveal details and actions when toggled', async ({ page }) => {
     await openApp(page, {
