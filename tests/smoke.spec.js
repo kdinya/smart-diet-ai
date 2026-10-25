@@ -787,6 +787,50 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#home-weight')).toHaveText('75.2');
   });
 
+  test('a food row expands to show protein, fat and carbs', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: '77777777-7777-4777-8777-777777777777', name: 'Oats', meal: 'breakfast', grams: 200, kcal: 300, protein: 10, fat: 5, carbs: 50, date: today, createdAt: Date.now() }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const row = page.locator('#diary-meals .meal-item', { hasText: 'Oats' });
+    await expect(row.locator('.meal-detail')).toBeHidden();
+    await row.locator('.meal-info').click();
+    await expect(row.locator('.meal-detail')).toBeVisible();
+    await expect(row.locator('.meal-detail')).toContainText('10');
+    await row.locator('.meal-info').click();
+    await expect(row.locator('.meal-detail')).toBeHidden();
+  });
+
+  test('breakfast, lunch and dinner show eaten against the meal target', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, kcal: 2000, protein: 100, fat: 70, carbs: 242 }, foods: [], weights: [] });
+    await openView(page, 'diary');
+    const cards = page.locator('#diary-meals .meal-card');
+    await expect(cards.nth(0).locator('.meal-kcal')).toContainText('0 / 500');
+    await expect(cards.nth(1).locator('.meal-kcal')).toContainText('0 / 700');
+    await expect(cards.nth(2).locator('.meal-kcal')).toContainText('0 / 800');
+    await expect(cards.nth(3).locator('.meal-kcal')).not.toContainText('/');
+  });
+
+  test('a weigh-in can be deleted from the statistics', async ({ page }) => {
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [],
+      weights: [
+        { id: '88888888-8888-4888-8888-888888888888', value: 82.3, date: '2026-10-01' },
+        { id: '99999999-9999-4999-8999-999999999999', value: 80.4, date: '2026-10-20' },
+      ],
+    });
+    await openView(page, 'stats');
+    await expect(page.locator('#weight-history .food-row')).toHaveCount(2);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#weight-history [data-delete-weight="2026-10-20"]').click();
+    await expect(page.locator('#weight-history .food-row')).toHaveCount(1);
+    await expect(page.locator('#weight-history')).not.toContainText('80.4');
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
