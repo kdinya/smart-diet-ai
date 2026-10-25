@@ -831,6 +831,44 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#weight-history')).not.toContainText('80.4');
   });
 
+  test('meal cards are expanded today, collapsed for other dates, and can be toggled', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const past = new Date(Date.now() - 3 * 86400000).toLocaleDateString('en-CA');
+    const mk = (id, date) => ({ id, name: 'Oats ' + date, meal: 'breakfast', grams: 100, kcal: 300, protein: 10, fat: 5, carbs: 50, date, createdAt: Date.now() });
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [mk('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', today), mk('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', past)],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const first = page.locator('#diary-meals .meal-card').first();
+    await expect(first).not.toHaveClass(/collapsed/);
+    await expect(first.locator('.meal-item')).toBeVisible();
+    await first.locator('.meal-head').click();
+    await expect(first).toHaveClass(/collapsed/);
+    await expect(first.locator('.meal-item')).toBeHidden();
+    await expect(first.locator('.meal-kcal')).toContainText('300');
+    await page.fill('#diary-date', past);
+    await page.locator('#diary-date').dispatchEvent('change');
+    await expect(page.locator('#diary-meals .meal-card').first()).toHaveClass(/collapsed/);
+    await page.locator('#diary-meals .meal-card').first().locator('.meal-head').click();
+    await expect(page.locator('#diary-meals .meal-card').first().locator('.meal-item')).toBeVisible();
+  });
+
+  test('delete buttons use a trash icon', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: BASE_PREFS,
+      foods: [{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: 'Oats', meal: 'breakfast', grams: 100, kcal: 300, protein: 10, fat: 5, carbs: 50, date: today, createdAt: Date.now() }],
+      weights: [{ id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', value: 80, date: today }],
+    });
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals [data-delete-food] svg')).toHaveCount(1);
+    await expect(page.locator('#diary-meals [data-delete-food]')).not.toContainText('✕');
+    await openView(page, 'stats');
+    await expect(page.locator('#weight-history [data-delete-weight] svg')).toHaveCount(1);
+  });
+
   test('weight is chosen on a scroll wheel on touch devices', async ({ browser }) => {
     const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 }, serviceWorkers: 'block' });
     const page = await context.newPage();
