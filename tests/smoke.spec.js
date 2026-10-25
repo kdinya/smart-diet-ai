@@ -583,6 +583,7 @@ test.describe('Smoke: account switching', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(1);
 
     await signOut(page);
+    await autoConfirm(page, false);
     await signIn(page, 'bob@example.test');
 
     await openView(page, 'diary');
@@ -1531,7 +1532,7 @@ test.describe('Smoke: today balance', () => {
     expect(order.line).toBeGreaterThan(order.main);
   });
 
-  test('the remainder never goes below zero and the text follows the language', async ({ page }) => {
+  test('an overage is shown as over, and the text follows the language', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, {
       prefs: { ...BASE_PREFS, lang: 'uk' },
@@ -1540,8 +1541,10 @@ test.describe('Smoke: today balance', () => {
     });
     await expect(page.locator('#home-kcal')).toHaveText('2400');
     await expect(page.locator('#home-kcal-total')).toHaveText('2000');
-    await expect(page.locator('#home-kcal-left')).toHaveText('0');
-    await expect(page.locator('#view-home .stats .metric').first().locator('.left-line')).toHaveText('залишилось 0 ккал');
+    await expect(page.locator('#home-kcal-left')).toHaveText('400');
+    const kcalLine = page.locator('#view-home .stats .metric').first().locator('.left-line');
+    await expect(kcalLine).toHaveText('перебір 400 ккал');
+    await expect(kcalLine).toHaveClass(/over/);
   });
 });
 
