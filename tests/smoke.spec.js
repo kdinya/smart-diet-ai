@@ -1883,3 +1883,20 @@ test.describe('Smoke: weigh-in deletion in the cloud', () => {
     await expect(page.locator('#home-weight')).toHaveText('97.0');
   });
 });
+
+test.describe('Smoke: AI character', () => {
+  test('the playful character changes app texts and the choice survives reload', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await expect(page.locator('#chat-welcome')).not.toContainText('croissant');
+    await openView(page, 'settings');
+    await expect(page.locator('#pref-tone')).toHaveValue('polite');
+    await page.selectOption('#pref-tone', 'playful');
+    await page.click('#save-tone');
+    await expect(page.locator('#chat-welcome')).toContainText('just one more croissant');
+    await page.reload();
+    await expect(page.locator('#nav')).toBeVisible();
+    await openView(page, 'settings');
+    await expect(page.locator('#pref-tone')).toHaveValue('playful');
+    expect((await readStore(page)).prefs.aiTone).toBe('playful');
+  });
+});
