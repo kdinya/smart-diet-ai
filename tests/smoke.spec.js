@@ -1672,6 +1672,9 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
 
   test('meal and whole-day analysis send only today’s entries and show the answer', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    await page.clock.setFixedTime(noon);
     await openApp(page, {
       ...AI_STORE(['groq']),
       foods: [
@@ -1701,8 +1704,9 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await expect(page.locator('#analysis-title')).toHaveText('Analysis: Whole day');
     await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
     expect(body).toContain('Rice bowl');
-    expect(body).toContain('Not logged yet');
-    expect(body).toContain('breakfast, dinner');
+    expect(body).toContain('Current time: 12:00');
+    expect(body).toContain('Not logged although the usual time has passed: breakfast');
+    expect(body).toContain('Still ahead today: dinner');
     await page.keyboard.press('Escape');
     await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
   });

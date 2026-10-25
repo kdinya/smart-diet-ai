@@ -745,10 +745,19 @@ function analysisPrompt(date,meal,items){
       label=all?(uk?'весь день':'the whole day'):(uk?'прийом «'+t(meal).toLowerCase()+'»':'the '+t(meal).toLowerCase()+' meal'),
       rows=items.map(f=>`- ${String(f.name||'').slice(0,80)}: ${fmt(f.grams)} g, ${fmt(f.kcal)} kcal, protein ${fmt(f.protein)} g, fat ${fmt(f.fat)} g, carbs ${fmt(f.carbs)} g`).join('\n'),
       goal=`${fmt(target.kcal*share)} kcal, protein ${fmt(target.protein*share)} g, fat ${fmt(target.fat*share)} g, carbs ${fmt(target.carbs*share)} g`,
-      missing=all?['breakfast','lunch','dinner'].filter(m=>!state.foods.some(f=>f.date===date&&f.meal===m)).map(m=>t(m).toLowerCase()):[],
-      missLine=!all?'':(missing.length
-        ? (uk?`Ще не записано (можливо, ще попереду, не вважай пропущеними): ${missing.join(', ')}.`:`Not logged yet (may still be ahead, do not treat as skipped): ${missing.join(', ')}.`)
-        : (uk?'Усі основні прийоми їжі вже записано.':'All main meals are already logged.'))+(all?'\n'+(uk?`Залишок на решту дня: ${fmt(target.kcal-used.kcal)} kcal (від’ємне значення означає перевищення).`:`Remaining for the rest of the day: ${fmt(target.kcal-used.kcal)} kcal (a negative value means over the target).`):''),
+      missLine=!all?'':(()=>{let hour=new Date().getHours(),isToday=date===iso(),now=new Date(),clock=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),
+        has=m=>state.foods.some(f=>f.date===date&&f.meal===m),
+        pending=['breakfast','lunch','dinner'].filter(m=>!has(m)),
+        cut={breakfast:11,lunch:16,dinner:22},
+        late=pending.filter(m=>!isToday||hour>=cut[m]).map(m=>t(m).toLowerCase()),
+        ahead=pending.filter(m=>isToday&&hour<cut[m]).map(m=>t(m).toLowerCase()),
+        L=[uk?`Поточний час: ${clock}.`:`Current time: ${clock}.`];
+        if(late.length)L.push(uk?`Не записано, хоча звичний час уже минув: ${late.join(', ')}. Це могло бути пропущено, а могло бути не внесено, тому не стверджуй напевно.`:`Not logged although the usual time has passed: ${late.join(', ')}. It may have been skipped or simply not recorded, so do not state it as certain.`);
+        if(ahead.length)L.push(uk?`Ще попереду сьогодні: ${ahead.join(', ')}. Не вважай їх пропущеними.`:`Still ahead today: ${ahead.join(', ')}. Do not treat them as skipped.`);
+        if(!pending.length)L.push(uk?'Усі основні прийоми їжі вже записано.':'All main meals are already logged.');
+        L.push(uk?'Якщо прийом пропущено, не пропонуй компенсувати його голодуванням чи жорсткими обмеженнями. Дай звичайну пораду для наступного прийому.':'If a meal was skipped, do not suggest making up for it with fasting or strict restriction. Give a normal tip for the next meal.');
+        L.push(uk?`Залишок на решту дня: ${fmt(target.kcal-used.kcal)} kcal (від’ємне значення означає перевищення).`:`Remaining for the rest of the day: ${fmt(target.kcal-used.kcal)} kcal (a negative value means over the target).`);
+        return L.join('\n')})(),
       sum=`${fmt(used.kcal)} kcal, protein ${fmt(used.protein)} g, fat ${fmt(used.fat)} g, carbs ${fmt(used.carbs)} g`;
   return uk
     ? `Ти — загальний помічник з харчування, не лікар. Проаналізуй ${label} за записами щоденника користувача. Відповідай українською, коротко і простим текстом, без JSON і таблиць. Структура: 1) оцінка у 2–3 реченнях: чи збалансовано відносно орієнтирів; 2) чого бракує або чого забагато; 3) 2–3 прості конкретні поради для наступного прийому їжі або решти дня. Не вважай нові продукти вже з’їденими. Цифри є оцінкою. Медичні питання передай лікарю.\nОрієнтир: ${goal}.\n${missLine}\nЗаписи:\n${rows}\nРазом: ${sum}.`
