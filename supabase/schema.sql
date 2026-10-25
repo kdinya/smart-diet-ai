@@ -62,3 +62,27 @@ create policy "Users manage their own profile" on public.user_profiles
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 grant select, insert, update, delete on public.user_profiles to authenticated;
+
+-- My products: saved foods synced per record (one row per product).
+create table if not exists public.products (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 120),
+  grams numeric(9,2) not null default 100 check (grams >= 0),
+  kcal numeric(9,2) not null default 0 check (kcal >= 0),
+  protein numeric(9,2) not null default 0 check (protein >= 0),
+  fat numeric(9,2) not null default 0 check (fat >= 0),
+  carbs numeric(9,2) not null default 0 check (carbs >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists products_user_name_idx on public.products (user_id, lower(name));
+
+alter table public.products enable row level security;
+
+drop policy if exists "Users manage their own products" on public.products;
+create policy "Users manage their own products" on public.products
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.products to authenticated;
