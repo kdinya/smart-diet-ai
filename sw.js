@@ -1,4 +1,4 @@
-const CACHE='smart-diet-shell-v41';
+const CACHE='smart-diet-shell-v42';
 const SHELL=['./','./index.html','./manifest.json','./icon.svg','./vendor/supabase-js-2.117.3.js'];
 
 self.addEventListener('install',event=>event.waitUntil(

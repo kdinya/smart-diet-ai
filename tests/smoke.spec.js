@@ -655,6 +655,50 @@ test.describe('Smoke: input limits and resilience', () => {
   });
 });
 
+test.describe('Smoke: accessibility', () => {
+  test('settings fields and the diary date have accessible names', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const ids = ['auth-email', 'auth-password', 'pref-name', 'pref-lang', 'pref-kcal', 'pref-protein', 'pref-carbs', 'pref-fat', 'profile-birth', 'profile-sex', 'profile-height', 'profile-weight', 'profile-target', 'profile-activity', 'profile-pace', 'profile-notes', 'diary-date'];
+    const unnamed = await page.evaluate((list) => list.filter((id) => {
+      const el = document.getElementById(id);
+      return !el || !((el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'));
+    }), ids);
+    expect(unnamed).toEqual([]);
+  });
+
+  test('dialogs are announced as dialogs with a name', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const bad = await page.evaluate(() => [...document.querySelectorAll('.modal-back')].filter((el) => {
+      const label = el.getAttribute('aria-labelledby');
+      return el.getAttribute('role') !== 'dialog' || el.getAttribute('aria-modal') !== 'true' || !label || !document.getElementById(label);
+    }).map((el) => el.id));
+    expect(bad).toEqual([]);
+  });
+
+  test('muted text colour keeps at least 4.5:1 contrast on the app backgrounds', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const ratio = await page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement);
+      const parse = (hex) => { let v = hex.trim().replace('#', ''); if (v.length === 3) v = [...v].map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255); };
+      const lum = (rgb) => { const [r, g, b] = rgb.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const contrast = (a, b) => { const [hi, lo] = [lum(parse(a)), lum(parse(b))].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+      const muted = css.getPropertyValue('--muted');
+      return Math.min(...['--bg', '--paper', '--mint'].map((name) => contrast(muted, css.getPropertyValue(name))));
+    });
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('the body weight gauge has a text alternative', async ({ page }) => {
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, setupComplete: true, birthDate: '1990-01-01', height: 175, currentWeight: 80, targetWeight: 72 },
+      foods: [],
+      weights: [],
+    });
+    await openView(page, 'stats');
+    await expect(page.locator('#bmi-gauge svg')).toHaveAttribute('aria-label', /BMI \d+\.\d/);
+  });
+});
+
 test.describe('Smoke: sign-out and data transfer', () => {
   test('sign out hides the button and shows a status', async ({ page }) => {
     const backend = createBackend();
