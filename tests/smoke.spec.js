@@ -1705,7 +1705,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await expect(page.locator('#analysis-body')).toContainText('Balanced lunch. Add vegetables.');
     expect(body).toContain('Rice bowl');
     expect(body).toContain('Current time: 12:00');
-    expect(body).toContain('Not logged although the usual time has passed: breakfast');
+    expect(body).toContain('Not logged, but later meals are already recorded: breakfast. These were most likely skipped.');
     expect(body).toContain('Still ahead today: dinner');
     await page.keyboard.press('Escape');
     await expect(page.locator('#analysis-modal')).not.toHaveClass(/open/);
@@ -1740,6 +1740,30 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await expect(page.locator('#analysis-title')).toHaveText('Analysis: Whole day');
     expect(body).toContain('Old tea');
     expect(body).not.toContain('Rice bowl');
+  });
+
+  test('whole-day analysis treats a skipped breakfast as skipped when lunch and dinner are logged', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const evening = new Date();
+    evening.setHours(20, 0, 0, 0);
+    await page.clock.setFixedTime(evening);
+    await openApp(page, {
+      ...AI_STORE(['groq']),
+      foods: [
+        { id: '77777777-7777-4777-8777-777777777777', name: 'Soup', meal: 'lunch', grams: 300, kcal: 200, protein: 8, fat: 6, carbs: 25, date: today, createdAt: 2000 },
+        { id: '88888888-8888-4888-8888-888888888888', name: 'Fish', meal: 'dinner', grams: 200, kcal: 350, protein: 30, fat: 14, carbs: 5, date: today, createdAt: 4000 },
+      ],
+    });
+    let body = '';
+    await page.route('https://api.groq.com/**', (route) => {
+      body = route.request().postData() || '';
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Add breakfast tomorrow.' } }] }) });
+    });
+    await page.click('#view-home [data-analyze="day"]');
+    await expect(page.locator('#analysis-body')).toContainText('Add breakfast tomorrow.');
+    expect(body).toContain('Not logged, but later meals are already recorded: breakfast.');
+    expect(body).not.toContain('Still ahead today');
+    expect(body).toContain('do not suggest making up for it with fasting');
   });
 
   test('Ask the Dietitian sends no diary or profile data and keeps its history', async ({ page }) => {

@@ -746,12 +746,15 @@ function analysisPrompt(date,meal,items){
       rows=items.map(f=>`- ${String(f.name||'').slice(0,80)}: ${fmt(f.grams)} g, ${fmt(f.kcal)} kcal, protein ${fmt(f.protein)} g, fat ${fmt(f.fat)} g, carbs ${fmt(f.carbs)} g`).join('\n'),
       goal=`${fmt(target.kcal*share)} kcal, protein ${fmt(target.protein*share)} g, fat ${fmt(target.fat*share)} g, carbs ${fmt(target.carbs*share)} g`,
       missLine=!all?'':(()=>{let hour=new Date().getHours(),isToday=date===iso(),now=new Date(),clock=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),
-        has=m=>state.foods.some(f=>f.date===date&&f.meal===m),
-        pending=['breakfast','lunch','dinner'].filter(m=>!has(m)),
+        order=['breakfast','lunch','dinner'],has=m=>state.foods.some(f=>f.date===date&&f.meal===m),
+        pending=order.filter(m=>!has(m)),
+        laterLogged=m=>order.slice(order.indexOf(m)+1).some(has),
         cut={breakfast:11,lunch:16,dinner:22},
-        late=pending.filter(m=>!isToday||hour>=cut[m]).map(m=>t(m).toLowerCase()),
-        ahead=pending.filter(m=>isToday&&hour<cut[m]).map(m=>t(m).toLowerCase()),
+        skipped=pending.filter(laterLogged).map(m=>t(m).toLowerCase()),
+        late=pending.filter(m=>!laterLogged(m)&&(!isToday||hour>=cut[m])).map(m=>t(m).toLowerCase()),
+        ahead=pending.filter(m=>!laterLogged(m)&&isToday&&hour<cut[m]).map(m=>t(m).toLowerCase()),
         L=[uk?`Поточний час: ${clock}.`:`Current time: ${clock}.`];
+        if(skipped.length)L.push(uk?`Не записано, але пізніші прийоми вже є: ${skipped.join(', ')}. Ймовірно, їх пропущено.`:`Not logged, but later meals are already recorded: ${skipped.join(', ')}. These were most likely skipped.`);
         if(late.length)L.push(uk?`Не записано, хоча звичний час уже минув: ${late.join(', ')}. Це могло бути пропущено, а могло бути не внесено, тому не стверджуй напевно.`:`Not logged although the usual time has passed: ${late.join(', ')}. It may have been skipped or simply not recorded, so do not state it as certain.`);
         if(ahead.length)L.push(uk?`Ще попереду сьогодні: ${ahead.join(', ')}. Не вважай їх пропущеними.`:`Still ahead today: ${ahead.join(', ')}. Do not treat them as skipped.`);
         if(!pending.length)L.push(uk?'Усі основні прийоми їжі вже записано.':'All main meals are already logged.');
