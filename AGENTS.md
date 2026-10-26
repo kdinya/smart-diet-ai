@@ -67,20 +67,22 @@
    - Never hardcode strings in UI templates or scripts without corresponding `uk` and `en` entries.
    - Keep 100% dictionary key parity between `I.uk` and `I.en`.
 
-3. **Data Loss Prevention & Storage Resilience:**
-   - User profile, goals, daily food entries, and weight logs are stored in `localStorage` under key `smartdiet-v1`.
-   - Any schema or data structure update MUST preserve backwards compatibility with existing stored user data. Never wipe, rename, or reset `smartdiet-v1` without a safe migration fallback.
-   - Local state must seamlessly merge or synchronize with Supabase when cloud sync is configured.
-   - **Never expose Supabase `service_role` key in client-side code.** Only public `anon` key with properly configured Row Level Security (RLS) is allowed in the browser.
+3. **Absolute Priority: User Data Preservation & Functional Integrity (MANDATORY):**
+   - Preserving existing user data and core application integrity is the highest-priority invariant. No code change may clear, lose, silently overwrite, misattribute, or expose user data: profile details, daily goals, food diary entries, weight history, custom products, and pending sync/deletion queues.
+   - Treat `smartdiet-v1`, `smartdiet-ask-v1`, account-scoped archives, record IDs, schemas, ownership fields, and synchronization queues as compatibility contracts. Never rename or reset storage keys or change record shapes without a backwards-compatible migration that preserves every existing record.
+   - Local data is authoritative until the server confirms a corresponding write or deletion. Network errors, RLS/permission failures, timeouts, account switches, retries, and concurrent edits must never be treated as successful sync or cause pending changes to be discarded.
+   - Keep every queued operation associated with the correct account. Do not upload one user's local data to another account; do not delete data or archives belonging to other accounts. A deletion is complete only after the server confirms it, and an edit made during an upload must remain queued for a later sync.
+   - Before changing persistence, sync, authentication, import/export, or record editing, inspect the full read/write/delete and migration paths first. Add regression coverage for the affected failure and race cases, including reload and account-switch behavior. Prefer isolated/mock or dedicated test data; never run destructive tests against production user data.
+   - Before release, verify existing profile, goals, foods, weights, products, and pending queue load, render, survive reload, and remain intact after failed/slow sync. If a migration or test cannot prove preservation, do not ship the change until it is safe.
+   - **Never expose Supabase `service_role` key in client-side code.** Only the public `anon`/publishable key with properly configured Row Level Security (RLS) is allowed in the browser.
 
 4. **AI Providers & Model Integration:**
-   - The app supports Google Gemini and OpenAI as AI providers for meal portion and nutrition estimation.
-   - API endpoints and model identifiers must match official provider specifications:
-     - For Google Gemini: use actively supported stable models (e.g., `gemini-2.0-flash` or newer documented endpoints); do not use discontinued models.
-     - For OpenAI: use current lightweight models (e.g., `gpt-4o-mini`).
+   - The app supports Google Gemini, OpenAI, Anthropic Claude, Groq, and xAI Grok. Preserve all configured provider paths and their fallback behavior when editing prompts or UI.
+   - Keep model identifiers and request parameters aligned with each provider's current official API documentation. Do not assume a model remains available because it worked previously. When touching provider code, verify current models and endpoint requirements from the provider's official documentation; report any needed model change before changing it, except to restore a feature broken by a discontinued model.
+   - Respect provider-specific request constraints. Reasoning-enabled OpenAI models may reject `temperature`; Gemini responses may be truncated at the output limit, so detect truncation and never parse or save incomplete structured output as valid data.
+   - For Anthropic Claude, Groq, and xAI Grok, use current models and request parameters from provider documentation.
    - API keys are stored solely on the client device in `localStorage`; never transmit user API keys to third-party proxy servers without explicit consent.
-   - Always surface raw provider error messages in a user-friendly way so the user can easily diagnose missing keys, rate limits, or invalid model errors.
-   - **Periodic Model Version Check:** From time to time (and always when touching AI provider code), the agent must check the official documentation of every provider the app uses (Gemini, OpenAI, Anthropic Claude, Groq, xAI Grok) for the currently recommended and still-supported model identifiers. If any model hard-coded in the app is outdated, deprecated, or has a newer recommended replacement, the agent must tell the repository owner which models are outdated and propose the replacement. Model identifiers are changed only after the owner approves the proposal, unless a model is already discontinued and breaks the feature (then fix it and report it).
+   - Surface provider failures clearly and keep retry/fallback behavior bounded. Validate structured AI values before saving them; missing or invalid nutrition values must not silently become zero or be written to a user's diary.
 
 5. **Dietary & Safety Guardrails:**
    - Calculations and AI estimations are approximate nutritional estimates and NOT medical advice.
@@ -109,6 +111,6 @@ Before pushing any commit:
    - Verify food entry creation, editing, and deletion across both local and Supabase modes.
    - Verify AI portion calculation with valid and invalid inputs.
    - Verify UI rendering in both Ukrainian and English.
-   - Verify responsive layout on mobile breakpoint (≤680px) and desktop (>950px).
+   - Verify responsive layout at 360px–430px and ≤680px, plus desktop (>950px); check safe areas and ensure content clears fixed or floating controls.
 4. **Clean Working Tree:**
    - Ensure no leftover debug scripts, temporary files, or unstaged modifications.
