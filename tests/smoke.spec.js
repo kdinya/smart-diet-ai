@@ -1562,6 +1562,69 @@ const AI_STORE = (order) => ({
 });
 
 test.describe('Smoke: meal plan', () => {
+  test("tomorrow plan ignores today's fully used calorie budget and saves for tomorrow", async ({ page }) => {
+    const products = [
+      { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'meal-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'meal-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+    ];
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      ...AI_STORE(['gemini']),
+      prefs: { ...BASE_PREFS, kcal: 2000 },
+      products,
+      foods: [{ id: 'today-full', name: 'Already eaten', date: today, meal: 'lunch', grams: 500, kcal: 2000, protein: 80, fat: 60, carbs: 220 }],
+    });
+    let requestBody;
+    await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+      requestBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        headers: CORS,
+        contentType: 'application/json',
+        body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+          items: [{ id: 'meal-oats', grams: 100, meal: 'breakfast' }],
+        }) }] } }] }),
+      });
+    });
+    await page.locator('#meal-plan-open').click();
+    await page.locator('#meal-plan-dates [data-meal-plan-date="tomorrow"]').click();
+    await page.locator('#meal-plan-products [data-plan-product]').first().check();
+    await page.locator('#meal-plan-products [data-plan-product]').nth(1).check();
+    await page.locator('#meal-plan-products [data-plan-product]').nth(2).check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#toast')).toContainText('Plan saved as a draft');
+    expect(requestBody.contents[0].parts[0].text).toContain('tomorrow');
+    expect(requestBody.contents[0].parts[0].text).toContain('Already logged for this day: 0 kcal');
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    const tomorrow = await page.evaluate(() => {
+      const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-CA');
+    });
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].date).toBe(tomorrow);
+  });
+
+  test('meal-plan validation toast stays above the open modal', async ({ page }) => {
+    const products = [
+      { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'meal-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'meal-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+    ];
+    await openApp(page, { ...AI_STORE(['gemini']), products });
+    await page.locator('#meal-plan-open').click();
+    await page.locator('#meal-plan-run').click();
+    const toast = page.locator('#toast');
+    await expect(toast).toBeVisible();
+    const layers = await page.evaluate(() => ({
+      toast: Number(getComputedStyle(document.querySelector('#toast')).zIndex),
+      modal: Number(getComputedStyle(document.querySelector('#meal-plan-modal')).zIndex),
+    }));
+    expect(layers.toast).toBeGreaterThan(layers.modal);
+    await expect(page.locator('#meal-plan-modal')).toHaveClass(/open/);
+  });
+
   test('keeps actions visible and saves an AI-generated plan', async ({ page }) => {
     const products = [
       { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
