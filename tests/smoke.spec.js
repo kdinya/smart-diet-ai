@@ -2000,8 +2000,10 @@ test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
         { id: '11111111-1111-4111-8111-111111111111', name: 'old a', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: oldDate },
         { id: '22222222-2222-4222-8222-222222222222', name: 'old pending', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: oldDate },
         { id: '33333333-3333-4333-8333-333333333333', name: 'new', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: newDate },
+        { id: '44444444-4444-4444-8444-444444444444', name: 'old unconfirmed', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: oldDate },
       ];
       sb = {}; user = { id: 'tester' };
+      state.synced = { uid: 'tester', email: '', foods: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'], weights: [], products: [] };
       syncQueue.foods = ['22222222-2222-4222-8222-222222222222'];
       const orig = Storage.prototype.setItem;
       Storage.prototype.setItem = function (k, v) { if (k === storeKey && !window.__allowWrite) throw new DOMException('full', 'QuotaExceededError'); return orig.call(this, k, v); };
@@ -2014,7 +2016,7 @@ test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
     await page.click('#confirm-ok');
     await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
     const names = await page.evaluate(() => state.foods.map(f => f.name));
-    expect(names.sort()).toEqual(['new', 'old pending'].sort());
+    expect(names.sort()).toEqual(['new', 'old pending', 'old unconfirmed'].sort());
   });
 });
 
@@ -2137,5 +2139,38 @@ test.describe('Smoke: mobile layout at 360px', () => {
     });
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.right).toBeLessThanOrEqual(box.W);
+  });
+});
+
+
+test.describe('Smoke: data safety under slow uploads', () => {
+  test('an edit made while an upload is in flight is sent after it, not lost', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    let held = 0;
+    await page.route(/\/rest\/v1\/food_entries/, async (route) => {
+      if (route.request().method() === 'POST') {
+        held += 1;
+        await gate;
+      }
+      await route.fallback();
+    });
+    await openView(page, 'diary');
+    await addFood(page, 'Draft eggs');
+    await expect.poll(() => held).toBe(1);
+    await page.evaluate(() => {
+      const f = state.foods.find((x) => x.name === 'Draft eggs');
+      f.name = 'Final eggs';
+      persistFood(f);
+      save();
+    });
+    release();
+    await expect.poll(() => backend.tables.food_entries.map((r) => r.name)).toContain('Final eggs');
+    await expect.poll(() => page.evaluate(() => syncQueue.foods.length)).toBe(0);
   });
 });
