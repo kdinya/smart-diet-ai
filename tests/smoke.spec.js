@@ -1559,6 +1559,32 @@ const AI_STORE = (order) => ({
 });
 
 test.describe('Smoke: AI provider fallback', () => {
+  test('add to diary uses the meal picked after the answer', async ({ page }) => {
+    await openApp(page, AI_STORE(['gemini']));
+    await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
+      status: 200,
+      headers: CORS,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({
+          items: [{ name: 'Chicken', grams: 150, kcal: 248, protein: 46, fat: 5, carbs: 0 }],
+          total: { kcal: 248, protein: 46, fat: 5, carbs: 0 },
+          note: 'ok',
+        }) }] } }],
+      }),
+    }));
+    await page.locator('#chat-fab').click();
+    await page.locator('#chat-input').fill('chicken');
+    await page.locator('#chat-send').click();
+    const addButton = page.locator('.chatbox button', { hasText: 'Add to diary' });
+    await expect(addButton).toBeVisible();
+    await page.locator('#chat-panel .chat-context .dd-btn').click();
+    await page.locator('#chat-panel .chat-context .dd-opt[data-value="lunch"]').click();
+    await expect(page.locator('#chat-meal')).toHaveValue('lunch');
+    await addButton.click();
+    await expect.poll(async () => (await readStore(page)).foods.map((f) => f.meal)).toEqual(['lunch']);
+  });
+
   test('a failing provider is skipped and the next one answers', async ({ page }) => {
     await openApp(page, AI_STORE(['openai', 'groq']));
     const calls = [];
