@@ -1949,3 +1949,67 @@ test.describe('Smoke: AI character', () => {
     expect((await readStore(page)).prefs.aiTone).toBe('playful');
   });
 });
+
+test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
+  test('all close buttons share one style', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const info = await page.$$eval('button', bs => bs.filter(b => /✕|×/.test(b.textContent) && !b.closest('.install-banner')).map(b => ({ cls: b.className, id: b.id })));
+    expect(info.length).toBeGreaterThanOrEqual(9);
+    for (const b of info) expect(b.cls).toContain('modal-x');
+    const sizes = await page.$$eval('button.modal-x', bs => bs.map(b => { const s = getComputedStyle(b); return [s.width, s.height, s.backgroundColor, s.borderRadius, s.fontSize].join('|'); }));
+    expect(new Set(sizes).size).toBe(1);
+  });
+
+  test('model dropdown, custom id validation, warning and test button', async ({ page }) => {
+    await page.route('https://api.groq.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ choices: [{ message: { content: 'OK' } }] }) }));
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await expect(page.locator('[data-ai-warn="gemini"]')).toBeVisible();
+    await expect(page.locator('[data-ai-warn="groq"]')).toBeHidden();
+    await page.locator('.ai-row[data-prov="gemini"] .dd-btn').click();
+    await page.locator('.ai-row[data-prov="gemini"] .dd-opt[data-value="custom"]').click();
+    await expect(page.locator('[data-ai-custom="gemini"]')).toBeVisible();
+    await page.fill('[data-ai-custom="gemini"]', 'bad id!');
+    await page.click('#save-ai');
+    await expect(page.locator('#toast, .toast').first()).toContainText(/Model ID|ID моделі/);
+    await page.fill('[data-ai-custom="gemini"]', 'gemini-my-model');
+    await page.click('#save-ai');
+    await page.reload();
+    await openView(page, 'settings');
+    const st = await readStore(page);
+    expect(st.ai.models.gemini).toBe('gemini-my-model');
+    await expect(page.locator('[data-ai-custom="gemini"]')).toHaveValue('gemini-my-model');
+    // test button without key
+    await page.click('[data-ai-test="groq"]');
+    await expect(page.locator('[data-ai-result="groq"]')).toContainText('Add the API key first');
+    // test button with a key, auto model
+    await page.fill('[data-ai-key="groq"]', 'gsk_test_key_123');
+    await page.click('[data-ai-test="groq"]');
+    await expect(page.locator('[data-ai-result="groq"]')).toContainText('Works: openai/gpt-oss-120b');
+  });
+
+  test('storage full: old synced entries are offered for removal and removed only after OK', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const r = await page.evaluate(() => {
+      const oldDate = '2024-01-05', newDate = iso();
+      state.foods = [
+        { id: '11111111-1111-4111-8111-111111111111', name: 'old a', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: oldDate },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'old pending', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: oldDate },
+        { id: '33333333-3333-4333-8333-333333333333', name: 'new', meal: 'lunch', grams: 100, kcal: 100, protein: 1, fat: 1, carbs: 1, date: newDate },
+      ];
+      sb = {}; user = { id: 'tester' };
+      syncQueue.foods = ['22222222-2222-4222-8222-222222222222'];
+      const orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (k === storeKey && !window.__allowWrite) throw new DOMException('full', 'QuotaExceededError'); return orig.call(this, k, v); };
+      return staleSyncedFoods().map(f => f.name);
+    });
+    expect(r).toEqual(['old a']);
+    await page.evaluate(() => { writeLocal(storeKey, '{}'); });
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.evaluate(() => { window.__allowWrite = true; });
+    await page.click('#confirm-ok');
+    await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
+    const names = await page.evaluate(() => state.foods.map(f => f.name));
+    expect(names.sort()).toEqual(['new', 'old pending'].sort());
+  });
+});
