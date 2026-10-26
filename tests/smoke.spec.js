@@ -2174,3 +2174,52 @@ test.describe('Smoke: data safety under slow uploads', () => {
     await expect.poll(() => page.evaluate(() => syncQueue.foods.length)).toBe(0);
   });
 });
+
+test.describe('Smoke: dietitian answer display and spacing', () => {
+  test('response length can be chosen in Settings and the dietitian panel', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'en' } });
+    await openView(page, 'settings');
+    const select = page.locator('#pref-verbosity');
+    await select.locator('xpath=..').locator('.dd-btn').click();
+    await select.locator('xpath=..').locator('.dd-opt[data-value="brief"]').click();
+    await page.locator('#save-tone').click();
+    await expect.poll(async () => (await readStore(page)).prefs.aiVerbosity).toBe('brief');
+    expect(await page.evaluate(() => askPrompt([], 'How much protein?'))).toContain('very briefly');
+    await select.locator('xpath=..').locator('.dd-btn').click();
+    await select.locator('xpath=..').locator('.dd-opt[data-value="detailed"]').click();
+    await page.locator('#save-tone').click();
+    expect(await page.evaluate(() => askPrompt([], 'How much protein?'))).toContain('in detail');
+  });
+  test('saved JSON comparison replies render as readable text instead of raw JSON', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'en' } });
+    const json = '```json\n{"comparison":[{"name":"Coffee with honey","calories_kcal":21,"carbs_g":5.7,"sugar_g":5.7,"notes":"A light natural sweetener."},{"name":"Coffee with sugar","calories_kcal":16,"carbs_g":4,"sugar_g":4,"notes":"A quick sweet option."}],"summary":"Honey has about 5 kcal more."}\n```';
+    await page.evaluate((value) => localStorage.setItem('smartdiet-ask-v1', JSON.stringify([{ role: 'ai', text: value }])), json);
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await page.click('[data-action="open-ask"]');
+    const bubble = page.locator('#ask-box .bubble.ai').last();
+    await expect(bubble).toContainText('Coffee with honey');
+    await expect(bubble).toContainText('21 kcal');
+    await expect(bubble).toContainText('Honey has about 5 kcal more.');
+    await expect(bubble).not.toContainText('```json');
+    await expect(bubble).not.toContainText('"comparison"');
+  });
+  test('a prepared dish stays one nutrition item and mobile content clears the launcher', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
+    let sent = '';
+    await page.route('https://api.groq.com/**', async (route) => {
+      sent = route.request().postData() || '';
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ items: [{ name: 'Млинці на молоці', grams: 180, kcal: 360, protein: 12, fat: 10, carbs: 55 }], total: { kcal: 360, protein: 12, fat: 10, carbs: 55 }, note: 'Орієнтовна оцінка готової страви.' }) } }] }) });
+    });
+    await page.locator('#chat-fab').click();
+    await page.locator('#chat-input').fill('млинці на молоці');
+    await page.locator('#chat-send').click();
+    await expect.poll(() => sent).toContain('рахуй це як ОДНУ готову страву');
+    await expect(page.locator('#chatbox')).toContainText('Млинці на молоці');
+    await expect(page.locator('#chatbox')).not.toContainText('окреме молоко');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const padding = await page.locator('.main').evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
+    expect(padding).toBeGreaterThanOrEqual(166);
+  });
+});
+
