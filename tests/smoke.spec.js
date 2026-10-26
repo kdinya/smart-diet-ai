@@ -2219,7 +2219,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await expect(page.locator('#chatbox')).not.toContainText('окреме молоко');
     await page.setViewportSize({ width: 390, height: 844 });
     const padding = await page.locator('.main').evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
-    expect(padding).toBeGreaterThanOrEqual(83);
+    expect(padding).toBeGreaterThanOrEqual(123);
   });
 });
 
