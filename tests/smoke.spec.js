@@ -1562,6 +1562,48 @@ const AI_STORE = (order) => ({
   ai: { order, keys: { gemini: 'g-key', openai: 'sk-test', anthropic: 'a-key', groq: 'gsk_test', xai: 'xai-test' } },
 });
 
+test.describe('Smoke: meal plan', () => {
+  test('keeps actions visible and saves an AI-generated plan', async ({ page }) => {
+    const products = [
+      { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'meal-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'meal-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+      { id: 'meal-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14 },
+    ];
+    await openApp(page, { ...AI_STORE(['gemini']), products });
+    await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
+      status: 200,
+      headers: CORS,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({
+          items: [{ id: 'meal-oats', grams: 150, meal: 'breakfast' }],
+        }) }] } }],
+      }),
+    }));
+
+    await page.locator('#meal-plan-open').click();
+    const modal = page.locator('#meal-plan-modal .meal-plan-modal');
+    const list = page.locator('#meal-plan-products');
+    const run = page.locator('#meal-plan-run');
+    await list.evaluate((el) => { el.style.height = '90px'; el.style.flex = '0 0 90px'; });
+    await list.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await expect(run).toBeInViewport();
+    await expect(page.locator('#meal-plan-modal')).toHaveClass(/open/);
+
+    const checks = page.locator('#meal-plan-products [data-plan-product]');
+    for (let i = 0; i < 3; i += 1) await checks.nth(i).check();
+    await run.click();
+    await expect(page.locator('#toast')).toContainText('Plan saved as a draft');
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].items).toEqual([{ name: 'Oats', meal: 'breakfast', grams: 150, kcal: 525, protein: 18, fat: 9, carbs: 90 }]);
+    expect(await modal.isVisible()).toBe(false);
+  });
+});
+
 test.describe('Smoke: AI provider fallback', () => {
   test('add to diary uses the meal picked after the answer', async ({ page }) => {
     await openApp(page, AI_STORE(['gemini']));
