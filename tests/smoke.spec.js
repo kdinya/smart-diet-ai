@@ -234,12 +234,16 @@ async function handleSocial(route, req, url, backend, json, table, uid) {
   }
 
   if (req.method() === 'DELETE') {
+    const removed = [];
     for (let i = rows.length - 1; i >= 0; i -= 1) {
       const row = rows[i];
       const allowed = table === 'product_shares' ? row.to_user === uid || row.from_user === uid : visible(row);
-      if (allowed && matchesFilters(row, params)) rows.splice(i, 1);
+      if (allowed && matchesFilters(row, params)) {
+        removed.unshift(row);
+        rows.splice(i, 1);
+      }
     }
-    return route.fulfill({ status: 204, headers: CORS, body: '' });
+    return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(removed) });
   }
 
   return json(405, { message: 'Method not mocked' });
@@ -301,7 +305,7 @@ async function openApp(page, store = {}) {
   await page.goto('/');
   await page.evaluate((data) => localStorage.setItem('smartdiet-v1', JSON.stringify(data)), store);
   await page.reload();
-  await expect(page.locator('#nav')).toBeVisible();
+  await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
 }
 
 async function readStore(page) {
@@ -391,7 +395,7 @@ test.describe('Smoke: goals', () => {
     await expect(page.locator('#toast')).toHaveText('Goals saved.');
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'settings');
     await expect(page.locator('#pref-kcal')).toHaveValue('1800');
     await expect(page.locator('#pref-protein')).toHaveValue('120');
@@ -432,7 +436,7 @@ test.describe('Smoke: food deletion', () => {
     await expect(foodRow(page, 'Smoke rice')).toHaveCount(0);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals')).not.toContainText('Smoke rice');
     expect((await readStore(page)).foods).toHaveLength(0);
@@ -455,7 +459,7 @@ test.describe('Smoke: food deletion', () => {
     await expect.poll(() => backend.tables.food_entries.length).toBe(0);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals')).not.toContainText('Smoke oats');
   });
@@ -681,7 +685,7 @@ test.describe('Smoke: backup import', () => {
     expect(imported.prefs.name).toBe('Imported');
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     const reloaded = await readStore(page);
     expect(reloaded.foods.map((food) => food.name)).not.toContain('Old local entry');
     expect(reloaded.foods).toHaveLength(2);
@@ -738,7 +742,7 @@ test.describe('Smoke: input limits and resilience', () => {
     expect((await readStore(page)).foods).toHaveLength(0);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await page.evaluate(() => openModal('weight'));
     await page.fill('#weight-value', '1000');
     await page.click('#weight-save');
@@ -766,7 +770,7 @@ test.describe('Smoke: input limits and resilience', () => {
       }
     });
     await page.goto('/');
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await expect(page.locator('#toast')).toContainText('unreadable', { timeout: 20_000 });
     const kept = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('smartdiet-corrupt-')).map((key) => localStorage.getItem(key)));
     expect(kept).toEqual(['{broken json']);
@@ -774,7 +778,7 @@ test.describe('Smoke: input limits and resilience', () => {
 
   test('wrongly shaped saved data is repaired instead of crashing', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: 'oops', weights: 5, products: { a: 1 } });
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'diary');
     const shapes = await page.evaluate(() => [state.foods, state.weights, state.products].map((list) => Array.isArray(list)));
     expect(shapes).toEqual([true, true, true]);
@@ -788,7 +792,7 @@ test.describe('Smoke: input limits and resilience', () => {
     });
     await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
     await page.goto('/');
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     expect(external).toEqual([]);
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     expect(csp).toContain("object-src 'none'");
@@ -1342,7 +1346,7 @@ test.describe('Smoke: friends', () => {
     expect(backend.tables.friendships).toMatchObject([{ requester: 'user-bob', addressee: 'user-alice', status: 'pending' }]);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'settings');
     await expect(page.locator('#friend-requests')).toContainText('Bob');
     await page.click('[data-friend-accept]');
@@ -1395,7 +1399,7 @@ test.describe('Smoke: friends', () => {
 
     befriend(backend);
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'settings');
     await expect(page.locator('#friends-list')).toContainText('Bob');
     await autoConfirm(page, true);
@@ -1694,7 +1698,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     await expect(card('lunch')).toHaveClass(/collapsed/);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await expect(card('breakfast')).not.toHaveClass(/collapsed/);
     await expect(card('lunch')).toHaveClass(/collapsed/);
   });
@@ -1820,7 +1824,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
     expect(body).not.toContain('Denys');
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await page.click('[data-action="open-ask"]');
     await expect(page.locator('#ask-box')).toContainText('How much protein do I need?');
     await expect(page.locator('#ask-box')).toContainText('Aim for protein at every meal.');
@@ -1875,7 +1879,7 @@ test.describe('Smoke: weigh-in deletion in the cloud', () => {
     await page.waitForTimeout(2500);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'stats');
     await expect(page.locator('#weight-history')).not.toContainText('96');
     expect(backend.tables.weight_entries).toHaveLength(0);
@@ -1901,7 +1905,7 @@ test.describe('Smoke: weigh-in deletion in the cloud', () => {
     await expect(page.locator('#weight-history')).not.toContainText('96');
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
     await openView(page, 'stats');
     await expect(page.locator('#weight-history')).not.toContainText('96');
@@ -1925,7 +1929,7 @@ test.describe('Smoke: weigh-in deletion in the cloud', () => {
     await expect.poll(async () => (await readStore(page)).weights.length).toBe(0);
 
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await expect.poll(() => backend.tables.weight_entries.length).toBe(0);
     await openView(page, 'stats');
     await expect(page.locator('#weight-history')).not.toContainText('96');
@@ -1943,7 +1947,7 @@ test.describe('Smoke: AI character', () => {
     await page.click('#save-tone');
     await expect(page.locator('#chat-welcome')).toContainText('just one more croissant');
     await page.reload();
-    await expect(page.locator('#nav')).toBeVisible();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'settings');
     await expect(page.locator('#pref-tone')).toHaveValue('playful');
     expect((await readStore(page)).prefs.aiTone).toBe('playful');
@@ -2031,5 +2035,107 @@ test.describe('Smoke: Gemini default and styled settings pickers', () => {
     await page.locator('#pref-lang').locator('xpath=..').locator('.dd-opt[data-value="uk"]').click();
     await page.click('#save-lang');
     expect((await readStore(page)).prefs.lang).toBe('uk');
+  });
+});
+
+
+test.describe('Smoke: review fixes', () => {
+  test('goal form rejects empty, out-of-range and inconsistent values', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.fill('#pref-kcal', '500');
+    await page.click('#save-prefs');
+    await expect(page.locator('#toast')).toContainText('1000');
+    await page.fill('#pref-kcal', '2000');
+    await page.fill('#pref-protein', '200');
+    await page.click('#save-prefs');
+    await expect(page.locator('#toast')).toContainText('do not match');
+    await page.fill('#pref-protein', '100');
+    await page.fill('#pref-carbs', '');
+    await page.click('#save-prefs');
+    const st = await readStore(page);
+    expect(st.prefs.carbs).toBe(242);
+    expect(st.prefs.protein).toBe(100);
+  });
+
+  test('AI parser rejects items with missing values instead of storing zeros', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const r = await page.evaluate(() => {
+      const tryParse = (o) => { try { parseNutrition(JSON.stringify(o)); return 'accepted'; } catch (e) { return 'rejected'; } };
+      return {
+        missingKcal: tryParse({ items: [{ name: 'Rice', grams: 150, protein: 3, fat: 0, carbs: 40 }] }),
+        complete: tryParse({ items: [{ name: 'Rice', grams: 150, kcal: 195, protein: 3, fat: 0, carbs: 40 }] }),
+        zeroGrams: tryParse({ items: [{ name: 'Rice', grams: 0, kcal: 0, protein: 0, fat: 0, carbs: 0 }] }),
+      };
+    });
+    expect(r).toEqual({ missingKcal: 'rejected', complete: 'accepted', zeroGrams: 'rejected' });
+  });
+
+  test('GPT-6 requests send no temperature and use low reasoning effort', async ({ page }) => {
+    let captured = null;
+    await page.route('https://api.openai.com/**', async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      captured = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ choices: [{ message: { content: 'ok' } }] }) });
+    });
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => callOpenAICompat('https://api.openai.com/v1/chat/completions', ['gpt-6-luna'], 'sk-test', 'hi', false, Date.now() + 10000));
+    expect(captured.model).toBe('gpt-6-luna');
+    expect('temperature' in captured).toBe(false);
+    expect(captured.reasoning_effort).toBe('low');
+  });
+
+  test('a Gemini reply cut off by the length limit is reported, not parsed', async ({ page }) => {
+    await page.route('https://generativelanguage.googleapis.com/**', async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"items":[' }] } }] }) });
+    });
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const msg = await page.evaluate(() => callGemini('k', 'p', true, Date.now() + 10000).then(() => 'ok', e => e.message));
+    expect(msg).toContain('cut off');
+  });
+
+  test('accepting a product that was already recalled does not save it', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const saved = await page.evaluate(async () => {
+      const chain = { delete() { return this; }, eq() { return this; }, select() { return Promise.resolve({ data: [], error: null }); } };
+      sb = { from: () => chain };
+      user = { id: 'u-recipient' };
+      inboxRows = [{ id: 'share-1', name: 'Ghost product', grams: 100, kcal: 200, protein: 1, fat: 1, carbs: 1, from_user: 'u-sender' }];
+      await resolveShare('share-1', true);
+      return state.products.some(p => p.name === 'Ghost product');
+    });
+    expect(saved).toBe(false);
+  });
+
+  test('deleting a weigh-in while signed in queues the deletion for that account only', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [{ id: 'w-1', value: 80, date: '2024-05-01' }] });
+    const queued = await page.evaluate(async () => {
+      user = { id: 'account-a' };
+      await deleteWeight('2024-05-01');
+      return syncQueue.delWeights;
+    });
+    expect(queued).toEqual([{ d: '2024-05-01', u: 'account-a' }]);
+  });
+});
+
+test.describe('Smoke: mobile layout at 360px', () => {
+  test.use({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+
+  test('main screens have no horizontal overflow and the settings dropdown stays on screen', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    for (const v of ['home', 'diary', 'products', 'stats', 'settings']) {
+      await page.locator(`#nav:visible [data-view="${v}"], #mobile-nav:visible [data-view="${v}"]`).first().click();
+      await expect(page.locator(`#view-${v}`)).toHaveClass(/active/);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+    }
+    await page.locator('#profile-activity').locator('xpath=..').locator('.dd-btn').click();
+    const box = await page.evaluate(() => {
+      const b = document.querySelector('#profile-activity').parentElement.querySelector('.dd-list').getBoundingClientRect();
+      return { left: b.left, right: b.right, W: innerWidth };
+    });
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(box.W);
   });
 });
