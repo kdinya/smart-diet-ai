@@ -2013,3 +2013,23 @@ test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
     expect(names.sort()).toEqual(['new', 'old pending'].sort());
   });
 });
+
+test.describe('Smoke: Gemini default and styled settings pickers', () => {
+  test('Auto uses the fast Gemini model first and settings selects use the app dropdown', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    expect(await page.evaluate(() => AI_MODELS.gemini.auto)).toEqual(['gemini-3.5-flash-lite']);
+    await openView(page, 'settings');
+    for (const id of ['#pref-lang', '#profile-sex', '#profile-activity', '#profile-pace']) {
+      await expect(page.locator(id)).toHaveClass(/dd-native/);
+    }
+    const pace = page.locator('#profile-pace');
+    const values = await pace.evaluate(s => [...s.options].map(o => o.value));
+    await pace.locator('xpath=..').locator('.dd-btn').click();
+    await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt').nth(1).click();
+    await expect(pace).toHaveValue(values[1]);
+    await page.locator('#pref-lang').locator('xpath=..').locator('.dd-btn').click();
+    await page.locator('#pref-lang').locator('xpath=..').locator('.dd-opt[data-value="uk"]').click();
+    await page.click('#save-lang');
+    expect((await readStore(page)).prefs.lang).toBe('uk');
+  });
+});
