@@ -947,7 +947,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'home');
     await expect(page.locator('#home-meals .meal-card')).toHaveCount(4);
     await expect(page.locator('#home-meals')).toContainText('Apple');
-    await expect(page.locator('#chat-meal option[value="snack"]')).toHaveCount(1);
+    await expect(page.locator('#chat-meal')).toHaveCount(0);
   });
 
   test('today balance shows two blocks per row', async ({ page }) => {
@@ -1003,14 +1003,11 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(new Set(colors).size).toBe(4);
   });
 
-  test('meal is picked from a styled dropdown in the dietitian chat', async ({ page }) => {
+  test('dietitian has no meal selector and shows meal choice only in add configuration', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.click('#chat-fab');
-    await page.click('#chat-panel .dd-btn');
-    await expect(page.locator('#chat-panel .dd')).toHaveClass(/open/);
-    await page.click('#chat-panel .dd-opt[data-value="snack"]');
-    await expect(page.locator('#chat-meal')).toHaveValue('snack');
-    await expect(page.locator('#chat-panel .dd')).not.toHaveClass(/open/);
+    await expect(page.locator('#chat-meal')).toHaveCount(0);
+    await expect(page.locator('#chat-panel .chat-context select')).toHaveCount(0);
   });
 
   test('diary info popup explains the colors', async ({ page }) => {
@@ -1043,12 +1040,12 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#weight-value')).toHaveValue('80.4');
   });
 
-  test('dietitian chat picks the meal by time of day', async ({ page }) => {
+  test('dietitian has no separate meal selection control', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const meals = await page.evaluate(() => [8, 12, 15, 16, 21].map((h) => autoMeal(h)));
     expect(meals).toEqual(['breakfast', 'lunch', 'lunch', 'dinner', 'dinner']);
     await page.click('#chat-fab');
-    await expect(page.locator('#chat-meal')).toHaveValue(await page.evaluate(() => autoMeal()));
+    await expect(page.locator('#chat-meal')).toHaveCount(0);
   });
 
   test('dietitian input grows up to five lines and then scrolls', async ({ page }) => {
@@ -1191,6 +1188,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.locator('#products-list [data-toggle-product]').first().click();
     await page.locator('#products-list [data-add-product]').first().click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await expect(page.locator('#pick-dates [data-pick-date="tomorrow"]')).toBeVisible();
+    await page.locator('#pick-dates [data-pick-date="today"]').click();
     await page.fill('#pick-grams', '100');
     await page.click('#pick-add');
     await openView(page, 'diary');
@@ -1624,11 +1623,13 @@ test.describe('Smoke: AI provider fallback', () => {
     await page.locator('#chat-send').click();
     const addButton = page.locator('.chatbox button', { hasText: 'Add to diary' });
     await expect(addButton).toBeVisible();
-    await page.locator('#chat-panel .chat-context .dd-btn').click();
-    await page.locator('#chat-panel .chat-context .dd-opt[data-value="lunch"]').click();
-    await expect(page.locator('#chat-meal')).toHaveValue('lunch');
     await addButton.click();
-    await expect.poll(async () => (await readStore(page)).foods.map((f) => f.meal)).toEqual(['lunch']);
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.locator('#pick-meals [data-pick-meal="lunch"]').click();
+    await page.locator('#pick-dates [data-pick-date="tomorrow"]').click();
+    await page.locator('#pick-add').click();
+    const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-CA'); });
+    await expect.poll(async () => (await readStore(page)).foods.map((f) => [f.meal, f.date])).toEqual([['lunch', tomorrow]]);
   });
 
   test('a failing provider is skipped and the next one answers', async ({ page }) => {
