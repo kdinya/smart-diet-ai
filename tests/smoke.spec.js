@@ -1017,6 +1017,31 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(foods[2].snackId).not.toBe(firstId);
   });
 
+  test('a main meal interrupts the snack hour but an existing snack can still receive food', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
+    await openView(page, 'diary');
+    await addFood(page, 'Apple', 'snack');
+    const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
+    await page.evaluate(() => window.__advanceTestClock(15 * 60 * 1000));
+    await addFood(page, 'Lunch', 'lunch');
+    await page.evaluate(() => window.__advanceTestClock(10 * 60 * 1000));
+    await page.locator('#diary-meals [data-new-snack="1"]').click();
+    for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
+    await page.click('#food-save');
+    let snacks=(await readStore(page)).foods.filter(f=>f.meal==='snack');
+    expect(snacks).toHaveLength(2);
+    expect(snacks[0].snackId).toBe(firstId);
+    expect(snacks[1].snackId).not.toBe(firstId);
+    const firstCard=page.locator(`#diary-meals [data-meal-key*="|snack|${firstId}"]`).first();
+    await firstCard.locator('[data-action="add-food"]').click();
+    for (const [id, value] of [['#food-name','Orange'],['#food-grams','100'],['#food-kcal','45'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','11']]) await page.fill(id,value);
+    await page.click('#food-save');
+    snacks=(await readStore(page)).foods.filter(f=>f.meal==='snack');
+    expect(snacks).toHaveLength(3);
+    expect(snacks[2].snackId).toBe(firstId);
+  });
+
   test('today balance shows two blocks per row', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const boxes = await page.locator('#view-home .stats .metric').evaluateAll((els) => els.map((el) => {
