@@ -1606,6 +1606,40 @@ test.describe('Smoke: meal plan', () => {
     expect(drafts[0].date).toBe(tomorrow);
   });
 
+  test('draft lock keeps a draft after its day, and the bin deletes it even when locked', async ({ page }) => {
+    const dayOffset = (days) => page.evaluate((n) => {
+      const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA');
+    }, days);
+    const today = await dayOffset(0);
+    const yesterday = await dayOffset(-1);
+    const draft = (id, date, locked) => ({
+      id, date, items: [{ name: id, meal: 'lunch', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25 }],
+      ...(locked === undefined ? {} : { locked }),
+    });
+    const draftKey = 'smartdiet-meal-drafts-v1:local';
+    await page.goto('/');
+    await page.evaluate((data) => localStorage.setItem('smartdiet-v1', JSON.stringify(data)), { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(([key, value]) => localStorage.setItem(key, JSON.stringify(value)), [draftKey, [
+      draft('old-open', yesterday), draft('old-locked', yesterday, true), draft('today-open', today),
+    ]]);
+    await page.reload();
+    const storedIds = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).map((d) => d.id), draftKey);
+    expect(await storedIds()).toEqual(['old-locked', 'today-open']);
+    await expect(page.locator('#meal-drafts-open')).toBeVisible();
+    await page.locator('#meal-drafts-open').click();
+    await expect(page.locator('#meal-drafts-modal')).toHaveClass(/open/);
+    await expect(page.locator('[data-plan-lock="old-locked"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-plan-lock="today-open"]').click();
+    await expect(page.locator('[data-plan-lock="today-open"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-plan-delete="old-locked"]').click();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.locator('#confirm-ok').click();
+    await expect(page.locator('[data-plan-delete="old-locked"]')).toHaveCount(0);
+    expect(await storedIds()).toEqual(['today-open']);
+    await page.reload();
+    expect(await storedIds()).toEqual(['today-open']);
+  });
+
   test('meal-plan validation toast stays above the open modal', async ({ page }) => {
     const products = [
       { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
