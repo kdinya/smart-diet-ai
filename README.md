@@ -22,6 +22,7 @@
 - **AI Dietitian:** type what you want to eat. The app estimates the grams and nutrition and suggests how much fits your calories for that meal. Add the result to your diary with one tap.
 - **Choose a character:** in **Settings → AI personality**, pick *Polite and cultured* or *Playful and cheeky*. The choice applies to the AI Dietitian, meal analysis and short messages in the app.
 - **Choose an AI model:** in **Settings → AI providers**, pick *Auto* (free models first), a model from the list, or type your own model ID. The *Test* button checks that the model answers.
+- **Notifications:** short messages appear at the top right for 10 seconds and can be closed with ✕. Messages that disappear on their own are kept in the bell list with a counter, marked as unread. Closed ones are marked as read. You can mark all as read or delete single messages. The list is stored only on this device.
 - **Storage cleanup:** when browser storage is full, the app offers to delete diary entries older than 12 months that are already saved in the cloud. Profile, weight, goals and products stay.
 - **Analyze buttons:** next to each meal and next to today's meals on the Overview and Diary screens, get a short review of that meal or of the whole day, with 2–3 tips.
 - **Ask the Dietitian:** ask any general nutrition question. These questions do not include your diary or your profile.
