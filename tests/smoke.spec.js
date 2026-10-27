@@ -1330,6 +1330,33 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#products-list')).toContainText('Keep oatmeal');
   });
 
+  test('saved-product selectors use the My products font size and alphabetical order', async ({ page }) => {
+    const products = [
+      { id: 'product-z', name: 'Zucchini', grams: 100, kcal: 20, protein: 1, fat: 0, carbs: 4 },
+      { id: 'product-b', name: 'Buckwheat', grams: 100, kcal: 110, protein: 4, fat: 1, carbs: 22 },
+      { id: 'product-a', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14 },
+    ];
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products });
+
+    await openView(page, 'products');
+    const savedNames = page.locator('#products-list .product-name');
+    await expect(savedNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
+    await expect(savedNames.first()).toHaveCSS('font-size', '14px');
+
+    await openView(page, 'home');
+    await page.locator('#meal-plan-open').click();
+    const planNames = page.locator('#meal-plan-products .meal-plan-picker-name');
+    await expect(planNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
+    await expect(planNames.first()).toHaveCSS('font-size', '14px');
+    await page.locator('[data-close-meal-plan]').first().click();
+
+    await page.locator('#view-home [data-action="add-food"]').click();
+    await page.locator('#pick-product').click();
+    const pickerNames = page.locator('#pick-body .pick-item b');
+    await expect(pickerNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
+    await expect(pickerNames.first()).toHaveCSS('font-size', '14px');
+  });
+
   test('saved products start collapsed and reveal details and actions when toggled', async ({ page }) => {
     await openApp(page, {
       prefs: BASE_PREFS,
