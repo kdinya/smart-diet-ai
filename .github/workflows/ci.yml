@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   smoke:
@@ -29,3 +30,49 @@ jobs:
         with:
           name: test-results
           path: test-results/
+
+  database:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: test-database
+      cancel-in-progress: false
+    env:
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Verify the target is the test project
+        run: |
+          for name in TEST_DATABASE_URL TEST_SUPABASE_URL TEST_SUPABASE_ANON_KEY TEST_SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set"
+              exit 1
+            fi
+          done
+          PROD_REF=wscprmtjjbevesrchhjr
+          REF=$(node -e "console.log(new URL(process.env.TEST_SUPABASE_URL).hostname.split('.')[0])")
+          if [ "$REF" = "$PROD_REF" ]; then
+            echo "::error::TEST_SUPABASE_URL points to the production project"
+            exit 1
+          fi
+          case "$TEST_DATABASE_URL" in
+            *"$PROD_REF"*) echo "::error::TEST_DATABASE_URL points to the production project"; exit 1 ;;
+          esac
+          case "$TEST_DATABASE_URL" in
+            *"$REF"*) ;;
+            *) echo "::error::TEST_DATABASE_URL does not belong to the test project"; exit 1 ;;
+          esac
+          echo "Test project: $REF"
+      - name: Apply schema to the test database
+        run: psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: Run database integration tests
+        run: node tests/db.integration.mjs
