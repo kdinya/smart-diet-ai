@@ -94,6 +94,12 @@
    - The application is designed mobile-first as an installable PWA.
    - Mobile navigation bar (`.mobilebar`), sticky headers, chat panels, modals, and input keyboards (`inputmode="numeric"`, `inputmode="decimal"`) must work flawlessly on narrow viewports (360px - 430px) and iOS Safari with notch/home indicator safe areas (`env(safe-area-inset-*)`).
    - Modals must be cleanly dismissible via close buttons (✕), backdrop clicks, or cancel actions.
+7. **UI Layering & Stacking Hierarchy:**
+   - Base pages and layout views: baseline layer (`z-index: 0` – `5`).
+   - Sticky navigation, action buttons, and panels (`.mobilebar`, `.chat-fab`, `.chat-panel`): interface overlay layer (`z-index: 40` – `60`).
+   - Standard modal dialogs (`.modal-back`): modal layer (`z-index: 100`).
+   - Confirmation dialogs (`#confirm-modal`): alert/confirmation layer (`z-index: 200`), always positioned above any underlying open modals.
+   - Informational toasts and notifications (`.toast`): topmost layer (`z-index: 10000`), always visible above all windows and dialogs.
 
 ---
 
