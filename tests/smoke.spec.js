@@ -1355,6 +1355,21 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const pickerNames = page.locator('#pick-body .pick-item b');
     await expect(pickerNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
     await expect(pickerNames.first()).toHaveCSS('font-size', '14px');
+    await expect(page.locator('#pick-body .pick-item .muted').first()).toHaveCSS('font-size', '12px');
+  });
+
+  test('food entry modal puts product picker first and hides date for a chosen meal', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+
+    await page.locator('#diary-meals [data-action="add-food"][data-meal="breakfast"]').click();
+    await expect(page.locator('#food-form > #pick-product')).toHaveCount(1);
+    await expect(page.locator('#food-date').locator('xpath=..')).toBeHidden();
+    await page.locator('#modal-close').click();
+
+    await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
+    await expect(page.locator('#food-form > #pick-product')).toHaveCount(1);
+    await expect(page.locator('#food-date').locator('xpath=..')).toBeVisible();
   });
 
   test('saved products start collapsed and reveal details and actions when toggled', async ({ page }) => {
