@@ -329,3 +329,7 @@ revoke all on public.profiles, public.friendships, public.product_shares from pu
 grant select, update (display_name) on public.profiles to authenticated;
 grant select, update (status), delete on public.friendships to authenticated;
 grant select, insert, delete on public.product_shares to authenticated;
+
+-- Optional metadata preserves snack grouping and diary order across devices.
+alter table public.food_entries add column if not exists snack_id text;
+alter table public.food_entries add column if not exists meal_order numeric;
