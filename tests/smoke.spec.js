@@ -2200,17 +2200,27 @@ test.describe('Smoke: review fixes', () => {
     expect(st.prefs.protein).toBe(100);
   });
 
-  test('AI parser rejects items with missing values instead of storing zeros', async ({ page }) => {
+  test('AI parser rejects items with missing or negative values and does not alter calories silently', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const r = await page.evaluate(() => {
-      const tryParse = (o) => { try { parseNutrition(JSON.stringify(o)); return 'accepted'; } catch (e) { return 'rejected'; } };
+      const tryParse = (o) => { try { return { status: 'accepted', data: parseNutrition(JSON.stringify(o)) }; } catch (e) { return { status: 'rejected' }; } };
       return {
-        missingKcal: tryParse({ items: [{ name: 'Rice', grams: 150, protein: 3, fat: 0, carbs: 40 }] }),
-        complete: tryParse({ items: [{ name: 'Rice', grams: 150, kcal: 195, protein: 3, fat: 0, carbs: 40 }] }),
-        zeroGrams: tryParse({ items: [{ name: 'Rice', grams: 0, kcal: 0, protein: 0, fat: 0, carbs: 0 }] }),
+        missingKcal: tryParse({ items: [{ name: 'Rice', grams: 150, protein: 3, fat: 0, carbs: 40 }] }).status,
+        negativeKcal: tryParse({ items: [{ name: 'Rice', grams: 150, kcal: -195, protein: 3, fat: 0, carbs: 40 }] }).status,
+        negativeProtein: tryParse({ items: [{ name: 'Rice', grams: 150, kcal: 195, protein: -3, fat: 0, carbs: 40 }] }).status,
+        complete: tryParse({ items: [{ name: 'Rice', grams: 150, kcal: 195, protein: 3, fat: 0, carbs: 40 }] }).status,
+        zeroGrams: tryParse({ items: [{ name: 'Rice', grams: 0, kcal: 0, protein: 0, fat: 0, carbs: 0 }] }).status,
+        keptKcal: tryParse({ items: [{ name: 'Test', grams: 100, kcal: 200, protein: 20, fat: 10, carbs: 30 }] }).data?.items[0]?.kcal,
       };
     });
-    expect(r).toEqual({ missingKcal: 'rejected', complete: 'accepted', zeroGrams: 'rejected' });
+    expect(r).toEqual({
+      missingKcal: 'rejected',
+      negativeKcal: 'rejected',
+      negativeProtein: 'rejected',
+      complete: 'accepted',
+      zeroGrams: 'rejected',
+      keptKcal: 200,
+    });
   });
 
   test('GPT-6 requests send no temperature and use low reasoning effort', async ({ page }) => {
@@ -2235,6 +2245,90 @@ test.describe('Smoke: review fixes', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const msg = await page.evaluate(() => callGemini('k', 'p', true, Date.now() + 10000).then(() => 'ok', e => e.message));
     expect(msg).toContain('cut off');
+  });
+
+  test('an OpenAI-compatible reply cut off by length is reported, not parsed', async ({ page }) => {
+    await page.route('https://api.openai.com/**', async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"items":[' } }] }) });
+    });
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const msg = await page.evaluate(() => callOpenAICompat('https://api.openai.com/v1/chat/completions', ['gpt-4.1-mini'], 'k', 'p', true, Date.now() + 10000).then(() => 'ok', e => e.message));
+    expect(msg).toContain('cut off');
+  });
+
+  test('an Anthropic reply cut off by max_tokens is reported, not parsed', async ({ page }) => {
+    await page.route('https://api.anthropic.com/**', async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"items":[' }] }) });
+    });
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const msg = await page.evaluate(() => callAnthropic('k', 'p', Date.now() + 10000).then(() => 'ok', e => e.message));
+    expect(msg).toContain('cut off');
+  });
+
+  test('adding a food item from a meal draft is idempotent and marks the item added', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const draft = {
+      id: 'draft-idempotent-1',
+      date: today,
+      items: [{ id: 'p-1', name: 'Oatmeal', meal: 'breakfast', grams: 150, kcal: 200, protein: 7, fat: 4, carbs: 32 }],
+    };
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate((d) => {
+      saveMealDrafts([d]);
+      renderMealDraftButton();
+    }, draft);
+
+    await page.locator('#meal-drafts-open').click();
+    await expect(page.locator('#meal-drafts-modal')).toHaveClass(/open/);
+    const addBtn = page.locator('#meal-drafts-list [data-plan-add]').first();
+    await expect(addBtn).toBeEnabled();
+
+    await addBtn.click();
+    await expect(addBtn).toBeDisabled();
+    await expect(addBtn).toContainText(/Added|Додано/);
+
+    const foods = await page.evaluate(() => state.foods);
+    expect(foods).toHaveLength(1);
+    expect(foods[0].name).toBe('Oatmeal');
+
+    const drafts = await page.evaluate(() => mealDrafts());
+    expect(drafts[0].items[0].added).toBe(true);
+    expect(drafts[0].items[0].addedFoodId).toBe(foods[0].id);
+
+    await page.locator('#meal-drafts-modal .btn-close').click();
+    await page.locator('#meal-drafts-open').click();
+    const reopenedBtn = page.locator('#meal-drafts-list [data-plan-add]').first();
+    await expect(reopenedBtn).toBeDisabled();
+  });
+
+  test('meal plan rejects zero-gram portions and refuses to save when budget is exceeded', async ({ page }) => {
+    const products = [
+      { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'meal-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'meal-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+    ];
+    await openApp(page, { ...AI_STORE(['gemini']), products, prefs: { ...BASE_PREFS, kcal: 200 } });
+    await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
+      status: 200,
+      headers: CORS,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({
+          items: [{ id: 'meal-oats', grams: 0.1, meal: 'breakfast' }],
+        }) }] } }],
+      }),
+    }));
+
+    await page.locator('#meal-plan-open').click();
+    const checks = page.locator('#meal-plan-products [data-plan-product]');
+    for (let i = 0; i < 3; i += 1) await checks.nth(i).check();
+    await page.locator('#meal-plan-run').click();
+
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText(/failed|замала|Не вдалося/i);
+    const drafts = await page.evaluate(() => mealDrafts());
+    expect(drafts).toHaveLength(0);
   });
 
   test('accepting a product that was already recalled does not save it', async ({ page }) => {

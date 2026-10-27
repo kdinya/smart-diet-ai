@@ -15,8 +15,35 @@ const BASE = env('TEST_SUPABASE_URL').replace(/\/+$/, '');
 const ANON = env('TEST_SUPABASE_ANON_KEY');
 const SERVICE = env('TEST_SUPABASE_SERVICE_ROLE_KEY');
 
-if (new URL(BASE).hostname.split('.')[0] === PRODUCTION_REF) {
-  throw new Error('Refusing to run: TEST_SUPABASE_URL points to the production project.');
+let baseUrl;
+try {
+  baseUrl = new URL(BASE);
+} catch (e) {
+  throw new Error(`Invalid TEST_SUPABASE_URL: ${e.message}`);
+}
+const testHostMatch = baseUrl.hostname.match(/^([a-z0-9_-]+)\.supabase\.co$/i);
+if (!testHostMatch) {
+  throw new Error(`TEST_SUPABASE_URL hostname '${baseUrl.hostname}' does not match expected pattern <project-ref>.supabase.co`);
+}
+const testProjectRef = testHostMatch[1].toLowerCase();
+if (testProjectRef === PRODUCTION_REF.toLowerCase() || BASE.toLowerCase().includes(PRODUCTION_REF.toLowerCase())) {
+  throw new Error(`Refusing to run: TEST_SUPABASE_URL points to the production project (${PRODUCTION_REF}).`);
+}
+
+const dbUrlStr = process.env.TEST_DATABASE_URL;
+if (dbUrlStr) {
+  if (dbUrlStr.toLowerCase().includes(PRODUCTION_REF.toLowerCase())) {
+    throw new Error(`Refusing to run: TEST_DATABASE_URL points to the production project (${PRODUCTION_REF}).`);
+  }
+  let dbUrl;
+  try {
+    dbUrl = new URL(dbUrlStr);
+  } catch (e) {
+    throw new Error(`Invalid TEST_DATABASE_URL: ${e.message}`);
+  }
+  if (!dbUrl.hostname.toLowerCase().includes(testProjectRef)) {
+    throw new Error(`TEST_DATABASE_URL host '${dbUrl.hostname}' does not match test project ref '${testProjectRef}'.`);
+  }
 }
 
 const runId = randomUUID().slice(0, 8);
@@ -104,16 +131,6 @@ async function run() {
   const C = ids.c;
   const day = new Date().toISOString().slice(0, 10);
 
-  // Anonymous and internal access
-  let r = await rest('food_entries');
-  check('Anonymous visitor cannot read the food diary', emptyOrDenied(r), describe(r));
-  r = await rest('user_profiles');
-  check('Anonymous visitor cannot read synced profiles', emptyOrDenied(r), describe(r));
-  r = await rpc('request_friend', { body: { code: 'AAAAAAAA' } });
-  check('Anonymous visitor cannot call request_friend', denied(r), describe(r));
-  r = await rest('friend_request_limits', { as: 'a' });
-  check('Friend rate-limit table is hidden from users', denied(r), describe(r));
-
   // Owner writes
   r = await rest('food_entries', {
     as: 'a', method: 'POST', prefer: 'return=representation',
@@ -142,6 +159,22 @@ async function run() {
   check('Owner reads own products', rows(r) === 1, describe(r));
   r = await rest('user_profiles', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
   check('Owner reads own profile document', rows(r) === 1, describe(r));
+
+  // Anonymous visitor access verified after private rows are seeded
+  let rAnon = await rest('food_entries');
+  check('Anonymous visitor cannot read food diary when entries exist', emptyOrDenied(rAnon), describe(rAnon));
+  rAnon = await rest('user_profiles');
+  check('Anonymous visitor cannot read synced profiles when rows exist', emptyOrDenied(rAnon), describe(rAnon));
+  rAnon = await rest('weight_entries');
+  check('Anonymous visitor cannot read weight entries when rows exist', emptyOrDenied(rAnon), describe(rAnon));
+  rAnon = await rest('products');
+  check('Anonymous visitor cannot read user products when rows exist', emptyOrDenied(rAnon), describe(rAnon));
+  rAnon = await rest('profiles');
+  check('Anonymous visitor cannot read profiles table', emptyOrDenied(rAnon), describe(rAnon));
+  rAnon = await rpc('request_friend', { body: { code: 'AAAAAAAA' } });
+  check('Anonymous visitor cannot call request_friend', denied(rAnon), describe(rAnon));
+  let rLimits = await rest('friend_request_limits', { as: 'a' });
+  check('Friend rate-limit table is hidden from users', denied(rLimits), describe(rLimits));
 
   // Same-day weigh-in upsert, as the app does it
   r = await rest('weight_entries', {
@@ -202,6 +235,13 @@ async function run() {
 
   r = await rpc('request_friend', { as: 'a', body: { code: codeB } });
   check('Friend request is sent', r.json === 'ok', JSON.stringify(r.json));
+
+  // Friendship is pending: neither participant may read the other's profile yet
+  r = await rest('profiles', { as: 'b', query: `user_id=${eq(A)}&select=user_id` });
+  check('Addressee cannot read profile while friendship request is pending', emptyOrDenied(r), describe(r));
+  r = await rest('profiles', { as: 'a', query: `user_id=${eq(B)}&select=user_id` });
+  check('Requester cannot read profile while friendship request is pending', emptyOrDenied(r), describe(r));
+
   r = await rpc('request_friend', { as: 'b', body: { code: codeA } });
   check('Reverse request accepts the friendship', r.json === 'accepted', JSON.stringify(r.json));
   r = await rpc('request_friend', { as: 'a', body: { code: codeB } });

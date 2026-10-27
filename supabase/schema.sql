@@ -288,8 +288,9 @@ drop policy if exists "Users read related profiles" on public.profiles;
 create policy "Users read related profiles" on public.profiles for select to authenticated
   using (user_id = auth.uid() or exists (
     select 1 from public.friendships f
-    where (f.requester = auth.uid() and f.addressee = profiles.user_id)
-       or (f.addressee = auth.uid() and f.requester = profiles.user_id)
+    where f.status = 'accepted'
+      and ((f.requester = auth.uid() and f.addressee = profiles.user_id)
+        or (f.addressee = auth.uid() and f.requester = profiles.user_id))
   ));
 drop policy if exists "Users update own display name" on public.profiles;
 create policy "Users update own display name" on public.profiles for update to authenticated
