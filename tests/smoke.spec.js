@@ -1348,6 +1348,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const planNames = page.locator('#meal-plan-products .meal-plan-picker-name');
     await expect(planNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
     await expect(planNames.first()).toHaveCSS('font-size', '14px');
+    await expect(page.locator('#meal-plan-products .meal-plan-picker-item').first()).toHaveCSS('padding-top', '7px');
+    await expect(page.locator('#meal-plan-products .meal-plan-picker-item').first()).toHaveCSS('padding-bottom', '7px');
     await page.locator('[data-close-meal-plan]').first().click();
 
     await page.locator('#view-home [data-action="add-food"]').click();
@@ -1355,6 +1357,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const pickerNames = page.locator('#pick-body .pick-item b');
     await expect(pickerNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
     await expect(pickerNames.first()).toHaveCSS('font-size', '14px');
+    await expect(page.locator('#pick-body .pick-item').first()).toHaveCSS('padding-top', '8px');
+    await expect(page.locator('#pick-body .pick-item').first()).toHaveCSS('padding-bottom', '8px');
     await expect(page.locator('#pick-body .pick-item .muted').first()).toHaveCSS('font-size', '12px');
   });
 
