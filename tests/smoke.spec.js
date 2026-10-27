@@ -953,12 +953,14 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('multiple snack events are numbered, grouped, and survive reload', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
     await first.locator('[data-action="add-food"]').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
+    await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -973,20 +975,46 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Snack 2' })).toHaveCount(1);
   });
 
-  test('snacks follow dinner first and later ordinary meals keep their appended position', async ({ page }) => {
+  test('main meals stay in breakfast-lunch-dinner order when added out of order', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'diary');
-    await addFood(page, 'Breakfast food', 'breakfast');
     await addFood(page, 'Dinner food', 'dinner');
+    await addFood(page, 'Breakfast food', 'breakfast');
+    await addFood(page, 'Lunch food', 'lunch');
+    const labels=await page.locator('#diary-meals .meal-title').allTextContents();
+    expect(labels.indexOf('Сніданок')).toBeLessThan(labels.indexOf('Обід'));
+    expect(labels.indexOf('Обід')).toBeLessThan(labels.indexOf('Вечеря'));
     await page.locator('#diary-meals [data-meal="snack"]').first().click();
     for (const [id, value] of [['#food-name','Snack food'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Перекус 1' })).toHaveCount(1);
-    let labels=await page.locator('#diary-meals .meal-title').allTextContents();
-    expect(labels.indexOf('Вечеря')).toBeLessThan(labels.indexOf('Перекус 1'));
-    await addFood(page, 'Lunch added later', 'lunch');
-    labels=await page.locator('#diary-meals .meal-title').allTextContents();
-    expect(labels.indexOf('Перекус 1')).toBeLessThan(labels.indexOf('Обід'));
+    const ordered=await page.locator('#diary-meals .meal-title').allTextContents();
+    expect(ordered.indexOf('Сніданок')).toBeLessThan(ordered.indexOf('Обід'));
+    expect(ordered.indexOf('Обід')).toBeLessThan(ordered.indexOf('Вечеря'));
+    expect(ordered.indexOf('Вечеря')).toBeLessThan(ordered.indexOf('Перекус 1'));
+  });
+
+  test('snacks added less than an hour apart share the same snack event', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
+    await openView(page, 'diary');
+    await addFood(page, 'Apple', 'snack');
+    const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
+    await page.evaluate(() => window.__advanceTestClock(59 * 60 * 1000));
+    await page.locator('#diary-meals [data-new-snack="1"]').click();
+    for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
+    await page.click('#food-save');
+    let foods=(await readStore(page)).foods.filter(f=>f.meal==='snack');
+    expect(foods).toHaveLength(2);
+    expect(foods[0].snackId).toBe(firstId);
+    expect(foods[1].snackId).toBe(firstId);
+    await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
+    await page.locator('#diary-meals [data-new-snack="1"]').click();
+    for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
+    await page.click('#food-save');
+    foods=(await readStore(page)).foods.filter(f=>f.meal==='snack');
+    expect(foods).toHaveLength(3);
+    expect(foods[2].snackId).not.toBe(firstId);
   });
 
   test('today balance shows two blocks per row', async ({ page }) => {
