@@ -392,7 +392,7 @@ test.describe('Smoke: goals', () => {
     await page.fill('#pref-carbs', '200');
     await page.fill('#pref-fat', '60');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toHaveText('Goals saved.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Goals saved.');
 
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
@@ -408,11 +408,11 @@ test.describe('Smoke: goals', () => {
     await openView(page, 'settings');
     await page.fill('#pref-kcal', '-500');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Values must be numbers from 0 to 10000.');
 
     await page.fill('#pref-kcal', '0');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Values must be numbers from 0 to 10000.');
 
     const stored = await readStore(page);
     expect(stored.prefs.kcal).toBe(1800);
@@ -432,7 +432,7 @@ test.describe('Smoke: food deletion', () => {
     await foodRow(page, 'Smoke rice').locator('[data-delete-food]').click();
     await expect.poll(() => dialogs.length).toBe(1);
     expect(dialogs[0]).toBe('Delete “Smoke rice” from the diary (lunch)?');
-    await expect(page.locator('#toast')).toHaveText('Entry deleted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Entry deleted.');
     await expect(foodRow(page, 'Smoke rice')).toHaveCount(0);
 
     await page.reload();
@@ -455,7 +455,7 @@ test.describe('Smoke: food deletion', () => {
 
     await autoConfirm(page, true);
     await foodRow(page, 'Smoke oats').locator('[data-delete-food]').click();
-    await expect(page.locator('#toast')).toHaveText('Entry deleted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Entry deleted.');
     await expect.poll(() => backend.tables.food_entries.length).toBe(0);
 
     await page.reload();
@@ -571,7 +571,7 @@ test.describe('Smoke: food deletion', () => {
     backend.failDeletes = true;
     await autoConfirm(page, true);
     await foodRow(page, 'Smoke eggs').locator('[data-delete-food]').click();
-    await expect(page.locator('#toast')).toContainText('Saved locally; sync failed:');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Saved locally; sync failed:');
     await expect(foodRow(page, 'Smoke eggs')).toHaveCount(1);
     expect(backend.tables.food_entries).toHaveLength(1);
   });
@@ -676,7 +676,7 @@ test.describe('Smoke: backup import', () => {
 
     await expect.poll(() => dialogs.length).toBe(1);
     expect(dialogs[0]).toContain('Replace the data on this device');
-    await expect(page.locator('#toast')).toHaveText('Imported 2 entries and 1 weigh-ins.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Imported 2 entries and 1 weigh-ins.');
 
     const imported = await readStore(page);
     expect(imported.foods.map((food) => food.name).sort()).toEqual(['Imported oatmeal', 'Imported soup']);
@@ -717,12 +717,12 @@ test.describe('Smoke: backup import', () => {
     await openView(page, 'settings');
 
     await page.setInputFiles('#import-file', backupFile({ hello: 'world' }));
-    await expect(page.locator('#toast')).toHaveText('This file is not a Smart Diet AI backup.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('This file is not a Smart Diet AI backup.');
     expect(dialogs).toHaveLength(0);
     expect((await readStore(page)).foods.map((food) => food.name)).toEqual(['Old local entry']);
 
     await page.setInputFiles('#import-file', backupFile('{"foods": [ broken'));
-    await expect(page.locator('#toast')).toHaveText('This file is not a Smart Diet AI backup.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('This file is not a Smart Diet AI backup.');
     expect(dialogs).toHaveLength(0);
 
     const stored = await readStore(page);
@@ -738,7 +738,7 @@ test.describe('Smoke: input limits and resilience', () => {
     await page.fill('#food-name', 'Huge portion');
     await page.fill('#food-kcal', '99999999');
     await page.click('#food-save');
-    await expect(page.locator('#toast')).toHaveText('Values must be numbers from 0 to 10000.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Values must be numbers from 0 to 10000.');
     expect((await readStore(page)).foods).toHaveLength(0);
 
     await page.reload();
@@ -746,7 +746,7 @@ test.describe('Smoke: input limits and resilience', () => {
     await page.evaluate(() => openModal('weight'));
     await page.fill('#weight-value', '1000');
     await page.click('#weight-save');
-    await expect(page.locator('#toast')).toHaveText('Enter a weight from 1 to 500 kg.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Enter a weight from 1 to 500 kg.');
     expect((await readStore(page)).weights).toHaveLength(0);
   });
 
@@ -771,7 +771,7 @@ test.describe('Smoke: input limits and resilience', () => {
     });
     await page.goto('/');
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-    await expect(page.locator('#toast')).toContainText('unreadable', { timeout: 20_000 });
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('unreadable', { timeout: 20_000 });
     const kept = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('smartdiet-corrupt-')).map((key) => localStorage.getItem(key)));
     expect(kept).toEqual(['{broken json']);
   });
@@ -1340,7 +1340,7 @@ test.describe('Smoke: friends', () => {
     const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
     await bob.page.fill('#friend-code-input', 'aaaa2222');
     await bob.page.click('#friend-add');
-    await expect(bob.page.locator('#toast')).toHaveText('Friend request sent.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toHaveText('Friend request sent.');
     await expect(bob.page.locator('#sent-requests')).toContainText('Alice');
     expect(backend.tables.friendships).toMatchObject([{ requester: 'user-bob', addressee: 'user-alice', status: 'pending' }]);
 
@@ -1349,7 +1349,7 @@ test.describe('Smoke: friends', () => {
     await openView(page, 'settings');
     await expect(page.locator('#friend-requests')).toContainText('Bob');
     await page.click('[data-friend-accept]');
-    await expect(page.locator('#toast')).toHaveText('Request accepted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Request accepted.');
     await expect(page.locator('#friends-list')).toContainText('Bob');
     expect(backend.tables.friendships[0].status).toBe('accepted');
     await bob.context.close();
@@ -1363,17 +1363,17 @@ test.describe('Smoke: friends', () => {
     for (const code of ['ZZZZ9999', 'AAAA2222', 'short']) {
       await page.fill('#friend-code-input', code);
       await page.click('#friend-add');
-      await expect(page.locator('#toast')).toHaveText('User not found.');
+      await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('User not found.');
       await expect(page.locator('#friend-code-input')).toHaveValue('');
       expect(backend.tables.friendships).toHaveLength(0);
     }
 
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#toast')).toHaveText('Friend request sent.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Friend request sent.');
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#toast')).toHaveText('Request or friendship already exists.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Request or friendship already exists.');
     expect(backend.tables.friendships).toHaveLength(1);
   });
 
@@ -1383,7 +1383,7 @@ test.describe('Smoke: friends', () => {
     await startAlice(page, backend);
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#toast')).toHaveText('Too many attempts. Try again later.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Too many attempts. Try again later.');
     expect(backend.tables.friendships).toHaveLength(0);
   });
 
@@ -1425,7 +1425,7 @@ test.describe('Smoke: product sharing', () => {
     await startAlice(page, backend);
     await addProduct(page, 'Oats', '150');
     await shareFirstProductWith(page, 'Bob');
-    await expect(page.locator('#toast')).toHaveText('Product sent.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Product sent.');
     expect(backend.tables.product_shares).toMatchObject([{ from_user: 'user-alice', to_user: 'user-bob', name: 'Oats', kcal: 150 }]);
 
     const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
@@ -1435,7 +1435,7 @@ test.describe('Smoke: product sharing', () => {
     await expect(bob.page.locator('#inbox-body')).toContainText('Alice');
     await expect(bob.page.locator('#inbox-body')).toContainText('Oats');
     await bob.page.click('[data-share-accept]');
-    await expect(bob.page.locator('#toast')).toHaveText('Product added to My products.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toHaveText('Product added to My products.');
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name)).toEqual(['Oats']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
@@ -1449,7 +1449,7 @@ test.describe('Smoke: product sharing', () => {
     await openView(bob.page, 'products');
     await bob.page.click('#inbox-open');
     await bob.page.click('[data-share-decline]');
-    await expect(bob.page.locator('#toast')).toHaveText('Product declined.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toHaveText('Product declined.');
     await expect(bob.page.locator('#inbox-body')).toContainText('No new products.');
     expect(backend.tables.product_shares).toHaveLength(0);
     expect((await readStore(bob.page)).products || []).toHaveLength(0);
@@ -1462,13 +1462,13 @@ test.describe('Smoke: product sharing', () => {
     await startAlice(page, backend);
     await addProduct(page, 'Oats', '150');
     await shareFirstProductWith(page, 'Bob');
-    await expect(page.locator('#toast')).toHaveText('Product sent.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Product sent.');
 
     await openView(page, 'settings');
     await expect(page.locator('#sent-shares')).toContainText('Bob');
     await expect(page.locator('#sent-shares')).toContainText('Oats');
     await page.click('[data-share-recall]');
-    await expect(page.locator('#toast')).toHaveText('Product recalled.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Product recalled.');
     await expect(page.locator('#sent-shares')).toContainText('No sent products.');
     expect(backend.tables.product_shares).toHaveLength(0);
 
@@ -1487,7 +1487,7 @@ test.describe('Smoke: product sharing', () => {
     await startAlice(page, backend);
     await addProduct(page, 'Oats', '150');
     await shareFirstProductWith(page, 'Bob');
-    await expect(page.locator('#toast')).toHaveText('Could not send: this friend already has 20 products waiting in the inbox.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Could not send: this friend already has 20 products waiting in the inbox.');
     expect(backend.tables.product_shares).toHaveLength(20);
   });
 
@@ -1593,7 +1593,7 @@ test.describe('Smoke: meal plan', () => {
     await page.locator('#meal-plan-products [data-plan-product]').nth(1).check();
     await page.locator('#meal-plan-products [data-plan-product]').nth(2).check();
     await page.locator('#meal-plan-run').click();
-    await expect(page.locator('#toast')).toContainText('Plan saved as a draft');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Plan saved as a draft');
     expect(requestBody.contents[0].parts[0].text).toContain('tomorrow');
     expect(requestBody.contents[0].parts[0].text).toContain('Already logged for this day: 0 kcal');
     const drafts = await page.evaluate(() => Object.entries(localStorage)
@@ -1649,10 +1649,10 @@ test.describe('Smoke: meal plan', () => {
     await openApp(page, { ...AI_STORE(['gemini']), products });
     await page.locator('#meal-plan-open').click();
     await page.locator('#meal-plan-run').click();
-    const toast = page.locator('#toast');
+    const toast = page.locator('#notif-stack .toast-msg').last();
     await expect(toast).toBeVisible();
     const layers = await page.evaluate(() => ({
-      toast: Number(getComputedStyle(document.querySelector('#toast')).zIndex),
+      toast: Number(getComputedStyle(document.querySelector('#notif-stack')).zIndex),
       modal: Number(getComputedStyle(document.querySelector('#meal-plan-modal')).zIndex),
     }));
     expect(layers.toast).toBeGreaterThan(layers.modal);
@@ -1690,7 +1690,7 @@ test.describe('Smoke: meal plan', () => {
     const checks = page.locator('#meal-plan-products [data-plan-product]');
     for (let i = 0; i < 3; i += 1) await checks.nth(i).check();
     await run.click();
-    await expect(page.locator('#toast')).toContainText('Plan saved as a draft');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Plan saved as a draft');
     const drafts = await page.evaluate(() => Object.entries(localStorage)
       .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
       .flatMap(([, value]) => JSON.parse(value)));
@@ -2187,11 +2187,11 @@ test.describe('Smoke: review fixes', () => {
     await openView(page, 'settings');
     await page.fill('#pref-kcal', '500');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toContainText('1000');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('1000');
     await page.fill('#pref-kcal', '2000');
     await page.fill('#pref-protein', '200');
     await page.click('#save-prefs');
-    await expect(page.locator('#toast')).toContainText('do not match');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('do not match');
     await page.fill('#pref-protein', '100');
     await page.fill('#pref-carbs', '');
     await page.click('#save-prefs');
@@ -2363,3 +2363,47 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
   });
 });
 
+test.describe('Smoke: notifications', () => {
+  test('timed messages become unread in the bell list, closed ones become read, and the list can be cleared', async ({ page }) => {
+    await page.clock.install();
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => {
+      document.querySelectorAll('#notif-stack .toast').forEach((card) => card.remove());
+      notifications.length = 0;
+      saveNotifications();
+      refreshNotifications();
+    });
+
+    await page.evaluate(() => {
+      toast('First note');
+      toast('Second note');
+    });
+    await expect(page.locator('#notif-stack .toast')).toHaveCount(2);
+
+    await page.clock.runFor(10_500);
+    await expect(page.locator('#notif-stack .toast')).toHaveCount(0);
+    await expect(page.locator('#notif-badge')).toHaveText('2');
+
+    await page.evaluate(() => toast('Third note'));
+    await page.locator('#notif-stack .toast').last().locator('.toast-x').click();
+    await expect(page.locator('#notif-badge')).toHaveText('2');
+
+    await page.click('#notif-bell');
+    await expect(page.locator('#notif-modal')).toHaveClass(/open/);
+    const items = page.locator('#notif-list .notif-item');
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0)).toContainText('Third note');
+    await expect(items.nth(0)).toHaveClass(/read/);
+    await expect(items.nth(1)).toHaveClass(/unread/);
+
+    await page.click('#notif-read-all');
+    await expect(page.locator('#notif-badge')).toBeHidden();
+    await expect(page.locator('#notif-list .notif-item.unread')).toHaveCount(0);
+
+    await items.nth(2).locator('.notif-del').click();
+    await expect(items).toHaveCount(2);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#notif-modal')).not.toHaveClass(/open/);
+  });
+});
