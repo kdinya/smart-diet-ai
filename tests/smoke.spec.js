@@ -1856,9 +1856,11 @@ test.describe('Smoke: AI provider fallback', () => {
     await page.locator('#chat-fab').click();
     await page.locator('#chat-input').fill('chicken');
     await page.locator('#chat-send').click();
-    const addButton = page.locator('.chatbox button', { hasText: 'Add to diary' });
+    const addButton = page.locator('#chatbox .chat-product-plus');
     await expect(addButton).toBeVisible();
     await addButton.click();
+    await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
+    await page.locator('#ask-product-action-diary').click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await page.locator('#pick-meals [data-pick-meal="lunch"]').click();
     await page.locator('#pick-dates [data-pick-date="tomorrow"]').click();
@@ -2610,6 +2612,28 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await page.locator('#pick-meals [data-pick-meal="breakfast"]').click();
     await page.locator('#pick-add').click();
     await expect.poll(async () => (await readStore(page)).foods.map((x) => x.name)).toContain('Йогурт');
+  });
+
+  test('floating dietitian chat displays each recommended product on its own row', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
+    const json = JSON.stringify({ items: [
+      { name: 'Вівсянка', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 },
+      { name: 'Йогурт', grams: 120, kcal: 90, protein: 8, fat: 2, carbs: 10 },
+    ], total: { kcal: 280, protein: 15, fat: 5, carbs: 42 }, note: '' });
+    await page.route('https://api.groq.com/**', (route) => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: json } }] }) }));
+    await page.locator('#chat-fab').click();
+    await page.locator('#chat-input').fill('перекус');
+    await page.locator('#chat-send').click();
+
+    const rows = page.locator('#chatbox .chat-product-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Вівсянка');
+    await expect(rows.nth(1)).toContainText('Йогурт');
+    const rowTops = await rows.evaluateAll((items) => items.map((item) => Math.round(item.getBoundingClientRect().top)));
+    expect(rowTops[1]).toBeGreaterThan(rowTops[0]);
+    await rows.nth(0).locator('.chat-product-plus').click();
+    await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
+    await expect(page.locator('#ask-product-action-name')).toHaveText('Вівсянка');
   });
 
   test('a prepared dish stays one nutrition item and mobile content clears the launcher', async ({ page }) => {
