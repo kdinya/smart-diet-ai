@@ -2792,6 +2792,80 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     expect(messageGap).toBeGreaterThanOrEqual(12);
   });
 
+  test('floating dietitian chat history survives close and reload, clears with confirmation, and remains account-scoped', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
+    const reply = JSON.stringify({ items: [{ name: 'Вівсянка', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 }], total: { kcal: 190, protein: 7, fat: 3, carbs: 32 }, note: 'Орієнтовна порція.' });
+    await page.route('https://api.groq.com/**', route => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: reply } }] }) }));
+    await page.locator('#chat-fab').click();
+    await page.locator('#chat-input').fill('вівсянка');
+    await page.locator('#chat-send').click();
+    await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
+    await page.locator('#chat-close').click();
+    await page.locator('#chat-fab').click();
+    await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await page.locator('#chat-fab').click();
+    await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
+    const savedKey = await page.evaluate(() => Object.keys(localStorage).find(key => key === 'smartdiet-dietitian-chat-v1:local'));
+    expect(savedKey).toBe('smartdiet-dietitian-chat-v1:local');
+    const accountKeys = await page.evaluate(() => {
+      user = { id: 'dietitian-test-user' };
+      switchDietitianChat();
+      const accountWasInitiallyEmpty = dietitianChat.length === 0;
+      appendDietitianChat({ id: 'account-only-message', role: 'user', text: 'private account chat' });
+      user = null;
+      switchDietitianChat();
+      const guestHasAccountMessage = dietitianChat.some(message => message.text === 'private account chat');
+      const guestHistoryLength = dietitianChat.length;
+      user = { id: 'dietitian-test-user' };
+      switchDietitianChat();
+      const accountRestored = dietitianChat.some(message => message.text === 'private account chat');
+      user = null;
+      switchDietitianChat();
+      return { accountWasInitiallyEmpty, guestHasAccountMessage, guestHistoryLength, accountRestored };
+    });
+    expect(accountKeys.accountWasInitiallyEmpty).toBe(true);
+    expect(accountKeys.guestHasAccountMessage).toBe(false);
+    expect(accountKeys.guestHistoryLength).toBeGreaterThan(0);
+    expect(accountKeys.accountRestored).toBe(true);
+    await page.locator('#chat-clear').click();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.locator('#confirm-cancel').click();
+    await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
+    await page.locator('#chat-clear').click();
+    await page.locator('#confirm-ok').click();
+    await expect(page.locator('#chatbox .bubble:not(#chat-welcome)')).toHaveCount(0);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-dietitian-chat-v1:local') || '[]'))).toEqual([]);
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await page.locator('#chat-fab').click();
+    await expect(page.locator('#chatbox .bubble:not(#chat-welcome)')).toHaveCount(0);
+  });
+
+  test('meal cards stack eye and title, then calories, then macros without horizontal overflow', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'en' }, foods: [
+      { id: 'meal-layout-test', name: 'Oats', meal: 'breakfast', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60, date: today, createdAt: 1 },
+    ] });
+    await page.setViewportSize({ width: 360, height: 800 });
+    await openView(page, 'diary');
+    const card = page.locator('#diary-meals .meal-card').first();
+    const positions = await card.evaluate(el => {
+      const top = el.querySelector('.meal-top');
+      const eye = top.querySelector('.meal-activity-icon').getBoundingClientRect();
+      const title = top.querySelector('.meal-title').getBoundingClientRect();
+      const calories = top.querySelector('.meal-kcal').getBoundingClientRect();
+      const macros = top.querySelector('.meal-macros').getBoundingClientRect();
+      return { eye: { top: eye.top, left: eye.left }, title: { top: title.top, left: title.left }, calories: { top: calories.top, left: calories.left }, macros: { top: macros.top, left: macros.left }, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
+    });
+    expect(Math.abs(positions.eye.top - positions.title.top)).toBeLessThanOrEqual(3);
+    expect(positions.calories.top).toBeGreaterThan(positions.title.top);
+    expect(positions.macros.top).toBeGreaterThan(positions.calories.top);
+    expect(positions.macros.left).toBeCloseTo(positions.calories.left, 0);
+    expect(positions.scrollWidth).toBeLessThanOrEqual(positions.innerWidth);
+  });
+
   test('a prepared dish stays one nutrition item and mobile content clears the launcher', async ({ page }) => {
     await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
     let sent = '';
