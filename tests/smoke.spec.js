@@ -642,6 +642,8 @@ const IMPORT_BACKUP = {
   prefs: {
     ...BASE_PREFS,
     name: 'Imported',
+    mealActivity: { '2026-10-24|lunch': false },
+    snackPositions: { '2026-10-24|snack-id': { after:'breakfast', order:0 } },
     kcal: 1800,
     protein: 120,
     carbs: 200,
@@ -683,6 +685,8 @@ test.describe('Smoke: backup import', () => {
     expect(imported.weights.map((weight) => [weight.date, weight.value])).toEqual([['2026-10-24', 80.2]]);
     expect(imported.prefs.kcal).toBe(1800);
     expect(imported.prefs.name).toBe('Imported');
+    expect(imported.prefs.mealActivity['2026-10-24|lunch']).toBe(false);
+    expect(imported.prefs.snackPositions['2026-10-24|snack-id']).toEqual({after:'breakfast',order:0});
 
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
@@ -973,6 +977,63 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.reload();
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Snack 1' })).toHaveCount(1);
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Snack 2' })).toHaveCount(1);
+  });
+
+  test('meal activity icons toggle totals while preserving food entries', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate()+1); return d.toLocaleDateString('en-CA'); });
+    await openApp(page, { prefs: BASE_PREFS, foods: [
+      { id:'aaaa1111-1111-4111-8111-111111111111', name:'Today oats', meal:'lunch', grams:100, kcal:300, protein:10, fat:5, carbs:50, date:today, createdAt:1 },
+      { id:'bbbb2222-2222-4222-8222-222222222222', name:'Tomorrow oats', meal:'lunch', grams:100, kcal:600, protein:20, fat:10, carbs:100, date:tomorrow, createdAt:2 },
+    ], weights:[] });
+    await openView(page,'diary');
+    await page.evaluate(date=>{let input=document.querySelector('#diary-date');input.value=date;input.dispatchEvent(new Event('change'))},tomorrow);
+    const future=page.locator('#diary-meals .meal-card').nth(1);
+    await expect(future).toHaveClass(/excluded/);
+    await expect(future.locator('[data-meal-activity]')).toContainText('○');
+    await expect(future.locator('.meal-list')).toContainText('Tomorrow oats');
+    await expect(future.locator('.meal-kcal')).toContainText('0 / 700');
+    await future.locator('[data-meal-activity]').click();
+    await expect(future).not.toHaveClass(/excluded/);
+    await expect(future.locator('.meal-activity-icon')).toHaveText('✓');
+    await expect(future.locator('.meal-kcal')).toContainText('600 / 700');
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(true);
+
+    const confirmations=[]; await autoConfirm(page,true,confirmations);
+    await page.evaluate(date=>{let input=document.querySelector('#diary-date');input.value=date;input.dispatchEvent(new Event('change'))},today);
+    const current=page.locator('#diary-meals .meal-card').nth(1);
+    await expect(current.locator('.meal-activity-icon')).toHaveText('✓');
+    await current.locator('[data-meal-activity]').click();
+    await expect.poll(()=>confirmations.length).toBe(1);
+    await expect(current).toHaveClass(/excluded/);
+    await expect(current.locator('.meal-list')).toContainText('Today oats');
+    await expect(current.locator('.meal-kcal')).toContainText('0 / 700');
+    expect((await readStore(page)).prefs.mealActivity[`${today}|lunch`]).toBe(false);
+  });
+
+  test('snack arrows move a snack across fixed main meals and persist', async ({ page }) => {
+    await openApp(page,{prefs:{...BASE_PREFS,lang:'en'},foods:[
+      {id:'cccc1111-1111-4111-8111-111111111111',name:'Breakfast food',meal:'breakfast',grams:100,kcal:200,protein:5,fat:3,carbs:30,date:'2026-10-28',createdAt:100,mealOrder:1},
+      {id:'dddd2222-2222-4222-8222-222222222222',name:'Snack food',meal:'snack',grams:100,kcal:100,protein:2,fat:1,carbs:20,date:'2026-10-28',createdAt:200,mealOrder:2,snackId:'snack-a'},
+      {id:'eeee3333-3333-4333-8333-333333333333',name:'Lunch food',meal:'lunch',grams:100,kcal:300,protein:10,fat:5,carbs:40,date:'2026-10-28',createdAt:300,mealOrder:3},
+      {id:'ffff4444-4444-4444-8444-444444444444',name:'Dinner food',meal:'dinner',grams:100,kcal:400,protein:20,fat:8,carbs:50,date:'2026-10-28',createdAt:400,mealOrder:4},
+    ],weights:[]});
+    await openView(page,'diary');
+    const cards=page.locator('#diary-meals .meal-card');
+    await expect(cards).toHaveCount(4);
+    let titles=await page.locator('#diary-meals .meal-title').allTextContents();
+    expect(titles).toEqual(['Breakfast','Snack 1','Lunch','Dinner']);
+    const snack=page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
+    await snack.locator('[data-snack-move="1"]').click();
+    titles=await page.locator('#diary-meals .meal-title').allTextContents();
+    expect(titles).toEqual(['Breakfast','Lunch','Snack 1','Dinner']);
+    await snack.locator('[data-snack-move="-1"]').click();
+    titles=await page.locator('#diary-meals .meal-title').allTextContents();
+    expect(titles).toEqual(['Breakfast','Snack 1','Lunch','Dinner']);
+    await page.reload();
+    await expect(page.locator('#diary-meals .meal-title')).toHaveText(['Breakfast','Snack 1','Lunch','Dinner']);
   });
 
   test('main meals stay in breakfast-lunch-dinner order when added out of order', async ({ page }) => {
