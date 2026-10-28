@@ -1011,7 +1011,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(true);
 
     const confirmations=[]; await autoConfirm(page,true,confirmations);
-    await page.evaluate(date=>{let input=document.querySelector('#diary-date');input.value=date;input.dispatchEvent(new Event('change'))},today);
+    await openView(page,'diary');
     const current=page.locator('#diary-meals .meal-card').nth(1);
     await expect(current.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
     await current.locator('[data-meal-activity]').click();
@@ -2640,15 +2640,19 @@ test.describe('Smoke: mobile layout at 360px', () => {
         const details = el.querySelector('.meal-details').getBoundingClientRect();
         const eyeBox = eyeButton.getBoundingClientRect();
         const iconBox = icon.getBoundingClientRect();
+        const titleRange = document.createRange();
+        titleRange.selectNodeContents(el.querySelector('.meal-title'));
+        const titleText = titleRange.getBoundingClientRect();
         return { left: box.left, right: box.right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
-          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), details,
+          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), titleText, details,
           eyeBg: getComputedStyle(eyeButton).backgroundColor, iconBg: getComputedStyle(icon).backgroundColor,
           iconBorder: getComputedStyle(icon).borderWidth };
       });
       expect(bounds.left).toBeGreaterThanOrEqual(0);
       expect(bounds.right).toBeLessThanOrEqual(360);
       expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
-      expect(bounds.eye.left).toBeLessThan(bounds.title.left);
+      expect(bounds.titleText.left).toBeGreaterThanOrEqual(bounds.eye.right);
+      expect(bounds.titleText.left - bounds.eye.right).toBeLessThanOrEqual(8);
       expect(Math.abs(bounds.icon.width - bounds.icon.height)).toBeLessThanOrEqual(0.5);
       expect(bounds.eyeBg).toBe('rgba(0, 0, 0, 0)');
       expect(bounds.iconBg).toBe('rgba(0, 0, 0, 0)');
@@ -2871,12 +2875,15 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     const positions = await card.evaluate(el => {
       const top = el.querySelector('.meal-top');
       const eye = top.querySelector('.meal-activity-icon').getBoundingClientRect();
-      const title = top.querySelector('.meal-title').getBoundingClientRect();
+      const titleRange = document.createRange();
+      titleRange.selectNodeContents(top.querySelector('.meal-title'));
+      const title = titleRange.getBoundingClientRect();
       const calories = top.querySelector('.meal-kcal').getBoundingClientRect();
       const macros = top.querySelector('.meal-macros').getBoundingClientRect();
-      return { eye: { top: eye.top, left: eye.left }, title: { top: title.top, left: title.left }, calories: { top: calories.top, left: calories.left }, macros: { top: macros.top, left: macros.left }, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
+      return { eye: { top: eye.top, left: eye.left, right: eye.right, height: eye.height }, title: { top: title.top, left: title.left, height: title.height }, calories: { top: calories.top, left: calories.left }, macros: { top: macros.top, left: macros.left }, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
     });
-    expect(Math.abs(positions.eye.top - positions.title.top)).toBeLessThanOrEqual(3);
+    expect(Math.abs((positions.eye.top + positions.eye.height / 2) - (positions.title.top + positions.title.height / 2))).toBeLessThanOrEqual(3);
+    expect(positions.title.left).toBeGreaterThanOrEqual(positions.eye.right);
     expect(positions.calories.top).toBeGreaterThan(positions.title.top);
     expect(positions.macros.top).toBeGreaterThan(positions.calories.top);
     expect(positions.macros.left).toBeCloseTo(positions.calories.left, 0);

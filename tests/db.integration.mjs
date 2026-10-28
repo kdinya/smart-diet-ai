@@ -125,6 +125,7 @@ const shareBody = (from, to, name) => ({
 });
 
 async function run() {
+  let r;
   for (const key of ['a', 'b', 'c']) await createUser(key);
   for (const key of ['a', 'b', 'c']) await signIn(key);
 
