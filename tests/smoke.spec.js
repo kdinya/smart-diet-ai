@@ -990,12 +990,15 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.evaluate(date=>{let input=document.querySelector('#diary-date');input.value=date;input.dispatchEvent(new Event('change'))},tomorrow);
     const future=page.locator('#diary-meals .meal-card').nth(1);
     await expect(future).toHaveClass(/excluded/);
-    await expect(future.locator('[data-meal-activity]')).toContainText('○');
+    await expect(future.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'closed');
+    await expect(future.locator('.meal-activity-status')).toHaveCount(0);
+    const futureHeader = await future.locator('.meal-top').evaluate(el => ({ eye: el.querySelector('[data-meal-activity]').getBoundingClientRect().left, title: el.querySelector('.meal-title').getBoundingClientRect().left }));
+    expect(futureHeader.eye).toBeLessThan(futureHeader.title);
     await expect(future.locator('.meal-list')).toContainText('Tomorrow oats');
     await expect(future.locator('.meal-kcal')).toContainText('0 / 700');
     await future.locator('[data-meal-activity]').click();
     await expect(future).not.toHaveClass(/excluded/);
-    await expect(future.locator('.meal-activity-icon')).toHaveText('✓');
+    await expect(future.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
     await expect(future.locator('.meal-kcal')).toContainText('600 / 700');
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
@@ -1004,7 +1007,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const confirmations=[]; await autoConfirm(page,true,confirmations);
     await page.evaluate(date=>{let input=document.querySelector('#diary-date');input.value=date;input.dispatchEvent(new Event('change'))},today);
     const current=page.locator('#diary-meals .meal-card').nth(1);
-    await expect(current.locator('.meal-activity-icon')).toHaveText('✓');
+    await expect(current.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
     await current.locator('[data-meal-activity]').click();
     await expect.poll(()=>confirmations.length).toBe(1);
     await expect(current).toHaveClass(/excluded/);
@@ -2574,6 +2577,31 @@ test.describe('Smoke: mobile layout at 360px', () => {
     });
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.right).toBeLessThanOrEqual(box.W);
+  });
+
+  test('meal eye icons sit before meal names and all meal header controls fit the narrow viewport', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [
+      { id:'11111111-1111-4111-8111-111111111111', name:'Вівсянка', meal:'breakfast', grams:100, kcal:200, protein:5, fat:3, carbs:30, date:today, createdAt:1 },
+      { id:'22222222-2222-4222-8222-222222222222', name:'Яблуко', meal:'snack', grams:100, kcal:80, protein:1, fat:0, carbs:20, date:today, createdAt:2, snackId:'snack-a' },
+      { id:'33333333-3333-4333-8333-333333333333', name:'Курка', meal:'lunch', grams:100, kcal:300, protein:30, fat:5, carbs:0, date:today, createdAt:3 },
+      { id:'44444444-4444-4444-8444-444444444444', name:'Риба', meal:'dinner', grams:100, kcal:250, protein:25, fat:10, carbs:0, date:today, createdAt:4 },
+    ], weights:[] });
+    await openView(page, 'diary');
+    const cards = page.locator('#diary-meals .meal-card');
+    await expect(cards).toHaveCount(4);
+    for (const card of await cards.all()) {
+      const bounds = await card.locator('.meal-top').evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return { left: box.left, right: box.right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+          eye: el.querySelector('[data-meal-activity]').getBoundingClientRect(), title: el.querySelector('.meal-title').getBoundingClientRect() };
+      });
+      expect(bounds.left).toBeGreaterThanOrEqual(0);
+      expect(bounds.right).toBeLessThanOrEqual(360);
+      expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
+      expect(bounds.eye.left).toBeLessThan(bounds.title.left);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
 });
 
