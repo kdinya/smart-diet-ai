@@ -313,7 +313,7 @@ async function readStore(page) {
 }
 
 async function openView(page, view) {
-  await page.locator(`#nav [data-view="${view}"]`).click();
+  await page.locator(`#nav:visible [data-view="${view}"], #mobile-nav:visible [data-view="${view}"]`).click();
   await expect(page.locator(`#view-${view}`)).toHaveClass(/active/);
 }
 
@@ -992,8 +992,14 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(future).toHaveClass(/excluded/);
     await expect(future.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'closed');
     await expect(future.locator('.meal-activity-status')).toHaveCount(0);
-    const futureHeader = await future.locator('.meal-top').evaluate(el => ({ eye: el.querySelector('[data-meal-activity]').getBoundingClientRect().left, title: el.querySelector('.meal-title').getBoundingClientRect().left }));
-    expect(futureHeader.eye).toBeLessThan(futureHeader.title);
+    const futureHeader = await future.locator('.meal-top').evaluate(el => {
+      const eye = el.querySelector('[data-meal-activity]').getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(el.querySelector('.meal-title'));
+      const title = range.getBoundingClientRect();
+      return { eyeRight: eye.right, titleLeft: title.left };
+    });
+    expect(futureHeader.eyeRight).toBeLessThanOrEqual(futureHeader.titleLeft);
     await expect(future.locator('.meal-list')).toContainText('Tomorrow oats');
     await expect(future.locator('.meal-kcal')).toContainText('0 / 700');
     await future.locator('[data-meal-activity]').click();
@@ -1028,13 +1034,24 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
       { id:'61616161-6161-4161-8161-616161616161', name:'Пізній запис', meal:'lunch', grams:100, kcal:400, protein:15, fat:8, carbs:60, date:dates.dayAfterTomorrow, createdAt:2 },
     ], weights:[] });
     await openView(page, 'diary');
+    const selectDiaryDate = async (date) => {
+      await page.click('#diary-date');
+      while (true) {
+        const visibleMonth = (await page.locator('#cal-days .cal-day').first().getAttribute('data-cal-date')).slice(0, 7);
+        if (visibleMonth === date.slice(0, 7)) break;
+        await page.locator(visibleMonth < date.slice(0, 7) ? '#cal-next' : '#cal-prev').click();
+      }
+      await page.locator(`[data-cal-date="${date}"]`).click();
+      await page.click('#cal-done');
+    };
+    await selectDiaryDate(dates.yesterday);
     const yesterdayCard = page.locator('#diary-meals .meal-card').nth(1);
     await expect(yesterdayCard.locator('.meal-title')).toContainText('Lunch');
     await expect(yesterdayCard).not.toHaveClass(/excluded/);
     await expect(yesterdayCard.locator('[data-meal-activity]')).toHaveCount(0);
     await expect(yesterdayCard.locator('.meal-kcal')).toContainText('300 / 700');
 
-    await page.evaluate(date => { const input = document.querySelector('#diary-date'); input.value = date; input.dispatchEvent(new Event('change')); }, dates.dayAfterTomorrow);
+    await selectDiaryDate(dates.dayAfterTomorrow);
     const futureCard = page.locator('#diary-meals .meal-card').nth(1);
     await expect(futureCard.locator('[data-meal-activity]')).toHaveCount(0);
     await expect(futureCard).toHaveClass(/excluded/);
@@ -1441,7 +1458,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#meal-plan-products .meal-plan-picker-item').first()).toHaveCSS('padding-bottom', '7px');
     await page.locator('[data-close-meal-plan]').first().click();
 
-    await page.locator('#view-home [data-action="add-food"]').click();
+    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
     await page.locator('#pick-product').click();
     const pickerNames = page.locator('#pick-body .pick-item b');
     await expect(pickerNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
@@ -1922,7 +1939,7 @@ test.describe('Smoke: meal plan', () => {
       .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
       .flatMap(([, value]) => JSON.parse(value)));
     expect(drafts).toHaveLength(1);
-    expect(drafts[0].items).toEqual([{ name: 'Oats', meal: 'breakfast', grams: 150, kcal: 525, protein: 18, fat: 9, carbs: 90 }]);
+    expect(drafts[0].items).toEqual([{ id: 'meal-oats', name: 'Oats', meal: 'breakfast', grams: 150, kcal: 525, protein: 18, fat: 9, carbs: 90 }]);
     expect(await modal.isVisible()).toBe(false);
   });
 });
@@ -2526,7 +2543,7 @@ test.describe('Smoke: review fixes', () => {
     expect(drafts[0].items[0].added).toBe(true);
     expect(drafts[0].items[0].addedFoodId).toBe(foods[0].id);
 
-    await page.locator('#meal-drafts-modal .btn-close').click();
+    await page.locator('#meal-drafts-modal [data-close-meal-drafts]').first().click();
     await page.locator('#meal-drafts-open').click();
     const reopenedBtn = page.locator('#meal-drafts-list [data-plan-add]').first();
     await expect(reopenedBtn).toBeDisabled();
@@ -2555,7 +2572,7 @@ test.describe('Smoke: review fixes', () => {
     for (let i = 0; i < 3; i += 1) await checks.nth(i).check();
     await page.locator('#meal-plan-run').click();
 
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText(/failed|замала|Не вдалося/i);
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText(/Could not create plan: portion too small \(0 g\)\.|Не вдалося скласти план: порція замала \(0 г\)\./i);
     const drafts = await page.evaluate(() => mealDrafts());
     expect(drafts).toHaveLength(0);
   });

@@ -41,8 +41,10 @@ if (dbUrlStr) {
   } catch (e) {
     throw new Error(`Invalid TEST_DATABASE_URL: ${e.message}`);
   }
-  if (!dbUrl.hostname.toLowerCase().includes(testProjectRef)) {
-    throw new Error(`TEST_DATABASE_URL host '${dbUrl.hostname}' does not match test project ref '${testProjectRef}'.`);
+  const dbHost = dbUrl.hostname.toLowerCase();
+  const dbUser = decodeURIComponent(dbUrl.username).toLowerCase();
+  if (!dbHost.includes(testProjectRef) && !dbUser.endsWith(`.${testProjectRef}`)) {
+    throw new Error(`TEST_DATABASE_URL does not identify test project '${testProjectRef}' in its host or database username.`);
   }
 }
 
