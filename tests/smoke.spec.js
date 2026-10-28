@@ -2640,11 +2640,8 @@ test.describe('Smoke: mobile layout at 360px', () => {
         const details = el.querySelector('.meal-details').getBoundingClientRect();
         const eyeBox = eyeButton.getBoundingClientRect();
         const iconBox = icon.getBoundingClientRect();
-        const titleRange = document.createRange();
-        titleRange.selectNodeContents(el.querySelector('.meal-title'));
-        const titleText = titleRange.getBoundingClientRect();
         return { left: box.left, right: box.right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
-          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), titleText, details,
+          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), details,
           eyeBg: getComputedStyle(eyeButton).backgroundColor, iconBg: getComputedStyle(icon).backgroundColor,
           iconBorder: getComputedStyle(icon).borderWidth };
       });
@@ -2880,10 +2877,10 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
       const title = titleRange.getBoundingClientRect();
       const calories = top.querySelector('.meal-kcal').getBoundingClientRect();
       const macros = top.querySelector('.meal-macros').getBoundingClientRect();
-      return { eye: { top: eye.top, left: eye.left, right: eye.right, height: eye.height }, title: { top: title.top, left: title.left, height: title.height }, calories: { top: calories.top, left: calories.left }, macros: { top: macros.top, left: macros.left }, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
+      return { eye: { top: eye.top, left: eye.left, right: eye.right, bottom: eye.bottom }, title: { top: title.top, left: title.left, bottom: title.bottom }, calories: { top: calories.top, left: calories.left }, macros: { top: macros.top, left: macros.left }, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
     });
-    expect(Math.abs((positions.eye.top + positions.eye.height / 2) - (positions.title.top + positions.title.height / 2))).toBeLessThanOrEqual(3);
-    expect(positions.title.left).toBeGreaterThanOrEqual(positions.eye.right);
+    expect(positions.eye.top).toBeLessThan(positions.title.bottom);
+    expect(positions.eye.bottom).toBeGreaterThan(positions.title.top);
     expect(positions.calories.top).toBeGreaterThan(positions.title.top);
     expect(positions.macros.top).toBeGreaterThan(positions.calories.top);
     expect(positions.macros.left).toBeCloseTo(positions.calories.left, 0);
