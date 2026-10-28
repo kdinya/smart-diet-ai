@@ -2604,7 +2604,7 @@ test.describe('Smoke: mobile layout at 360px', () => {
     expect(box.right).toBeLessThanOrEqual(box.W);
   });
 
-  test('meal eye icons sit before meal names and all meal header controls fit the narrow viewport', async ({ page }) => {
+  test('meal eyes stay crisp and nutrition details align below them on narrow screens', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [
       { id:'11111111-1111-4111-8111-111111111111', name:'Вівсянка', meal:'breakfast', grams:100, kcal:200, protein:5, fat:3, carbs:30, date:today, createdAt:1 },
@@ -2618,13 +2618,25 @@ test.describe('Smoke: mobile layout at 360px', () => {
     for (const card of await cards.all()) {
       const bounds = await card.locator('.meal-top').evaluate(el => {
         const box = el.getBoundingClientRect();
+        const eyeButton = el.querySelector('[data-meal-activity]');
+        const icon = eyeButton.querySelector('.meal-activity-icon');
+        const details = el.querySelector('.meal-details').getBoundingClientRect();
+        const eyeBox = eyeButton.getBoundingClientRect();
+        const iconBox = icon.getBoundingClientRect();
         return { left: box.left, right: box.right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
-          eye: el.querySelector('[data-meal-activity]').getBoundingClientRect(), title: el.querySelector('.meal-title').getBoundingClientRect() };
+          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), details,
+          eyeBg: getComputedStyle(eyeButton).backgroundColor, iconBg: getComputedStyle(icon).backgroundColor,
+          iconBorder: getComputedStyle(icon).borderWidth };
       });
       expect(bounds.left).toBeGreaterThanOrEqual(0);
       expect(bounds.right).toBeLessThanOrEqual(360);
       expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
       expect(bounds.eye.left).toBeLessThan(bounds.title.left);
+      expect(Math.abs(bounds.icon.width - bounds.icon.height)).toBeLessThanOrEqual(0.5);
+      expect(bounds.eyeBg).toBe('rgba(0, 0, 0, 0)');
+      expect(bounds.iconBg).toBe('rgba(0, 0, 0, 0)');
+      expect(bounds.iconBorder).toBe('0px');
+      expect(Math.abs(bounds.details.left - bounds.eye.left)).toBeLessThanOrEqual(1);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
