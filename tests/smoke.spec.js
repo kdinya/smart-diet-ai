@@ -1016,6 +1016,31 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect((await readStore(page)).prefs.mealActivity[`${today}|lunch`]).toBe(false);
   });
 
+  test('past meal activity is always counted and eye controls appear only for today and tomorrow', async ({ page }) => {
+    const dates = await page.evaluate(() => {
+      const today = new Date();
+      const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+      const dayAfterTomorrow = new Date(today); dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      return { today: today.toLocaleDateString('en-CA'), yesterday: yesterday.toLocaleDateString('en-CA'), dayAfterTomorrow: dayAfterTomorrow.toLocaleDateString('en-CA') };
+    });
+    await openApp(page, { prefs: { ...BASE_PREFS, mealActivity: { [`${dates.yesterday}|lunch`]: false } }, foods: [
+      { id:'51515151-5151-4151-8151-515151515151', name:'Вчорашня каша', meal:'lunch', grams:100, kcal:300, protein:10, fat:5, carbs:50, date:dates.yesterday, createdAt:1 },
+      { id:'61616161-6161-4161-8161-616161616161', name:'Пізній запис', meal:'lunch', grams:100, kcal:400, protein:15, fat:8, carbs:60, date:dates.dayAfterTomorrow, createdAt:2 },
+    ], weights:[] });
+    await openView(page, 'diary');
+    const yesterdayCard = page.locator('#diary-meals .meal-card').nth(1);
+    await expect(yesterdayCard.locator('.meal-title')).toContainText('Lunch');
+    await expect(yesterdayCard).not.toHaveClass(/excluded/);
+    await expect(yesterdayCard.locator('[data-meal-activity]')).toHaveCount(0);
+    await expect(yesterdayCard.locator('.meal-kcal')).toContainText('300 / 700');
+
+    await page.evaluate(date => { const input = document.querySelector('#diary-date'); input.value = date; input.dispatchEvent(new Event('change')); }, dates.dayAfterTomorrow);
+    const futureCard = page.locator('#diary-meals .meal-card').nth(1);
+    await expect(futureCard.locator('[data-meal-activity]')).toHaveCount(0);
+    await expect(futureCard).toHaveClass(/excluded/);
+    await expect(futureCard.locator('.meal-kcal')).toContainText('0 / 700');
+  });
+
   test('snack arrows move a snack across fixed main meals and persist', async ({ page }) => {
     await openApp(page,{prefs:{...BASE_PREFS,lang:'en'},foods:[
       {id:'cccc1111-1111-4111-8111-111111111111',name:'Breakfast food',meal:'breakfast',grams:100,kcal:200,protein:5,fat:3,carbs:30,date:'2026-10-28',createdAt:100,mealOrder:1},
