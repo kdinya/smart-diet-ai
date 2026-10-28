@@ -2764,6 +2764,13 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     const detailSize = await rows.nth(0).locator('.chat-product-details').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
     expect(titleStyles.fontWeight).toBeGreaterThanOrEqual(600);
     expect(detailSize).toBeLessThan(titleStyles.fontSize);
+    const productRowStyle = await rows.nth(0).evaluate(el => {
+      const style = getComputedStyle(el);
+      return { borderColor: style.borderTopColor, borderStyle: style.borderTopStyle, borderRadius: style.borderTopLeftRadius };
+    });
+    expect(productRowStyle.borderColor).toBe('rgb(126, 184, 134)');
+    expect(productRowStyle.borderStyle).toBe('solid');
+    expect(productRowStyle.borderRadius).toBe('10px');
     const rowTops = await rows.evaluateAll((items) => items.map((item) => Math.round(item.getBoundingClientRect().top)));
     expect(rowTops[1]).toBeGreaterThan(rowTops[0]);
     await rows.nth(0).locator('.chat-product-plus').click();
