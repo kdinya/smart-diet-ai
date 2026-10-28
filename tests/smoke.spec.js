@@ -2866,7 +2866,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     expect(positions.scrollWidth).toBeLessThanOrEqual(positions.innerWidth);
   });
 
-  test('meal header keeps eye left, title centered between eye and analysis, and snack arrows below analysis', async ({ page }) => {
+  test('meal header keeps eye left, title close beside it, and snack arrows below analysis', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [
       { id: 'layout-breakfast', name: 'Oats', meal: 'breakfast', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60, date: today, createdAt: 1 },
@@ -2877,13 +2877,14 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     const card = page.locator('#diary-meals .meal-card').filter({ has: page.locator('.meal-title', { hasText: 'Snack' }) }).first();
     const layout = await card.evaluate(el => {
       const rect = selector => { const r=el.querySelector(selector).getBoundingClientRect(); return {top:r.top,left:r.left,right:r.right,bottom:r.bottom,width:r.width}; };
-      const range=document.createRange();range.selectNodeContents(el.querySelector('.meal-title'));const text=range.getBoundingClientRect();return { eye:rect('.meal-activity'), title:rect('.meal-title'), titleText:{left:text.left,right:text.right}, titleAlign:getComputedStyle(el.querySelector('.meal-title')).textAlign, analyze:rect('.meal-analyze'), arrows:rect('.snack-moves'), calories:rect('.meal-kcal'), macros:rect('.meal-macros'), top:rect('.meal-top'), innerWidth:window.innerWidth, scrollWidth:document.documentElement.scrollWidth };
+      const range=document.createRange();range.selectNodeContents(el.querySelector('.meal-title'));const text=range.getBoundingClientRect();return { eye:rect('.meal-activity'), title:rect('.meal-title'), titleText:{left:text.left,right:text.right}, titleAlign:getComputedStyle(el.querySelector('.meal-title')).textAlign, chevronRight:getComputedStyle(el.querySelector('.meal-head'),'::after').right, analyze:rect('.meal-analyze'), arrows:rect('.snack-moves'), calories:rect('.meal-kcal'), macros:rect('.meal-macros'), top:rect('.meal-top'), innerWidth:window.innerWidth, scrollWidth:document.documentElement.scrollWidth };
     });
-    expect(layout.titleText.left).toBeGreaterThan(layout.eye.right);
+    expect(layout.titleText.left).toBeGreaterThanOrEqual(layout.eye.right);
+    expect(layout.titleText.left-layout.eye.right).toBeLessThanOrEqual(8);
     expect(layout.titleText.right).toBeLessThan(layout.analyze.left);
-    expect(layout.titleAlign).toBe('center');
+    expect(layout.titleAlign).toBe('left');
+    expect(layout.chevronRight).toBe('96px');
     expect(layout.title.top).toBeLessThanOrEqual(layout.analyze.top+3);
-    expect(layout.title.left).toBeGreaterThan(layout.eye.right-2);
     expect(layout.arrows.top).toBeGreaterThanOrEqual(layout.analyze.bottom);
     expect(layout.arrows.right).toBeCloseTo(layout.top.right,0);
     expect(layout.calories.top).toBeGreaterThan(layout.arrows.bottom);
