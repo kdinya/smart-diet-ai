@@ -47,6 +47,7 @@
 8. **Language of This File & Documentation:**
    - This instruction file must be written in English.
    - All repository documentation must be provided in two languages: English (`README.md`) and Ukrainian (`README.uk.md`). Both versions must describe the same features and be kept in sync.
+9. **Direct Repository Work:** For all application changes, work directly in the GitHub repository `kdinya/smart-diet-ai`; do not ask the user to create or open a Lovable project.
 
 ---
 

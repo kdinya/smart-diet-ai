@@ -2576,7 +2576,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await expect(bubble).not.toContainText('```json');
     await expect(bubble).not.toContainText('"comparison"');
   });
-  test('Ask the Dietitian renders recommended foods as stacked cards with product and diary actions', async ({ page }) => {
+  test('Ask the Dietitian renders recommended foods as rows with plus actions and a destination dialog', async ({ page }) => {
     await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
     const json = JSON.stringify({ items: [
       { name: 'Вівсянка', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 },
@@ -2587,22 +2587,25 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await page.fill('#ask-input', 'Що можна додати до перекусу?');
     await page.click('#ask-send');
 
-    const cards = page.locator('#ask-box .ask-product-card');
-    await expect(cards).toHaveCount(2);
-    await expect(cards.nth(0)).toContainText('Вівсянка');
-    await expect(cards.nth(1)).toContainText('Йогурт');
-    await expect(cards.nth(0).locator('.ask-product-actions button')).toHaveCount(2);
-    await expect(cards.nth(1).locator('.ask-product-actions button')).toHaveCount(2);
-    await expect(cards.nth(0).locator('.ask-product-actions button').nth(0)).toHaveText('Додати до моїх продуктів');
-    await expect(cards.nth(0).locator('.ask-product-actions button').nth(1)).toHaveText('Додати до щоденника');
+    const rows = page.locator('#ask-box .ask-product-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('Вівсянка');
+    await expect(rows.nth(1)).toContainText('Йогурт');
+    await expect(rows.nth(0).locator('.ask-product-plus')).toHaveText('+');
+    await expect(rows.nth(0).locator('.ask-product-plus')).toHaveAttribute('aria-label', 'Вибрати, куди додати Вівсянка');
 
-    await cards.nth(0).locator('.ask-product-actions button').nth(0).click();
+    await rows.nth(0).locator('.ask-product-plus').click();
+    await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
+    await expect(page.locator('#ask-product-action-name')).toHaveText('Вівсянка');
+    await page.locator('#ask-product-action-save').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#food-name')).toHaveValue('Вівсянка');
     await page.locator('#food-save').click();
     await expect.poll(async () => (await readStore(page)).products.map((x) => x.name)).toContain('Вівсянка');
 
-    await cards.nth(1).locator('.ask-product-actions button').nth(1).click();
+    await rows.nth(1).locator('.ask-product-plus').click();
+    await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
+    await page.locator('#ask-product-action-diary').click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await page.locator('#pick-meals [data-pick-meal="breakfast"]').click();
     await page.locator('#pick-add').click();
