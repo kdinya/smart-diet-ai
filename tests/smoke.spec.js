@@ -2776,8 +2776,20 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await rows.nth(0).locator('.chat-product-plus').click();
     await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
     await expect(page.locator('#ask-product-action-name')).toHaveText('Вівсянка');
+    const summary = page.locator('#chatbox .bubble.ai').last().locator('.chat-product-total');
+    await expect(summary.locator('.ai-info-btn')).toHaveCount(1);
+    const infoSize = await summary.locator('.ai-info-btn').evaluate(el => {
+      const style = getComputedStyle(el);
+      return { width: parseFloat(style.width), height: parseFloat(style.height) };
+    });
+    expect(infoSize.width).toBeLessThanOrEqual(20);
+    expect(infoSize.height).toBeLessThanOrEqual(20);
     const bubbleChildren = await page.locator('#chatbox .bubble.ai').last().locator('> *').evaluateAll(nodes => nodes.map(n => n.className));
-    expect(bubbleChildren.slice(-2)).toEqual(['chat-ai-info-wrap', 'ai-meta hidden']);
+    expect(bubbleChildren.slice(-2)).toEqual(['chat-product-total', 'ai-meta hidden']);
+    const listGap = await page.locator('#chatbox .chat-product-list').evaluate(el => parseFloat(getComputedStyle(el).rowGap));
+    expect(listGap).toBeGreaterThanOrEqual(8);
+    const messageGap = await page.locator('#chatbox').evaluate(el => parseFloat(getComputedStyle(el).rowGap));
+    expect(messageGap).toBeGreaterThanOrEqual(12);
   });
 
   test('a prepared dish stays one nutrition item and mobile content clears the launcher', async ({ page }) => {
