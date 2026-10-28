@@ -2776,6 +2776,8 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await rows.nth(0).locator('.chat-product-plus').click();
     await expect(page.locator('#ask-product-action-modal')).toHaveClass(/open/);
     await expect(page.locator('#ask-product-action-name')).toHaveText('Вівсянка');
+    const bubbleChildren = await page.locator('#chatbox .bubble.ai').last().locator('> *').evaluateAll(nodes => nodes.map(n => n.className));
+    expect(bubbleChildren.slice(-2)).toEqual(['chat-ai-info-wrap', 'ai-meta hidden']);
   });
 
   test('a prepared dish stays one nutrition item and mobile content clears the launcher', async ({ page }) => {
