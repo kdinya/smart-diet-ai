@@ -2719,14 +2719,6 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText('Вівсянка');
     await expect(rows.nth(1)).toContainText('Йогурт');
-    const productNameStyle = await rows.nth(0).locator('.ask-product-name').evaluate(el => {
-      const style = getComputedStyle(el);
-      return { weight: Number(style.fontWeight), background: style.backgroundColor, color: style.color, borderLeft: style.borderLeftWidth };
-    });
-    expect(productNameStyle.weight).toBeGreaterThanOrEqual(700);
-    expect(productNameStyle.background).not.toBe('rgba(0, 0, 0, 0)');
-    expect(productNameStyle.color).not.toBe('rgb(0, 0, 0)');
-    expect(productNameStyle.borderLeft).toBe('3px');
     await expect(rows.nth(0).locator('.ask-product-plus')).toHaveText('+');
     await expect(rows.nth(0).locator('.ask-product-plus')).toHaveAttribute('aria-label', 'Вибрати, куди додати Вівсянка');
 
@@ -2763,6 +2755,15 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText('Вівсянка');
     await expect(rows.nth(1)).toContainText('Йогурт');
+    await expect(rows.nth(0).locator('.chat-product-title')).toHaveText('Вівсянка:');
+    await expect(rows.nth(0).locator('.chat-product-details')).toContainText('50');
+    const titleStyles = await rows.nth(0).locator('.chat-product-title').evaluate(el => {
+      const style = getComputedStyle(el);
+      return { fontSize: parseFloat(style.fontSize), fontWeight: Number(style.fontWeight) };
+    });
+    const detailSize = await rows.nth(0).locator('.chat-product-details').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+    expect(titleStyles.fontWeight).toBeGreaterThanOrEqual(600);
+    expect(detailSize).toBeLessThan(titleStyles.fontSize);
     const rowTops = await rows.evaluateAll((items) => items.map((item) => Math.round(item.getBoundingClientRect().top)));
     expect(rowTops[1]).toBeGreaterThan(rowTops[0]);
     await rows.nth(0).locator('.chat-product-plus').click();
