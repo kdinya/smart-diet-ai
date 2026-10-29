@@ -1037,7 +1037,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     });
     expect(futureHeader.eyeRight).toBeLessThanOrEqual(futureHeader.titleLeft);
     await expect(future.locator('.meal-list')).toContainText('Tomorrow oats');
-    await expect(future.locator('.meal-kcal')).toContainText('0 / 700');
+    await expect(future.locator('.meal-kcal')).toContainText('600 / 700');
     await future.locator('[data-meal-activity]').click();
     await expect(future).not.toHaveClass(/excluded/);
     await expect(future.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
@@ -1054,8 +1054,91 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect.poll(()=>confirmations.length).toBe(1);
     await expect(current).toHaveClass(/excluded/);
     await expect(current.locator('.meal-list')).toContainText('Today oats');
-    await expect(current.locator('.meal-kcal')).toContainText('0 / 700');
+    await expect(current.locator('.meal-kcal')).toContainText('300 / 700');
     expect((await readStore(page)).prefs.mealActivity[`${today}|lunch`]).toBe(false);
+  });
+
+  test('inactive meal keeps its own stats, anchors snacks, and stays excluded after date rollover', async ({ page }) => {
+    const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate()+1); return d.toLocaleDateString('en-CA'); });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en', mealActivity: {
+      [`${tomorrow}|breakfast`]: true,
+      [`${tomorrow}|lunch`]: false,
+      [`${tomorrow}|dinner`]: true,
+    } }, foods: [
+      { id:'aaaa1111-1111-4111-8111-111111111111', name:'Breakfast oats', meal:'breakfast', grams:100, kcal:100, protein:5, fat:2, carbs:15, date:tomorrow, createdAt:100 },
+      { id:'bbbb2222-2222-4222-8222-222222222222', name:'Lunch rice', meal:'lunch', grams:100, kcal:600, protein:12, fat:4, carbs:80, date:tomorrow, createdAt:200 },
+      { id:'cccc3333-3333-4333-8333-333333333333', name:'Afternoon apple', meal:'snack', grams:100, kcal:80, protein:0, fat:0, carbs:20, date:tomorrow, createdAt:300, snackId:'afternoon-snack' },
+      { id:'dddd4444-4444-4444-8444-444444444444', name:'Dinner fish', meal:'dinner', grams:100, kcal:300, protein:25, fat:12, carbs:5, date:tomorrow, createdAt:400 },
+    ], weights:[] });
+    await openView(page, 'diary');
+    await page.evaluate(date => { const input=document.querySelector('#diary-date'); input.value=date; input.dispatchEvent(new Event('change')); }, tomorrow);
+    const titles = () => page.locator('#diary-meals .meal-title').allTextContents();
+    expect(await titles()).toEqual(['Breakfast', 'Lunch', 'Snack 1', 'Dinner']);
+    let lunch = page.locator('#diary-meals .meal-card').nth(1);
+    await expect(lunch).toHaveClass(/excluded/);
+    await expect(lunch.locator('.meal-kcal')).toContainText('600 / 700');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('400');
+
+    const nextDayTime = await page.evaluate(date => new Date(`${date}T12:00:00`).getTime(), tomorrow);
+    await page.addInitScript(time => {
+      const NativeDate = Date;
+      class FixedDate extends NativeDate {
+        constructor(...args) { super(...(args.length ? args : [time])); }
+        static now() { return time; }
+      }
+      Object.defineProperty(window, 'Date', { value: FixedDate });
+    }, nextDayTime);
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'diary');
+    lunch = page.locator('#diary-meals .meal-card').nth(1);
+    await expect(lunch).toHaveClass(/excluded/);
+    await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'closed');
+    await expect(lunch.locator('.meal-kcal')).toContainText('600 / 700');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('400');
+    expect(await titles()).toEqual(['Breakfast', 'Lunch', 'Snack 1', 'Dinner']);
+
+    await lunch.locator('[data-meal-activity]').click();
+    await expect(lunch).not.toHaveClass(/excluded/);
+    await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('1000');
+    expect(await titles()).toEqual(['Breakfast', 'Lunch', 'Snack 1', 'Dinner']);
+    expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(true);
+  });
+
+  test('food added for tomorrow remains excluded after that date arrives until activated', async ({ page }) => {
+    const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate()+1); return d.toLocaleDateString('en-CA'); });
+    const nextDayTime = await page.evaluate(date => new Date(`${date}T12:00:00`).getTime(), tomorrow);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights:[] });
+    await openView(page, 'diary');
+    await page.evaluate(date => { const input=document.querySelector('#diary-date'); input.value=date; input.dispatchEvent(new Event('change')); }, tomorrow);
+    await addFood(page, 'Tomorrow lunch', 'lunch');
+    expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(false);
+    await expect(page.locator('#diary-meals .meal-card').nth(1)).toHaveClass(/excluded/);
+    await expect(page.locator('#diary-meals .meal-card').nth(1).locator('.meal-kcal')).toContainText('250 / 700');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('0');
+
+    await page.addInitScript(time => {
+      const NativeDate = Date;
+      class FixedDate extends NativeDate {
+        constructor(...args) { super(...(args.length ? args : [time])); }
+        static now() { return time; }
+      }
+      Object.defineProperty(window, 'Date', { value: FixedDate });
+    }, nextDayTime);
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'diary');
+    const lunch = page.locator('#diary-meals .meal-card').nth(1);
+    await expect(lunch).toHaveClass(/excluded/);
+    await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'closed');
+    await expect(lunch.locator('.meal-kcal')).toContainText('250 / 700');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('0');
+    await lunch.locator('[data-meal-activity]').click();
+    await expect(lunch).not.toHaveClass(/excluded/);
+    await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('250');
+    expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(true);
   });
 
   test('past meal activity is always counted and eye controls appear only for today and tomorrow', async ({ page }) => {
@@ -1091,7 +1174,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const futureCard = page.locator('#diary-meals .meal-card').nth(1);
     await expect(futureCard.locator('[data-meal-activity]')).toHaveCount(0);
     await expect(futureCard).toHaveClass(/excluded/);
-    await expect(futureCard.locator('.meal-kcal')).toContainText('0 / 700');
+    await expect(futureCard.locator('.meal-kcal')).toContainText('400 / 700');
   });
 
   test('snack arrows move a snack across fixed main meals and persist', async ({ page }) => {
