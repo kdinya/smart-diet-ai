@@ -32,19 +32,22 @@ if (testProjectRef === PRODUCTION_REF.toLowerCase() || BASE.toLowerCase().includ
 
 const dbUrlStr = process.env.TEST_DATABASE_URL;
 if (dbUrlStr) {
-  if (dbUrlStr.toLowerCase().includes(PRODUCTION_REF.toLowerCase())) {
-    throw new Error(`Refusing to run: TEST_DATABASE_URL points to the production project (${PRODUCTION_REF}).`);
-  }
   let dbUrl;
   try {
     dbUrl = new URL(dbUrlStr);
   } catch (e) {
     throw new Error(`Invalid TEST_DATABASE_URL: ${e.message}`);
   }
+  if (!['postgres:', 'postgresql:'].includes(dbUrl.protocol)) {
+    throw new Error('TEST_DATABASE_URL must use PostgreSQL protocol.');
+  }
   const dbHost = dbUrl.hostname.toLowerCase();
   const dbUser = decodeURIComponent(dbUrl.username).toLowerCase();
-  if (!dbHost.includes(testProjectRef) && !dbUser.endsWith(`.${testProjectRef}`)) {
-    throw new Error(`TEST_DATABASE_URL does not identify test project '${testProjectRef}' in its host or database username.`);
+  if (dbHost === `db.${PRODUCTION_REF}.supabase.co` || dbUser.endsWith(`.${PRODUCTION_REF}`)) {
+    throw new Error(`Refusing to run: TEST_DATABASE_URL points to the production project (${PRODUCTION_REF}).`);
+  }
+  if (!/^aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(dbHost) || dbUser !== `postgres.${testProjectRef}`) {
+    throw new Error(`TEST_DATABASE_URL must use the IPv4-reachable Supabase pooler and username postgres.${testProjectRef}.`);
   }
 }
 

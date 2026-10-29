@@ -86,6 +86,8 @@ function createBackend() {
       product_shares: [],
     },
     friendAttempts: {},
+    foodWriteStarted: false,
+    foodWriteRelease: null,
     failDeletes: false,
     failProfiles: false,
   };
@@ -131,6 +133,10 @@ async function mockSupabase(page, backend) {
 
     if (url.pathname === '/rest/v1/weight_entries' && req.method() === 'POST' && backend.delayWeightWrites) {
       await new Promise((resolve) => setTimeout(resolve, backend.delayWeightWrites));
+    }
+    if (url.pathname === '/rest/v1/food_entries' && req.method() === 'POST' && backend.delayFoodWrites) {
+      backend.foodWriteStarted = true;
+      await new Promise((resolve) => { backend.foodWriteRelease = resolve; });
     }
     if (url.pathname.startsWith('/rest/v1/')) {
       return handleRest(route, req, url, backend, json);
@@ -440,6 +446,7 @@ test.describe('Smoke: food deletion', () => {
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals')).not.toContainText('Smoke rice');
     expect((await readStore(page)).foods).toHaveLength(0);
+    expect(await page.evaluate(() => syncQueue.delFoods)).toHaveLength(0);
   });
 
   test('deleting a synced entry removes it from the cloud', async ({ page }) => {
@@ -462,6 +469,29 @@ test.describe('Smoke: food deletion', () => {
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'diary');
     await expect(page.locator('#diary-meals')).not.toContainText('Smoke oats');
+  });
+
+  test('a deletion during an in-flight food upload stays deleted after reload', async ({ page }) => {
+    const backend = createBackend();
+    backend.delayFoodWrites = true;
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    await openView(page, 'diary');
+    await addFood(page, 'Race condition oats');
+    await expect.poll(() => backend.foodWriteStarted).toBe(true);
+    await foodRow(page, 'Race condition oats').locator('[data-delete-food]').click();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.locator('#confirm-ok').click();
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Entry deleted.');
+    backend.foodWriteRelease();
+    await expect.poll(() => backend.tables.food_entries.length).toBe(0, { timeout: 10000 });
+    await expect.poll(() => page.evaluate(() => syncQueue.delFoods.length)).toBe(0, { timeout: 10000 });
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals')).not.toContainText('Race condition oats');
   });
 
   test('every change while signed in reaches the cloud at once', async ({ page }) => {
@@ -572,8 +602,14 @@ test.describe('Smoke: food deletion', () => {
     await autoConfirm(page, true);
     await foodRow(page, 'Smoke eggs').locator('[data-delete-food]').click();
     await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Saved locally; sync failed:');
+    await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
     await expect(foodRow(page, 'Smoke eggs')).toHaveCount(1);
     expect(backend.tables.food_entries).toHaveLength(1);
+
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    expect((await readStore(page)).foods.map((food) => food.name)).toContain('Smoke eggs');
+    expect(await page.evaluate(() => syncQueue.delFoods[0]?.food?.name)).toBe('Smoke eggs');
   });
 });
 
@@ -1059,11 +1095,12 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
   });
 
   test('snack arrows move a snack across fixed main meals and persist', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
     await openApp(page,{prefs:{...BASE_PREFS,lang:'en'},foods:[
-      {id:'cccc1111-1111-4111-8111-111111111111',name:'Breakfast food',meal:'breakfast',grams:100,kcal:200,protein:5,fat:3,carbs:30,date:'2026-10-28',createdAt:100,mealOrder:1},
-      {id:'dddd2222-2222-4222-8222-222222222222',name:'Snack food',meal:'snack',grams:100,kcal:100,protein:2,fat:1,carbs:20,date:'2026-10-28',createdAt:200,mealOrder:2,snackId:'snack-a'},
-      {id:'eeee3333-3333-4333-8333-333333333333',name:'Lunch food',meal:'lunch',grams:100,kcal:300,protein:10,fat:5,carbs:40,date:'2026-10-28',createdAt:300,mealOrder:3},
-      {id:'ffff4444-4444-4444-8444-444444444444',name:'Dinner food',meal:'dinner',grams:100,kcal:400,protein:20,fat:8,carbs:50,date:'2026-10-28',createdAt:400,mealOrder:4},
+      {id:'cccc1111-1111-4111-8111-111111111111',name:'Breakfast food',meal:'breakfast',grams:100,kcal:200,protein:5,fat:3,carbs:30,date:today,createdAt:100,mealOrder:1},
+      {id:'dddd2222-2222-4222-8222-222222222222',name:'Snack food',meal:'snack',grams:100,kcal:100,protein:2,fat:1,carbs:20,date:today,createdAt:200,mealOrder:2,snackId:'snack-a'},
+      {id:'eeee3333-3333-4333-8333-333333333333',name:'Lunch food',meal:'lunch',grams:100,kcal:300,protein:10,fat:5,carbs:40,date:today,createdAt:300,mealOrder:3},
+      {id:'ffff4444-4444-4444-8444-444444444444',name:'Dinner food',meal:'dinner',grams:100,kcal:400,protein:20,fat:8,carbs:50,date:today,createdAt:400,mealOrder:4},
     ],weights:[]});
     await openView(page,'diary');
     const cards=page.locator('#diary-meals .meal-card');
@@ -2577,6 +2614,20 @@ test.describe('Smoke: review fixes', () => {
     expect(drafts).toHaveLength(0);
   });
 
+  test('meal plan rejects carbohydrate totals above the remaining target even when calories fit', async ({ page }) => {
+    const products = ['A', 'B', 'C'].map((name, i) => ({ id: `macro-${i}`, name, grams: 100, kcal: 10, protein: 1, fat: 0, carbs: 100 }));
+    await openApp(page, { ...AI_STORE(['gemini']), products, prefs: { ...BASE_PREFS, kcal: 2000, carbs: 242 } });
+    await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
+      status: 200, headers: CORS, contentType: 'application/json',
+      body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: products.map(p => ({ id: p.id, grams: 100, meal: 'lunch' })) }) }] } }] }),
+    }));
+    await page.locator('#meal-plan-open').click();
+    for (const check of await page.locator('#meal-plan-products [data-plan-product]').all()) await check.check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('daily remainder exceeded');
+    expect(await page.evaluate(() => mealDrafts())).toHaveLength(0);
+  });
+
   test('accepting a product that was already recalled does not save it', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const saved = await page.evaluate(async () => {
@@ -2588,6 +2639,37 @@ test.describe('Smoke: review fixes', () => {
       return state.products.some(p => p.name === 'Ghost product');
     });
     expect(saved).toBe(false);
+  });
+
+  test('a failed local save while accepting a shared product leaves the invitation available', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const result = await page.evaluate(async () => {
+      const chain = { delete() { return this; }, eq() { return this; }, select() { return Promise.resolve({ data: [{ id: 'share-1' }], error: null }); } };
+      sb = { from: () => chain };
+      user = { id: 'u-recipient' };
+      inboxRows = [{ id: 'share-1', name: 'Shared lentils', grams: 100, kcal: 200, protein: 1, fat: 1, carbs: 1, from_user: 'u-sender' }];
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) { if (key === 'smartdiet-sync-queue') throw new DOMException('quota', 'QuotaExceededError'); return original.call(this, key, value); };
+      try { await resolveShare('share-1', true); }
+      finally { Storage.prototype.setItem = original; }
+      return { products: state.products.map(x => x.name), inbox: inboxRows.map(x => x.id) };
+    });
+    expect(result.products).toEqual([]);
+    expect(result.inbox).toEqual(['share-1']);
+  });
+
+  test('setting aside foreign data preserves account-scoped deletion queues in the archive', async ({ page }) => {
+    await openApp(page, { ...BASE_PREFS, foods: [], weights: [] });
+    const archive = await page.evaluate(() => {
+      state.synced = { uid: 'account-a', email: 'a@example.test' };
+      syncQueue.delFoods = [{ id: 'deleted-food', u: 'account-a' }];
+      syncQueue.delWeights = [{ d: '2025-01-01', u: 'account-a' }];
+      if (!setAsideForeignData()) return null;
+      const key = Object.keys(localStorage).find(k => k.startsWith('smartdiet-foreign-account-a-'));
+      return JSON.parse(localStorage.getItem(key));
+    });
+    expect(archive.syncQueue.delFoods).toEqual([{ id: 'deleted-food', u: 'account-a' }]);
+    expect(archive.syncQueue.delWeights).toEqual([{ d: '2025-01-01', u: 'account-a' }]);
   });
 
   test('deleting a weigh-in while signed in queues the deletion for that account only', async ({ page }) => {
@@ -2640,16 +2722,19 @@ test.describe('Smoke: mobile layout at 360px', () => {
         const details = el.querySelector('.meal-details').getBoundingClientRect();
         const eyeBox = eyeButton.getBoundingClientRect();
         const iconBox = icon.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el.querySelector('.meal-title'));
+        const titleText = range.getBoundingClientRect();
         return { left: box.left, right: box.right, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
-          eye: eyeBox, icon: iconBox, title: el.querySelector('.meal-title').getBoundingClientRect(), details,
+          eye: eyeBox, icon: iconBox, title: titleText, details,
           eyeBg: getComputedStyle(eyeButton).backgroundColor, iconBg: getComputedStyle(icon).backgroundColor,
           iconBorder: getComputedStyle(icon).borderWidth };
       });
       expect(bounds.left).toBeGreaterThanOrEqual(0);
       expect(bounds.right).toBeLessThanOrEqual(360);
       expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
-      expect(bounds.titleText.left).toBeGreaterThanOrEqual(bounds.eye.right);
-      expect(bounds.titleText.left - bounds.eye.right).toBeLessThanOrEqual(8);
+      expect(bounds.title.left).toBeGreaterThanOrEqual(bounds.eye.right);
+      expect(bounds.title.left - bounds.eye.right).toBeLessThanOrEqual(8);
       expect(Math.abs(bounds.icon.width - bounds.icon.height)).toBeLessThanOrEqual(0.5);
       expect(bounds.eyeBg).toBe('rgba(0, 0, 0, 0)');
       expect(bounds.iconBg).toBe('rgba(0, 0, 0, 0)');
@@ -2660,6 +2745,19 @@ test.describe('Smoke: mobile layout at 360px', () => {
   });
 });
 
+
+test.describe('Smoke: legacy snack ordering', () => {
+  test('old and current snack records share one chronological order when mealOrder is absent or null', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, { prefs: BASE_PREFS, foods: [
+      { id: 'old-snack-food', name: 'Old snack', meal: 'snack', grams: 100, kcal: 20, protein: 1, fat: 0, carbs: 3, date: today, createdAt: 1000, mealOrder: null },
+      { id: 'new-snack-food', name: 'New snack', meal: 'snack', grams: 100, kcal: 20, protein: 1, fat: 0, carbs: 3, date: today, createdAt: 2000, mealOrder: 9999999999999, snackId: 'new-snack' },
+      { id: 'breakfast-anchor', name: 'Breakfast', meal: 'breakfast', grams: 100, kcal: 100, protein: 5, fat: 2, carbs: 10, date: today, createdAt: 500 },
+    ], weights: [] });
+    const names = await page.evaluate((date) => mealTimeline(date).filter(x => x.type === 'snack').map(x => x.event.foods[0].name), today);
+    expect(names).toEqual(['Old snack', 'New snack']);
+  });
+});
 
 test.describe('Smoke: data safety under slow uploads', () => {
   test('an edit made while an upload is in flight is sent after it, not lost', async ({ page }) => {

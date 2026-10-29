@@ -58,20 +58,19 @@ jobs:
               exit 1
             fi
           done
-          PROD_REF=wscprmtjjbevesrchhjr
-          REF=$(node -e "console.log(new URL(process.env.TEST_SUPABASE_URL).hostname.split('.')[0])")
-          if [ "$REF" = "$PROD_REF" ]; then
-            echo "::error::TEST_SUPABASE_URL points to the production project"
-            exit 1
-          fi
-          case "$TEST_DATABASE_URL" in
-            *"$PROD_REF"*) echo "::error::TEST_DATABASE_URL points to the production project"; exit 1 ;;
-          esac
-          case "$TEST_DATABASE_URL" in
-            *"$REF"*) ;;
-            *) echo "::error::TEST_DATABASE_URL does not belong to the test project"; exit 1 ;;
-          esac
-          echo "Test project: $REF"
+          node --input-type=module <<'NODE'
+          const productionRef = 'wscprmtjjbevesrchhjr';
+          const app = new URL(process.env.TEST_SUPABASE_URL);
+          const match = app.hostname.toLowerCase().match(/^([a-z0-9_-]+)\.supabase\.co$/);
+          if (!match) throw new Error('TEST_SUPABASE_URL must use <project-ref>.supabase.co');
+          const ref = match[1];
+          if (ref === productionRef) throw new Error('TEST_SUPABASE_URL points to production');
+          const db = new URL(process.env.TEST_DATABASE_URL);
+          if (!['postgres:', 'postgresql:'].includes(db.protocol)) throw new Error('TEST_DATABASE_URL must use PostgreSQL protocol');
+          if (db.hostname.toLowerCase() === `db.${productionRef}.supabase.co` || decodeURIComponent(db.username).toLowerCase().endsWith(`.${productionRef}`)) throw new Error('TEST_DATABASE_URL points to production');
+          if (!/^aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(db.hostname.toLowerCase()) || decodeURIComponent(db.username).toLowerCase() !== `postgres.${ref}`) throw new Error(`TEST_DATABASE_URL must use the IPv4-reachable test pooler and username postgres.${ref}`);
+          console.log(`Verified dedicated test project: ${ref}`);
+          NODE
       - name: Apply schema to the test database
         run: psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
       - name: Run database integration tests
