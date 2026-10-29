@@ -881,6 +881,62 @@ test.describe('Smoke: input limits and resilience', () => {
   });
 });
 
+test.describe('Smoke: first-run setup', () => {
+  test('onboarding has no skip action and exposes maintenance pace after activity', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false, pace: 20 }, foods: [], weights: [] });
+    await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
+    await expect(page.locator('#onboarding-skip')).toHaveCount(0);
+    await expect(page.locator('#onboard-pace')).toBeAttached();
+    const order = await page.evaluate(() => {
+      const activity = document.querySelector('#onboard-activity').closest('.field');
+      const pace = document.querySelector('#onboard-pace').closest('.field');
+      return activity.compareDocumentPosition(pace) & Node.DOCUMENT_POSITION_FOLLOWING ? 'activity-before-pace' : 'wrong';
+    });
+    expect(order).toBe('activity-before-pace');
+    await page.evaluate(() => {
+      const pace = document.querySelector('#onboard-pace');
+      pace.value = '0';
+      pace.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('#onboard-target-field')).toBeHidden();
+  });
+
+  test('maintenance setup saves without a target weight and calculates daily macros', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false, pace: 20 }, foods: [], weights: [] });
+    await page.evaluate(() => {
+      const set = (id, value) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      set('onboard-birth', '1990-01-01');
+      set('onboard-height', '170');
+      set('onboard-weight', '70');
+      set('onboard-target', '');
+      set('onboard-pace', '0');
+    });
+    await page.locator('#onboarding-save').click();
+    await expect.poll(async () => (await readStore(page)).prefs?.setupComplete).toBe(true);
+    const prefs = (await readStore(page)).prefs;
+    expect(prefs.pace).toBe(0);
+    expect(prefs.targetWeight).toBeFalsy();
+    expect(prefs.recommendation.maintenance).toBe(true);
+    expect(prefs.kcal).toBeGreaterThan(0);
+    expect(prefs.protein).toBeGreaterThan(0);
+    await expect(page.locator('#onboarding-modal')).not.toHaveClass(/open/);
+    await page.reload();
+    await expect(page.locator('#onboarding-modal')).not.toHaveClass(/open/);
+  });
+
+  test('a returning user can sign in from onboarding without bypassing profile setup', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-modal summary').click();
+    await page.fill('#onboard-auth-email', 'alice@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['alice@example.test']);
+    await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
+  });
+});
+
 test.describe('Smoke: accessibility', () => {
   test('settings fields and the diary date have accessible names', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
