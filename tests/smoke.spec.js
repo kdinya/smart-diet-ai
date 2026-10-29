@@ -420,7 +420,7 @@ test.describe('Smoke: app version', () => {
     await expect(latest.locator('summary')).toContainText('2026.10.3');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('Icons on the calorie, protein, fat and carbs tiles');
+    await expect(latest).toContainText('nutrient icons on the tiles');
     await expect(versions.nth(3)).toContainText('bilingual food diary');
     await expect(versions.nth(3)).toContainText('Added');
     await page.locator('#release-history-close').click();
@@ -430,7 +430,7 @@ test.describe('Smoke: app version', () => {
     const latestUk = page.locator('#release-history-list > details').first();
     await expect(latestUk.locator('summary')).toContainText('2026.10.3');
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('Іконки на плитках калорій');
+    await expect(latestUk).toContainText('іконки на плитках харчування');
     const initialUk = page.locator('#release-history-list > details').last();
     await expect(initialUk.locator('summary')).toContainText('2026.10.0');
     await initialUk.locator('summary').click();
