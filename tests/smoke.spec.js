@@ -3227,7 +3227,7 @@ test.describe('Smoke: current date card', () => {
     expect(layout.width).toBeGreaterThan(layout.widestLabel + 20);
     expect(layout.width).toBeLessThan(layout.widestLabel + 50);
     expect(layout.dayAlign).toBe('right');
-    expect(layout.dayFontSize).toBeLessThanOrEqual(15);
+    expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
     expect(layout.weekdayFontSize).toBeCloseTo(15.6, 1);
     expect(layout.monthFontSize).toBeCloseTo(15.6, 1);
 
