@@ -5,6 +5,7 @@ const PASSWORD = 'correct-horse-battery';
 const USERS = {
   'alice@example.test': 'user-alice',
   'bob@example.test': 'user-bob',
+  'new@example.test': 'user-new',
 };
 
 const BASE_PREFS = {
@@ -90,6 +91,7 @@ function createBackend() {
     foodWriteRelease: null,
     failDeletes: false,
     failProfiles: false,
+    authEvents: [],
   };
 }
 
@@ -114,6 +116,14 @@ async function mockSupabase(page, backend) {
       if (!id || body.password !== PASSWORD) {
         return json(400, { error: 'invalid_grant', error_description: 'Invalid login credentials' });
       }
+      return json(200, sessionFor(id, body.email));
+    }
+
+    if (url.pathname === '/auth/v1/signup') {
+      const body = req.postDataJSON();
+      backend.authEvents.push({ action: 'signup', email: body.email });
+      const id = USERS[body.email];
+      if (!id || body.password !== PASSWORD) return json(400, { msg: 'Invalid signup request' });
       return json(200, sessionFor(id, body.email));
     }
 
@@ -882,11 +892,24 @@ test.describe('Smoke: input limits and resilience', () => {
 });
 
 test.describe('Smoke: first-run setup', () => {
-  test('onboarding has no skip action and exposes maintenance pace after activity', async ({ page }) => {
+  test('first-run choice offers sign-in, registration, and guest profile setup', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false, pace: 20 }, foods: [], weights: [] });
     await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
-    await expect(page.locator('#onboarding-skip')).toHaveCount(0);
+    await expect(page.locator('#onboarding-choice-signin')).toBeVisible();
+    await expect(page.locator('#onboarding-choice-signup')).toBeVisible();
+    await expect(page.locator('#onboarding-choice-guest')).toBeVisible();
+    await expect(page.locator('#onboarding-profile')).toBeHidden();
+    await page.locator('#onboarding-choice-guest').click();
+    await expect(page.locator('#onboarding-profile')).toBeVisible();
+    await expect(page.locator('#onboard-name')).toBeAttached();
+    await expect(page.locator('#onboard-birth')).toBeAttached();
+    await expect(page.locator('#onboard-sex')).toBeAttached();
+    await expect(page.locator('#onboard-height')).toBeAttached();
+    await expect(page.locator('#onboard-weight')).toBeAttached();
+    await expect(page.locator('#onboard-activity')).toBeAttached();
     await expect(page.locator('#onboard-pace')).toBeAttached();
+    await expect(page.locator('.onboarding-account-note')).toBeVisible();
+    await expect(page.locator('.onboarding-account-note')).toContainText('email and password');
     const order = await page.evaluate(() => {
       const activity = document.querySelector('#onboard-activity').closest('.field');
       const pace = document.querySelector('#onboard-pace').closest('.field');
@@ -901,10 +924,12 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboard-target-field')).toBeHidden();
   });
 
-  test('maintenance setup saves without a target weight and calculates daily macros', async ({ page }) => {
+  test('guest setup saves the completed plan locally without signing in', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false, pace: 20 }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-guest').click();
     await page.evaluate(() => {
       const set = (id, value) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      set('onboard-name', 'Guest');
       set('onboard-birth', '1990-01-01');
       set('onboard-height', '170');
       set('onboard-weight', '70');
@@ -913,29 +938,49 @@ test.describe('Smoke: first-run setup', () => {
     });
     await page.locator('#onboarding-save').click();
     await expect.poll(async () => (await readStore(page)).prefs?.setupComplete).toBe(true);
-    const prefs = (await readStore(page)).prefs;
-    expect(prefs.pace).toBe(0);
-    expect(prefs.targetWeight).toBeFalsy();
-    expect(prefs.recommendation.maintenance).toBe(true);
-    expect(prefs.kcal).toBeGreaterThan(0);
-    expect(prefs.protein).toBeGreaterThan(0);
+    const store = await readStore(page);
+    expect(store.prefs.name).toBe('Guest');
+    expect(store.prefs.pace).toBe(0);
+    expect(store.prefs.targetWeight).toBeFalsy();
+    expect(store.prefs.recommendation.maintenance).toBe(true);
+    expect(store.prefs.kcal).toBeGreaterThan(0);
+    expect(store.prefs.protein).toBeGreaterThan(0);
+    expect(store.synced?.uid).toBeUndefined();
     await expect(page.locator('#onboarding-modal')).not.toHaveClass(/open/);
     await page.reload();
     await expect(page.locator('#onboarding-modal')).not.toHaveClass(/open/);
   });
 
-  test('a returning user can sign in from onboarding without bypassing profile setup', async ({ page }) => {
+  test('sign-in opens the sign-in form and returns to plan setup for an incomplete profile', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
-    await page.locator('#onboarding-modal summary').click();
+    await page.locator('#onboarding-choice-signin').click();
+    await expect(page.locator('#onboard-auth-submit')).toHaveText('Sign in');
     await page.fill('#onboard-auth-email', 'alice@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['alice@example.test']);
+    await expect(page.locator('#onboarding-profile')).toBeVisible();
     await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
   });
+
+  test('registration opens a signup form and submits email and password to Supabase signup', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await expect(page.locator('#onboard-auth-submit')).toHaveText('Create account');
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('autocomplete', 'new-password');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
+    await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['new@example.test']);
+    await expect(page.locator('#onboarding-profile')).toBeVisible();
+  });
 });
+
 
 test.describe('Smoke: accessibility', () => {
   test('settings fields and the diary date have accessible names', async ({ page }) => {
