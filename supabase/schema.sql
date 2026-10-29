@@ -82,6 +82,8 @@ create table if not exists public.products (
   updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists verified boolean not null default false;
+
 create index if not exists products_user_name_idx on public.products (user_id, lower(name));
 
 alter table public.products enable row level security;

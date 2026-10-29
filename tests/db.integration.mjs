@@ -150,7 +150,7 @@ async function run() {
 
   r = await rest('products', {
     as: 'a', method: 'POST',
-    body: { user_id: A, name: 'CI product', grams: 100, kcal: 200, protein: 10, fat: 5, carbs: 20 },
+    body: { user_id: A, name: 'CI product', grams: 100, kcal: 200, protein: 10, fat: 5, carbs: 20, verified: true },
   });
   check('Owner can insert a product', r.status === 201, describe(r));
 
@@ -163,6 +163,8 @@ async function run() {
   check('Owner reads own weigh-ins', rows(r) === 1, describe(r));
   r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=id` });
   check('Owner reads own products', rows(r) === 1, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=verified` });
+  check('Product verified flag is stored', Array.isArray(r.json) && r.json[0]?.verified === true, describe(r));
   r = await rest('user_profiles', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
   check('Owner reads own profile document', rows(r) === 1, describe(r));
 
