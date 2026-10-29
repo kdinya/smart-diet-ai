@@ -3159,7 +3159,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
 });
 
 test.describe('Smoke: notifications', () => {
-  test('timed messages become unread in the bell list, closed ones become read, and the list can be cleared', async ({ page }) => {
+  test('unread messages can be read individually or together and all messages can be cleared with confirmation', async ({ page }) => {
     await page.clock.install();
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.evaluate(() => {
@@ -3187,9 +3187,22 @@ test.describe('Smoke: notifications', () => {
     await expect(page.locator('#notif-modal')).toHaveClass(/open/);
     const items = page.locator('#notif-list .notif-item');
     await expect(items).toHaveCount(3);
+    await page.setViewportSize({ width: 360, height: 780 });
+    const notificationLayout = await items.nth(1).evaluate((item) => {
+      const body = item.querySelector('.notif-body').getBoundingClientRect();
+      const actions = item.querySelector('.notif-item-actions').getBoundingClientRect();
+      return { scrollWidth: item.scrollWidth, clientWidth: item.clientWidth, body: { left: body.left, right: body.right }, actions: { left: actions.left, right: actions.right } };
+    });
+    expect(notificationLayout.scrollWidth).toBeLessThanOrEqual(notificationLayout.clientWidth);
+    expect(notificationLayout.body.right).toBeLessThanOrEqual(notificationLayout.actions.left);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
     await expect(items.nth(0)).toContainText('Third note');
     await expect(items.nth(0)).toHaveClass(/read/);
     await expect(items.nth(1)).toHaveClass(/unread/);
+
+    await items.nth(1).locator('[data-notif-read]').click();
+    await expect(items.nth(1)).toHaveClass(/read/);
+    await expect(page.locator('#notif-badge')).toHaveText('1');
 
     await page.click('#notif-read-all');
     await expect(page.locator('#notif-badge')).toBeHidden();
@@ -3197,6 +3210,17 @@ test.describe('Smoke: notifications', () => {
 
     await items.nth(2).locator('.notif-del').click();
     await expect(items).toHaveCount(2);
+
+    await page.click('#notif-delete-all');
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.click('#confirm-cancel');
+    await expect(items).toHaveCount(2);
+
+    await page.click('#notif-delete-all');
+    await page.click('#confirm-ok');
+    await expect(items).toHaveCount(0);
+    await expect(page.locator('#notif-list .notif-empty')).toBeVisible();
+    await expect(page.locator('#notif-delete-all')).toBeDisabled();
 
     await page.keyboard.press('Escape');
     await expect(page.locator('#notif-modal')).not.toHaveClass(/open/);
@@ -3228,9 +3252,18 @@ test.describe('Smoke: current date card', () => {
     expect(layout.width).toBeLessThan(layout.widestLabel + 50);
     expect(layout.dayAlign).toBe('right');
     expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
-    expect(layout.weekdayFontSize).toBeCloseTo(14.2, 1);
-    expect(layout.monthFontSize).toBeCloseTo(14.2, 1);
+    expect(layout.weekdayFontSize).toBeCloseTo(12.9, 1);
+    expect(layout.monthFontSize).toBeCloseTo(12.9, 1);
 
+    const bell = page.locator('#notif-bell');
+    const headerBoxes = await page.evaluate(() => {
+      const bell = document.querySelector('#notif-bell').getBoundingClientRect();
+      const date = document.querySelector('#today-label').getBoundingClientRect();
+      const title = document.querySelector('#greeting').getBoundingClientRect();
+      return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom } };
+    });
+    expect(headerBoxes.bell.right <= headerBoxes.date.left || headerBoxes.date.right <= headerBoxes.bell.left || headerBoxes.bell.bottom <= headerBoxes.date.top || headerBoxes.date.bottom <= headerBoxes.bell.top).toBe(true);
+    expect(headerBoxes.title.right <= headerBoxes.date.left || headerBoxes.date.right <= headerBoxes.title.left || headerBoxes.title.bottom <= headerBoxes.date.top || headerBoxes.date.bottom <= headerBoxes.title.top).toBe(true);
     const hero = page.locator('.hero');
     const dateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
     const heroTop = await hero.evaluate((el) => el.getBoundingClientRect().top);
@@ -3241,6 +3274,14 @@ test.describe('Smoke: current date card', () => {
     expect(mobileWidth).toBeLessThanOrEqual(360 - 32);
     const mobileDateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
     const mobileHeroTop = await hero.evaluate((el) => el.getBoundingClientRect().top);
+    const mobileBoxes = await page.evaluate(() => {
+      const bell = document.querySelector('#notif-bell').getBoundingClientRect();
+      const date = document.querySelector('#today-label').getBoundingClientRect();
+      const title = document.querySelector('#greeting').getBoundingClientRect();
+      return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom } };
+    });
+    expect(mobileBoxes.bell.right <= mobileBoxes.date.left || mobileBoxes.date.right <= mobileBoxes.bell.left || mobileBoxes.bell.bottom <= mobileBoxes.date.top || mobileBoxes.date.bottom <= mobileBoxes.bell.top).toBe(true);
+    expect(mobileBoxes.title.right <= mobileBoxes.date.left || mobileBoxes.date.right <= mobileBoxes.title.left || mobileBoxes.title.bottom <= mobileBoxes.date.top || mobileBoxes.date.bottom <= mobileBoxes.title.top).toBe(true);
     expect(mobileDateBottom).toBeLessThanOrEqual(mobileHeroTop);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
