@@ -3228,12 +3228,20 @@ test.describe('Smoke: current date card', () => {
     expect(layout.width).toBeLessThan(layout.widestLabel + 50);
     expect(layout.dayAlign).toBe('right');
     expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
-    expect(layout.weekdayFontSize).toBeCloseTo(15.6, 1);
-    expect(layout.monthFontSize).toBeCloseTo(15.6, 1);
+    expect(layout.weekdayFontSize).toBeCloseTo(14.2, 1);
+    expect(layout.monthFontSize).toBeCloseTo(14.2, 1);
+
+    const hero = page.locator('.hero');
+    const dateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
+    const heroTop = await hero.evaluate((el) => el.getBoundingClientRect().top);
+    expect(dateBottom).toBeLessThanOrEqual(heroTop);
 
     await page.setViewportSize({ width: 360, height: 780 });
     const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
     expect(mobileWidth).toBeLessThanOrEqual(360 - 32);
+    const mobileDateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
+    const mobileHeroTop = await hero.evaluate((el) => el.getBoundingClientRect().top);
+    expect(mobileDateBottom).toBeLessThanOrEqual(mobileHeroTop);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 });
