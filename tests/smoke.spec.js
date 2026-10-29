@@ -1519,6 +1519,48 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#food-date').locator('xpath=..')).toBeVisible();
   });
 
+  test('reopened dialogs return to the top without changing product pickers', async ({ page }) => {
+    const products = Array.from({ length: 28 }, (_, i) => ({
+      id: `scroll-product-${i}`,
+      name: `Scroll product ${String(i).padStart(2, '0')}`,
+      grams: 100,
+      kcal: 120,
+      protein: 5,
+      fat: 2,
+      carbs: 20,
+    }));
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products });
+    await page.setViewportSize({ width: 390, height: 640 });
+    await page.evaluate(() => {
+      let prototype = HTMLElement.prototype;
+      while (prototype && !Object.getOwnPropertyDescriptor(prototype, 'scrollTop')) prototype = Object.getPrototypeOf(prototype);
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'scrollTop');
+      window.__pickScrollWrites = 0;
+      Object.defineProperty(prototype, 'scrollTop', {
+        ...descriptor,
+        set(value) {
+          if (this.closest?.('#pick-modal')) window.__pickScrollWrites += 1;
+          return descriptor.set.call(this, value);
+        },
+      });
+    });
+    await openView(page, 'diary');
+
+    const addEntry = page.locator('#view-diary .toolbar [data-action="add-food"]');
+    const entryModal = page.locator('#modal .modal');
+    await addEntry.click();
+    await entryModal.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    expect(await entryModal.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    await page.locator('#modal-close').click();
+    await addEntry.click();
+    await expect.poll(() => entryModal.evaluate((el) => el.scrollTop)).toBe(0);
+
+    await page.locator('#pick-product').click();
+    await expect(page.locator('#pick-modal .pick-item')).toHaveCount(28);
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    expect(await page.evaluate(() => window.__pickScrollWrites)).toBe(0);
+  });
+
   test('saved products start collapsed and reveal details and actions when toggled', async ({ page }) => {
     await openApp(page, {
       prefs: BASE_PREFS,
