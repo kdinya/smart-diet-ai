@@ -1451,13 +1451,13 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'diary');
     const totals = page.locator('#diary-summary .day-total');
     await expect(totals).toHaveCount(4);
-    await expect(totals.nth(0)).toContainText('2000 / 2000');
+    await expect(totals.nth(0)).toContainText('2000/2000');
     await expect(totals.nth(0)).toHaveClass(/ok/);
-    await expect(totals.nth(1)).toContainText('20 / 10');
+    await expect(totals.nth(1)).toContainText('20/10');
     await expect(totals.nth(1)).toHaveClass(/over/);
-    await expect(totals.nth(2)).toContainText('140 / 70');
+    await expect(totals.nth(2)).toContainText('140/70');
     await expect(totals.nth(2)).toHaveClass(/over/);
-    await expect(totals.nth(3)).toContainText('600 / 242');
+    await expect(totals.nth(3)).toContainText('600/242');
     await expect(totals.nth(3)).toHaveClass(/over/);
     const colors = await totals.evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
     expect(colors[0]).not.toBe(colors[1]);
