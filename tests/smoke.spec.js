@@ -3202,3 +3202,24 @@ test.describe('Smoke: notifications', () => {
     await expect(page.locator('#notif-modal')).not.toHaveClass(/open/);
   });
 });
+
+
+test.describe('Smoke: current date card', () => {
+  test('shows weekday, a prominent right-aligned day number, and month in a wider card', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const date = page.locator('#today-label');
+    const expected = await page.evaluate(() => Object.fromEntries(new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long' }).formatToParts(new Date()).map((part) => [part.type, part.value])));
+    await expect(date.locator('.date-weekday')).toHaveText(expected.weekday);
+    await expect(date.locator('.date-day')).toHaveText(expected.day);
+    await expect(date.locator('.date-month')).toHaveText(expected.month);
+    const layout = await date.evaluate((el) => ({ width: el.getBoundingClientRect().width, dayAlign: getComputedStyle(el.querySelector('.date-day')).textAlign, dayFontSize: parseFloat(getComputedStyle(el.querySelector('.date-day')).fontSize) }));
+    expect(layout.width).toBeGreaterThan(250);
+    expect(layout.dayAlign).toBe('right');
+    expect(layout.dayFontSize).toBeGreaterThan(20);
+
+    await page.setViewportSize({ width: 360, height: 780 });
+    const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
+    expect(mobileWidth).toBeLessThanOrEqual(360 * 0.63);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  });
+});
