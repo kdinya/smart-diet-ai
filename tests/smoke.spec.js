@@ -3220,12 +3220,16 @@ test.describe('Smoke: current date card', () => {
         widestLabel: Math.max(weekday.getBoundingClientRect().width, month.getBoundingClientRect().width),
         dayAlign: getComputedStyle(el.querySelector('.date-day')).textAlign,
         dayFontSize: parseFloat(getComputedStyle(el.querySelector('.date-day')).fontSize),
+        weekdayFontSize: parseFloat(getComputedStyle(weekday).fontSize),
+        monthFontSize: parseFloat(getComputedStyle(month).fontSize),
       };
     });
     expect(layout.width).toBeGreaterThan(layout.widestLabel + 20);
     expect(layout.width).toBeLessThan(layout.widestLabel + 50);
     expect(layout.dayAlign).toBe('right');
     expect(layout.dayFontSize).toBeLessThanOrEqual(15);
+    expect(layout.weekdayFontSize).toBeCloseTo(15.6, 1);
+    expect(layout.monthFontSize).toBeCloseTo(15.6, 1);
 
     await page.setViewportSize({ width: 360, height: 780 });
     const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
