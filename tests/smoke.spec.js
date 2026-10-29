@@ -392,12 +392,29 @@ test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.10.1');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.2');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.10.1');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.2');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
+    await page.locator('#app-version').click();
+    await expect(page.locator('#release-history-modal')).toBeVisible();
+    const versions = page.locator('#release-history-list > details');
+    await expect(versions).toHaveCount(2);
+    const latest = versions.first();
+    await latest.locator('summary').click();
+    await expect(latest).toHaveAttribute('open', '');
+    await expect(latest).toContainText('Expandable release history in Settings.');
+    await expect(latest).toContainText('Added');
+    await page.locator('#release-history-close').click();
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await page.locator('#app-version').click();
+    const latestUk = page.locator('#release-history-list > details').first();
+    await latestUk.locator('summary').click();
+    await expect(latestUk).toContainText('Розгортаний журнал версій у налаштуваннях.');
+    await expect(latestUk).toContainText('Додано');
   });
 });
 
