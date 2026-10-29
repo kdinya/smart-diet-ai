@@ -388,6 +388,19 @@ function foodRow(page, name) {
   return page.locator('#diary-meals .meal-list > div', { hasText: name });
 }
 
+test.describe('Smoke: app version', () => {
+  test('shows the current release version in Settings in both interface languages', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.1');
+    await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
+    await page.selectOption('#pref-lang', 'en');
+    await page.locator('#save-lang').click();
+    await expect(page.locator('#app-version')).toHaveText('2026.10.1');
+    await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
+  });
+});
+
 test.describe('Smoke: goals', () => {
   test('saves daily goals, keeps them after reload, and rejects invalid numbers', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
@@ -1095,13 +1108,13 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(lunch).toHaveClass(/excluded/);
     await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'closed');
     await expect(lunch.locator('.meal-kcal')).toContainText('600 / 700');
-    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('400');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('480');
     expect(await titles()).toEqual(['Breakfast', 'Lunch', 'Snack 1', 'Dinner']);
 
     await lunch.locator('[data-meal-activity]').click();
     await expect(lunch).not.toHaveClass(/excluded/);
     await expect(lunch.locator('.meal-activity-icon')).toHaveAttribute('data-eye', 'open');
-    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('1000');
+    await expect(page.locator('#diary-summary .day-total strong').first()).toHaveText('1080');
     expect(await titles()).toEqual(['Breakfast', 'Lunch', 'Snack 1', 'Dinner']);
     expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(true);
   });
@@ -1112,6 +1125,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights:[] });
     await openView(page, 'diary');
     await page.evaluate(date => { const input=document.querySelector('#diary-date'); input.value=date; input.dispatchEvent(new Event('change')); }, tomorrow);
+    await page.locator('#diary-meals .meal-card').nth(1).locator('[data-toggle-meal]').click();
     await addFood(page, 'Tomorrow lunch', 'lunch');
     expect((await readStore(page)).prefs.mealActivity[`${tomorrow}|lunch`]).toBe(false);
     await expect(page.locator('#diary-meals .meal-card').nth(1)).toHaveClass(/excluded/);
