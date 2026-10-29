@@ -29,7 +29,7 @@
 
 **Save products you eat often**
 - Keep foods in "My products" with a standard portion, and add them to your diary in seconds.
-- In the product form, "Find calories" opens a Google search for tablycjakalorijnosti.com.ua in a new tab. The app does not read the results; you enter the values yourself.
+- In the product form, "Find calories" opens a Google search for calorie data in a new tab. The app does not read the results; you enter the values yourself.
 - Mark a product as verified in its settings; a check icon then shows next to it in My products.
 
 **Follow your weight**
