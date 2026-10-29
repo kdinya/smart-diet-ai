@@ -898,6 +898,8 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboarding-choice-signin')).toBeVisible();
     await expect(page.locator('#onboarding-choice-signup')).toBeVisible();
     await expect(page.locator('#onboarding-choice-guest')).toBeVisible();
+    await expect(page.locator('.onboarding-account-note')).toBeVisible();
+    await expect(page.locator('.onboarding-account-note')).toContainText('email and password');
     await expect(page.locator('#onboarding-profile')).toBeHidden();
     await page.locator('#onboarding-choice-guest').click();
     await expect(page.locator('#onboarding-profile')).toBeVisible();
@@ -908,8 +910,6 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboard-weight')).toBeAttached();
     await expect(page.locator('#onboard-activity')).toBeAttached();
     await expect(page.locator('#onboard-pace')).toBeAttached();
-    await expect(page.locator('.onboarding-account-note')).toBeVisible();
-    await expect(page.locator('.onboarding-account-note')).toContainText('email and password');
     const order = await page.evaluate(() => {
       const activity = document.querySelector('#onboard-activity').closest('.field');
       const pace = document.querySelector('#onboard-pace').closest('.field');
