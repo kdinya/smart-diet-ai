@@ -2006,6 +2006,27 @@ test.describe('Smoke: product sharing', () => {
     await bob.context.close();
   });
 
+  test('a checked product keeps its check mark when shared and accepted', async ({ page, browser }) => {
+    const backend = createBackend();
+    befriend(backend);
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list [data-edit-product]').first().click();
+    await page.locator('#product-verified').check();
+    await page.click('#food-save');
+    await shareFirstProductWith(page, 'Bob');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText('Product sent.');
+    expect(backend.tables.product_shares).toMatchObject([{ name: 'Oats', verified: true }]);
+
+    const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
+    await openView(bob.page, 'products');
+    await bob.page.click('#inbox-open');
+    await bob.page.click('[data-share-accept]');
+    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => [item.name, item.verified])).toEqual([['Oats', true]]);
+    await bob.context.close();
+  });
+
   test('a declined product is removed from the inbox and not saved', async ({ page, browser }) => {
     const backend = createBackend();
     befriend(backend);

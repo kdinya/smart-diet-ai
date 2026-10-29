@@ -252,6 +252,8 @@ create table if not exists public.product_shares (
   created_at timestamptz not null default now(),
   constraint product_shares_no_self check (from_user <> to_user)
 );
+alter table public.product_shares add column if not exists verified boolean not null default false;
+
 create index if not exists product_shares_inbox_idx on public.product_shares (to_user, from_user, created_at);
 create index if not exists product_shares_sender_idx on public.product_shares (from_user, created_at);
 
