@@ -972,12 +972,28 @@ test.describe('Smoke: first-run setup', () => {
     await page.locator('#onboarding-choice-signup').click();
     await expect(page.locator('#onboard-auth-submit')).toHaveText('Create account');
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('autocomplete', 'new-password');
+    await expect(page.locator('#onboard-username-field')).toBeVisible();
+    await page.fill('#onboard-username', 'Alice');
     await page.fill('#onboard-auth-email', 'new@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
     await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['new@example.test']);
     await expect(page.locator('#onboarding-profile')).toBeVisible();
+    await expect(page.locator('#onboarding-greeting')).toHaveText('Welcome, Alice!');
+    await expect(page.locator('#onboard-name')).toHaveValue('Alice');
+  });
+
+  test('registration without a username is blocked before Supabase signup', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-auth-email', 'noname@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Enter a username to create an account.');
+    expect(backend.authEvents).toEqual([]);
   });
 });
 
