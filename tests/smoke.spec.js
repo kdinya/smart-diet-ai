@@ -2332,6 +2332,79 @@ test.describe('Smoke: meal plan', () => {
     expect(drafts).toHaveLength(1);
     expect(drafts[0].items.map((x) => x.meal)).toEqual(['breakfast', 'breakfast', 'lunch', 'lunch', 'dinner', 'dinner']);
   });
+  test('tomorrow plan is scaled to every daily limit, not only calories', async ({ page }) => {
+    const products = [
+      { id: 'fit-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'fit-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'fit-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+      { id: 'fit-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14 },
+    ];
+    const answer = { items: [
+      { id: 'fit-chicken', grams: 500, meal: 'breakfast' }, { id: 'fit-oats', grams: 100, meal: 'breakfast' },
+      { id: 'fit-rice', grams: 300, meal: 'lunch' }, { id: 'fit-apple', grams: 200, meal: 'lunch' },
+      { id: 'fit-chicken', grams: 300, meal: 'dinner' }, { id: 'fit-rice', grams: 200, meal: 'dinner' },
+    ] };
+    await openApp(page, { ...AI_STORE(['gemini']), products });
+    await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
+      status: 200,
+      headers: CORS,
+      contentType: 'application/json',
+      body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }),
+    }));
+
+    await page.locator('#meal-plan-open').click();
+    await page.locator('[data-meal-plan-date="tomorrow"]').click();
+    const checks = page.locator('#meal-plan-products [data-plan-product]');
+    for (let i = 0; i < 4; i += 1) await checks.nth(i).check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#meal-plan-result')).toBeVisible();
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    expect(drafts).toHaveLength(1);
+    const sum = (k) => drafts[0].items.reduce((s, it) => s + it[k], 0);
+    expect(sum('protein')).toBeLessThanOrEqual(100);
+    expect(sum('kcal')).toBeLessThanOrEqual(2000);
+    expect(sum('carbs')).toBeLessThanOrEqual(242);
+    expect(sum('fat')).toBeLessThanOrEqual(70);
+    expect(new Set(drafts[0].items.map((x) => x.meal))).toEqual(new Set(['breakfast', 'lunch', 'dinner']));
+    expect(drafts[0].items.every((x) => x.grams >= 5)).toBe(true);
+  });
+  test('today plan skips meals already logged and plans only the missing ones', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const products = [
+      { id: 'today-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'today-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'today-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+      { id: 'today-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14 },
+    ];
+    const answer = { items: [
+      { id: 'today-chicken', grams: 200, meal: 'lunch' }, { id: 'today-rice', grams: 150, meal: 'lunch' },
+      { id: 'today-oats', grams: 80, meal: 'dinner' }, { id: 'today-apple', grams: 150, meal: 'dinner' },
+    ] };
+    await openApp(page, { ...AI_STORE(['gemini']), products, foods: [{ id: '55555555-5555-4555-8555-555555555555', name: 'Eggs', meal: 'breakfast', grams: 100, kcal: 300, protein: 20, fat: 20, carbs: 2, date: today, createdAt: Date.now() }], weights: [] });
+    let prompt = '';
+    await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+      prompt = route.request().postData() || '';
+      await route.fulfill({
+        status: 200,
+        headers: CORS,
+        contentType: 'application/json',
+        body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }),
+      });
+    });
+    await page.locator('#meal-plan-open').click();
+    const checks = page.locator('#meal-plan-products [data-plan-product]');
+    for (let i = 0; i < 4; i += 1) await checks.nth(i).check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#meal-plan-result')).toBeVisible();
+    expect(prompt).toContain('Lunch, Dinner');
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    expect(drafts).toHaveLength(1);
+    expect(new Set(drafts[0].items.map((x) => x.meal))).toEqual(new Set(['lunch', 'dinner']));
+  });
 });
 
 test.describe('Smoke: AI provider fallback', () => {
@@ -2967,7 +3040,7 @@ test.describe('Smoke: review fixes', () => {
     expect(drafts).toHaveLength(0);
   });
 
-  test('meal plan rejects carbohydrate totals above the remaining target even when calories fit', async ({ page }) => {
+  test('meal plan scales carbohydrate totals down to the remaining target when calories fit', async ({ page }) => {
     const products = ['A', 'B', 'C'].map((name, i) => ({ id: `macro-${i}`, name, grams: 100, kcal: 10, protein: 1, fat: 0, carbs: 100 }));
     await openApp(page, { ...AI_STORE(['gemini']), products, prefs: { ...BASE_PREFS, kcal: 2000, carbs: 242 } });
     await page.route('https://generativelanguage.googleapis.com/**', (route) => route.fulfill({
@@ -2977,8 +3050,11 @@ test.describe('Smoke: review fixes', () => {
     await page.locator('#meal-plan-open').click();
     for (const check of await page.locator('#meal-plan-products [data-plan-product]').all()) await check.check();
     await page.locator('#meal-plan-run').click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('daily remainder exceeded');
-    expect(await page.evaluate(() => mealDrafts())).toHaveLength(0);
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Plan saved as a draft');
+    const drafts = await page.evaluate(() => mealDrafts());
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].items.reduce((s, it) => s + it.carbs, 0)).toBeLessThanOrEqual(242);
+    expect(drafts[0].items.reduce((s, it) => s + it.kcal, 0)).toBeLessThanOrEqual(2000);
   });
 
   test('accepting a product that was already recalled does not save it', async ({ page }) => {
