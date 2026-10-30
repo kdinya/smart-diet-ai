@@ -2192,6 +2192,50 @@ test.describe('Smoke: meal plan', () => {
     expect(drafts[0].date).toBe(tomorrow);
   });
 
+  test('tomorrow plan counts a planned meal even when its eye is off', async ({ page }) => {
+    const products = [
+      { id: 'meal-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'meal-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'meal-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+    ];
+    const tomorrow = await page.evaluate(() => {
+      const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-CA');
+    });
+    await openApp(page, {
+      ...AI_STORE(['gemini']),
+      prefs: { ...BASE_PREFS, kcal: 2000 },
+      products,
+      foods: [{ id: 'tomorrow-planned-lunch', name: 'Planned lunch', date: tomorrow, meal: 'lunch', grams: 500, kcal: 900, protein: 40, fat: 20, carbs: 100, createdAt: 2 }],
+    });
+    let requestBody;
+    await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+      requestBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        headers: CORS,
+        contentType: 'application/json',
+        body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+          items: [{ id: 'meal-oats', grams: 100, meal: 'breakfast' }],
+        }) }] } }] }),
+      });
+    });
+    await page.locator('#meal-plan-open').click();
+    await page.locator('#meal-plan-dates [data-meal-plan-date="tomorrow"]').click();
+    await page.locator('#meal-plan-products [data-plan-product]').first().check();
+    await page.locator('#meal-plan-products [data-plan-product]').nth(1).check();
+    await page.locator('#meal-plan-products [data-plan-product]').nth(2).check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Plan saved as a draft');
+    const promptText = requestBody.contents[0].parts[0].text;
+    expect(promptText).toContain('Already logged for this day: 900 kcal');
+    expect(promptText).toContain('Plan ONLY these meals: Breakfast, Dinner');
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].date).toBe(tomorrow);
+  });
+
   test('draft lock keeps a draft after its day, and the bin deletes it even when locked', async ({ page }) => {
     const dayOffset = (days) => page.evaluate((n) => {
       const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA');
