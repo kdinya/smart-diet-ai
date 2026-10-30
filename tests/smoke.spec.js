@@ -1747,6 +1747,28 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#pick-body .pick-item .muted').first()).toHaveCSS('font-size', '12px');
   });
 
+  test('verified products show the same check in each product picker modal', async ({ page }) => {
+    const products = [
+      { id: 'verified-oats', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, verified: true },
+      { id: 'unverified-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, verified: false },
+    ];
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products });
+    const badge = page.locator('.product-verified');
+
+    await openView(page, 'home');
+    await page.locator('#meal-plan-open').click();
+    await expect(page.locator('#meal-plan-products .meal-plan-picker-item').nth(0).locator('.product-verified')).toHaveCount(0);
+    await expect(page.locator('#meal-plan-products .meal-plan-picker-item').nth(1).locator('.product-verified')).toHaveCount(1);
+    await expect(page.locator('#meal-plan-products .meal-plan-picker-item').nth(1).locator('.product-verified')).toHaveAttribute('aria-label', 'Verified product');
+    await page.locator('[data-close-meal-plan]').first().click();
+
+    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
+    await page.locator('#pick-product').click();
+    await expect(page.locator('#pick-body .pick-item').nth(0).locator('.product-verified')).toHaveCount(0);
+    await expect(page.locator('#pick-body .pick-item').nth(1).locator('.product-verified')).toHaveCount(1);
+    await expect(page.locator('#pick-body .pick-item').nth(1).locator('.product-verified')).toHaveAttribute('aria-label', 'Verified product');
+  });
+
   test('food entry modal puts product picker first and hides date for a chosen meal', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
