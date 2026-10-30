@@ -2282,7 +2282,55 @@ test.describe('Smoke: meal plan', () => {
       .flatMap(([, value]) => JSON.parse(value)));
     expect(drafts).toHaveLength(1);
     expect(drafts[0].items).toEqual([{ id: 'meal-oats', name: 'Oats', meal: 'breakfast', grams: 150, kcal: 525, protein: 18, fat: 9, carbs: 90 }]);
-    expect(await modal.isVisible()).toBe(false);
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#meal-plan-title')).toHaveText('Draft created');
+    await expect(page.locator('#meal-plan-result-body')).toContainText('Oats');
+  });
+
+  test('AI plan builds full meals, retries single-item answers, and shows progress while working', async ({ page }) => {
+    const products = [
+      { id: 'full-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60 },
+      { id: 'full-chicken', name: 'Chicken', grams: 100, kcal: 165, protein: 31, fat: 4, carbs: 0 },
+      { id: 'full-rice', name: 'Rice', grams: 100, kcal: 130, protein: 3, fat: 0, carbs: 28 },
+      { id: 'full-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14 },
+    ];
+    const answers = [
+      { items: [{ id: 'full-oats', grams: 60, meal: 'breakfast' }, { id: 'full-chicken', grams: 120, meal: 'lunch' }] },
+      { items: [
+        { id: 'full-oats', grams: 60, meal: 'breakfast' }, { id: 'full-apple', grams: 100, meal: 'breakfast' },
+        { id: 'full-chicken', grams: 120, meal: 'lunch' }, { id: 'full-rice', grams: 120, meal: 'lunch' },
+        { id: 'full-chicken', grams: 100, meal: 'dinner' }, { id: 'full-rice', grams: 100, meal: 'dinner' },
+      ] },
+    ];
+    await openApp(page, { ...AI_STORE(['gemini']), products });
+    let calls = 0;
+    await page.route('https://generativelanguage.googleapis.com/**', async (route) => {
+      const answer = answers[Math.min(calls, answers.length - 1)];
+      calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      await route.fulfill({
+        status: 200,
+        headers: CORS,
+        contentType: 'application/json',
+        body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }),
+      });
+    });
+
+    await page.locator('#meal-plan-open').click();
+    const checks = page.locator('#meal-plan-products [data-plan-product]');
+    for (let i = 0; i < 4; i += 1) await checks.nth(i).check();
+    await page.locator('#meal-plan-run').click();
+    await expect(page.locator('#meal-plan-building')).toBeVisible();
+    await expect(page.locator('#meal-plan-result')).toBeVisible();
+    await expect(page.locator('#meal-plan-result-body h4')).toHaveCount(3);
+    expect(calls).toBe(2);
+    await expect(page.locator('#meal-plan-result-body')).toContainText('Apple');
+    await expect(page.locator('#meal-plan-result-body')).toContainText('Rice');
+    const drafts = await page.evaluate(() => Object.entries(localStorage)
+      .filter(([key]) => key.startsWith('smartdiet-meal-drafts-v1:'))
+      .flatMap(([, value]) => JSON.parse(value)));
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].items.map((x) => x.meal)).toEqual(['breakfast', 'breakfast', 'lunch', 'lunch', 'dinner', 'dinner']);
   });
 });
 
