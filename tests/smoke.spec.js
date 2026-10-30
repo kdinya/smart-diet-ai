@@ -1769,6 +1769,38 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#pick-body .pick-item').nth(1).locator('.product-verified')).toHaveAttribute('aria-label', 'Verified product');
   });
 
+  test('product pickers display protein fat and carbs beside calories', async ({ page }) => {
+    const products = [
+      { id: 'oats', name: 'Oats', grams: 100, kcal: 150, protein: 5.5, fat: 3.2, carbs: 25.1 },
+    ];
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products });
+
+    await openView(page, 'home');
+    await page.locator('#meal-plan-open').click();
+    const planMeta = page.locator('#meal-plan-products .meal-plan-picker-item .meal-plan-picker-meta');
+    await expect(planMeta).toBeVisible();
+    await expect(planMeta).toContainText('100 g · 150 kcal');
+    await expect(planMeta).toContainText('P 5.5 · F 3.2 · C 25.1 g');
+    await page.locator('[data-close-meal-plan]').first().click();
+
+    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
+    await page.locator('#pick-product').click();
+    const pickItemMuted = page.locator('#pick-body .pick-item .muted').first();
+    await expect(pickItemMuted).toBeVisible();
+    await expect(pickItemMuted).toContainText('100 g · 150 kcal · P 5.5 · F 3.2 · C 25.1 g');
+  });
+
+  test('weekly calorie chart renders dashed weight-loss calorie target series and accessible label', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, kcal: 1750 }, foods: [], weights: [] });
+    await openView(page, 'stats');
+
+    const chart = page.locator('#calorie-chart');
+    await expect(chart).toBeVisible();
+    await expect(chart).toHaveAttribute('aria-label', 'Calorie chart');
+    await expect(chart.locator('path[stroke-dasharray="4 4"]')).toHaveCount(1);
+    await expect(page.locator('[data-i18n="calorieChartLegend"]')).toBeVisible();
+  });
+
   test('food entry modal puts product picker first and hides date for a chosen meal', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
