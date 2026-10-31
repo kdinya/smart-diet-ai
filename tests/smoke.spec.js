@@ -410,36 +410,37 @@ test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.5');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.5');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
     await page.locator('#app-version').click();
     await expect(page.locator('#release-history-modal')).toBeVisible();
     const versions = page.locator('#release-history-list > details');
-    await expect(versions).toHaveCount(5);
-    await expect(versions.nth(0).locator('summary')).toContainText('2026.10.4');
-    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.3');
-    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.2');
-    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.1');
-    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.0');
+    await expect(versions).toHaveCount(6);
+    await expect(versions.nth(0).locator('summary')).toContainText('2026.10.5');
+    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.4');
+    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.3');
+    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.2');
+    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.1');
+    await expect(versions.nth(5).locator('summary')).toContainText('2026.10.0');
     const latest = versions.first();
-    await expect(latest.locator('summary')).toContainText('2026.10.4');
+    await expect(latest.locator('summary')).toContainText('2026.10.5');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('Replaced raw database permission errors');
-    await expect(versions.nth(4)).toContainText('bilingual food diary');
-    await expect(versions.nth(4)).toContainText('Added');
+    await expect(latest).toContainText('Swipe left or right to dismiss pop-up notifications');
+    await expect(versions.nth(5)).toContainText('bilingual food diary');
+    await expect(versions.nth(5)).toContainText('Added');
     await page.locator('#release-history-close').click();
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await page.locator('#app-version').click();
     const latestUk = page.locator('#release-history-list > details').first();
-    await expect(latestUk.locator('summary')).toContainText('2026.10.4');
+    await expect(latestUk.locator('summary')).toContainText('2026.10.5');
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
+    await expect(latestUk).toContainText('Свайп вліво або вправо для закриття спливаючих сповіщень');
     const initialUk = page.locator('#release-history-list > details').last();
     await expect(initialUk.locator('summary')).toContainText('2026.10.0');
     await initialUk.locator('summary').click();
@@ -3649,6 +3650,61 @@ test.describe('Smoke: notifications', () => {
     await expect(page.locator('#notif-list .notif-empty')).toBeVisible();
     await expect(page.locator('#notif-delete-all')).toBeDisabled();
 
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#notif-modal')).not.toHaveClass(/open/);
+  });
+
+  test('dismisses pop-up notifications by swiping right or left and marks them as read', async ({ page }) => {
+    await page.clock.install();
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => {
+      document.querySelectorAll('#notif-stack .toast').forEach((card) => card.remove());
+      notifications.length = 0;
+      saveNotifications();
+      refreshNotifications();
+    });
+
+    // 1. Toast dismissed by swipe right
+    await page.evaluate(() => toast('Swipe me right'));
+    const toastRight = page.locator('#notif-stack .toast').last();
+    await expect(toastRight).toBeVisible();
+    const boxR = await toastRight.boundingBox();
+    expect(boxR).toBeTruthy();
+
+    await page.mouse.move(boxR.x + boxR.width / 2, boxR.y + boxR.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(boxR.x + boxR.width / 2 + 80, boxR.y + boxR.height / 2, { steps: 5 });
+    await page.mouse.up();
+
+    await page.clock.runFor(300);
+    await expect(page.locator('#notif-stack .toast')).toHaveCount(0);
+    // Because it was dismissed by user gesture, it is marked as read immediately, unread count stays 0
+    await expect(page.locator('#notif-badge')).toBeHidden();
+
+    // 2. Toast dismissed by swipe left
+    await page.evaluate(() => toast('Swipe me left'));
+    const toastLeft = page.locator('#notif-stack .toast').last();
+    await expect(toastLeft).toBeVisible();
+    const boxL = await toastLeft.boundingBox();
+    expect(boxL).toBeTruthy();
+
+    await page.mouse.move(boxL.x + boxL.width / 2, boxL.y + boxL.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(boxL.x + boxL.width / 2 - 80, boxL.y + boxL.height / 2, { steps: 5 });
+    await page.mouse.up();
+
+    await page.clock.runFor(300);
+    await expect(page.locator('#notif-stack .toast')).toHaveCount(0);
+    await expect(page.locator('#notif-badge')).toBeHidden();
+
+    // Verify notification center lists both as read
+    await page.click('#notif-bell');
+    await expect(page.locator('#notif-modal')).toHaveClass(/open/);
+    const items = page.locator('#notif-list .notif-item');
+    await expect(items).toHaveCount(2);
+    await expect(items.nth(0)).toHaveClass(/read/);
+    await expect(items.nth(1)).toHaveClass(/read/);
+    await expect(page.locator('#notif-list .notif-item.unread')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(page.locator('#notif-modal')).not.toHaveClass(/open/);
   });
