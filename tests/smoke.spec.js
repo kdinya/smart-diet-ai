@@ -91,6 +91,8 @@ function createBackend() {
     foodWriteRelease: null,
     failDeletes: false,
     failProfiles: false,
+    rlsProfiles: false,
+    deniedTables: [],
     authEvents: [],
   };
 }
@@ -270,6 +272,12 @@ async function handleRest(route, req, url, backend, json) {
   const rows = backend.tables[table];
   const uid = userIdFromRequest(req);
   if (!rows) return json(404, { message: `Unknown table ${table}` });
+  if (table === 'user_profiles' && backend.rlsProfiles) {
+    return json(403, { code: '42501', message: 'new row violates row-level security policy for table \"user_profiles\"' });
+  }
+  if (backend.deniedTables.includes(table)) {
+    return json(403, { code: '42501', message: `permission denied for table ${table}` });
+  }
   if (table === 'user_profiles' && backend.failProfiles) {
     return json(404, { code: 'PGRST205', message: "Could not find the table 'public.user_profiles' in the schema cache" });
   }
@@ -402,35 +410,36 @@ test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.10.3');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.10.3');
+    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
     await page.locator('#app-version').click();
     await expect(page.locator('#release-history-modal')).toBeVisible();
     const versions = page.locator('#release-history-list > details');
-    await expect(versions).toHaveCount(4);
-    await expect(versions.nth(0).locator('summary')).toContainText('2026.10.3');
-    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.2');
-    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.1');
-    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.0');
+    await expect(versions).toHaveCount(5);
+    await expect(versions.nth(0).locator('summary')).toContainText('2026.10.4');
+    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.3');
+    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.2');
+    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.1');
+    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.0');
     const latest = versions.first();
-    await expect(latest.locator('summary')).toContainText('2026.10.3');
+    await expect(latest.locator('summary')).toContainText('2026.10.4');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('nutrient icons on the tiles');
-    await expect(versions.nth(3)).toContainText('bilingual food diary');
-    await expect(versions.nth(3)).toContainText('Added');
+    await expect(latest).toContainText('Replaced raw database permission errors');
+    await expect(versions.nth(4)).toContainText('bilingual food diary');
+    await expect(versions.nth(4)).toContainText('Added');
     await page.locator('#release-history-close').click();
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await page.locator('#app-version').click();
     const latestUk = page.locator('#release-history-list > details').first();
-    await expect(latestUk.locator('summary')).toContainText('2026.10.3');
+    await expect(latestUk.locator('summary')).toContainText('2026.10.4');
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('іконки на плитках харчування');
+    await expect(latestUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
     const initialUk = page.locator('#release-history-list > details').last();
     await expect(initialUk.locator('summary')).toContainText('2026.10.0');
     await initialUk.locator('summary').click();
@@ -638,6 +647,22 @@ test.describe('Smoke: food deletion', () => {
     await other.close();
   });
 
+  test('RLS profile errors are explained and local changes remain queued', async ({ page }) => {
+    const backend = createBackend();
+    backend.rlsProfiles = true;
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+
+    await page.fill('#pref-kcal', '1800');
+    await page.click('#save-prefs');
+    await expect(page.locator('#sync-status')).toContainText('access rules do not allow it');
+    await expect(page.locator('#sync-status')).not.toContainText('row-level security');
+    expect((await readStore(page)).prefs.kcal).toBe(1800);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-sync-queue') || '{}').profile)).toBe(true);
+  });
+
   test('a failed cloud delete keeps the entry and reports the error', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
@@ -652,7 +677,7 @@ test.describe('Smoke: food deletion', () => {
     backend.failDeletes = true;
     await autoConfirm(page, true);
     await foodRow(page, 'Smoke eggs').locator('[data-delete-food]').click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Saved locally; sync failed:');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Saved on this device. Cloud sync failed:');
     await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
     await expect(foodRow(page, 'Smoke eggs')).toHaveCount(1);
     expect(backend.tables.food_entries).toHaveLength(1);
