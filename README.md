@@ -40,6 +40,7 @@
 **Calendar and backup**
 - Pick any date in the calendar. Days with saved entries are marked with a dot.
 - Export your data to a file and import it on another device.
+- Share the app with friends from **Settings**.
 
 **Other**
 - English and Ukrainian interface.
