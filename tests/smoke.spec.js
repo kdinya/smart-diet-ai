@@ -3696,3 +3696,14 @@ test.describe('Smoke: current date card', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 });
+
+test.describe('Smoke: launch icons', () => {
+  test('the install manifest gives Android the app icon and a separate maskable icon', async ({ page }) => {
+    const manifest = await (await page.request.get('./manifest.json')).json();
+    const anyIcon = manifest.icons.find((i) => i.sizes === '512x512' && i.purpose === 'any');
+    const maskable = manifest.icons.find((i) => i.sizes === '512x512' && i.purpose === 'maskable');
+    expect(anyIcon?.src).toBe('./icon-512.png');
+    expect(maskable?.src).toBe('./icon-maskable-512.png');
+    expect(manifest.background_color).toBe('#042415');
+  });
+});
