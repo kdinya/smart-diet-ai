@@ -904,6 +904,28 @@ test.describe('Smoke: backup import', () => {
     await expect(page.locator('#pref-kcal')).toHaveValue('1800');
   });
 
+  test('backup import keeps same-name products as copies and restores product history', async ({ page }) => {
+    await autoConfirm(page, true);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    const backup = {
+      ...IMPORT_BACKUP,
+      products: [
+        { id: '11111111-1111-4111-8111-111111111111', name: 'Oats', grams: 100, kcal: 90 },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'Oats', grams: 100, kcal: 150 },
+      ],
+      productHistory: [{ id: 'history-1', at: '2026-10-24T10:00:00.000Z', action: 'created', productId: '11111111-1111-4111-8111-111111111111', name: 'Oats' }],
+    };
+    await page.setInputFiles('#import-file', backupFile(backup));
+    await expect.poll(async () => (await readStore(page)).products.map((product) => [product.name, product.kcal]).sort((a, b) => a[1] - b[1])).toEqual([['Oats', 90], ['Oats copy', 150]]);
+    const imported = await readStore(page);
+    expect(imported.productHistory).toHaveLength(2);
+    expect(imported.productHistory.map((entry) => entry.name).sort()).toEqual(['Oats', 'Oats copy']);
+    await page.reload();
+    expect((await readStore(page)).products).toHaveLength(2);
+    expect((await readStore(page)).productHistory).toHaveLength(2);
+  });
+
   test('declining the confirmation keeps the current local data', async ({ page }) => {
     const dialogs = [];
     await autoConfirm(page, false, dialogs);
@@ -1811,7 +1833,88 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
   });
 
 
-    test('cancelling food deletion preserves the diary entry', async ({ page }) => {
+    test('same-name products are kept as numbered copies and product changes persist in the journal', async ({ page }) => {
+    const original = { id: '11111111-1111-4111-8111-111111111111', name: 'Buckwheat', grams: 100, kcal: 110, protein: 4, fat: 1, carbs: 22 };
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products: [original] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Buckwheat');
+    await page.fill('#food-grams', '100');
+    await page.fill('#food-kcal', '130');
+    await page.click('#food-save');
+
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Buckwheat', 'Buckwheat copy']);
+    let stored = await readStore(page);
+    expect(stored.products).toHaveLength(2);
+    expect(stored.products.find((product) => product.id === original.id).kcal).toBe(110);
+    expect(stored.productHistory.map((entry) => entry.action)).toEqual(['created']);
+    await expect(page.locator('.toast-msg').last()).toContainText('Buckwheat copy');
+
+    await page.locator('#product-history-open').click();
+    await expect(page.locator('#product-history-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-history-list')).toContainText('Created');
+    await expect(page.locator('#product-history-list')).toContainText('Buckwheat copy');
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'products');
+    await page.locator('#products-list [data-toggle-product]').nth(1).click();
+    await page.locator('#products-list [data-edit-product]').nth(1).click();
+    await page.fill('#food-name', 'Buckwheat deluxe');
+    await page.click('#food-save');
+    stored = await readStore(page);
+    expect(stored.productHistory.map((entry) => entry.action)).toEqual(['renamed', 'created']);
+    expect(stored.productHistory[0].previousName).toBe('Buckwheat copy');
+
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    await autoConfirm(page, true);
+    await page.locator('#products-list [data-delete-product]').first().click();
+    await expect.poll(async () => (await readStore(page)).productHistory[0].action).toBe('deleted');
+    await page.reload();
+    await openView(page, 'products');
+    await page.locator('#product-history-open').click();
+    await expect(page.locator('#product-history-list')).toContainText('Deleted');
+    await expect(page.locator('#product-history-list')).toContainText('Buckwheat');
+  });
+
+  test('legacy product migration keeps same-name products as localized copies', async ({ page }) => {
+    const legacyProducts = [
+      { id: '11111111-1111-4111-8111-111111111111', name: 'Пангасіус', grams: 100, kcal: 85, protein: 18, fat: 2, carbs: 0 },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Пангасіус', grams: 100, kcal: 90, protein: 19, fat: 2, carbs: 0 },
+      { id: '33333333-3333-4333-8333-333333333333', name: 'Пангасіус', grams: 100, kcal: 95, protein: 20, fat: 2, carbs: 0 },
+    ];
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', products: legacyProducts }, foods: [], weights: [] });
+    const stored = await readStore(page);
+    expect(stored.products.map((product) => product.name).sort()).toEqual(['Пангасіус', 'Пангасіус копія', 'Пангасіус копія 2']);
+    expect(stored.products.map((product) => product.id)).toEqual(legacyProducts.map((product) => product.id));
+    expect(stored.products.map((product) => product.kcal)).toEqual([85, 90, 95]);
+    expect(stored.productHistory.filter((entry) => entry.action === 'created')).toHaveLength(3);
+    await page.reload();
+    expect((await readStore(page)).products).toHaveLength(3);
+    expect((await readStore(page)).productHistory.filter((entry) => entry.action === 'created')).toHaveLength(3);
+  });
+
+  test('a failed product write keeps the form open and does not claim the product was saved', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Storage test');
+    await page.fill('#food-grams', '100');
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      let failed = false;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'smartdiet-v1' && String(value).includes('Storage test')) { failed = true; throw new DOMException('quota exceeded', 'QuotaExceededError'); }
+        return original.call(this, key, value);
+      };
+    });
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#products-list')).not.toContainText('Storage test');
+    await expect(page.locator('.toast-msg').last()).toContainText('Could not save “Storage test”');
+    expect((await readStore(page)).products || []).toHaveLength(0);
+  });
+
+  test('cancelling food deletion preserves the diary entry', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
     await addFood(page, 'Cancel apple');
@@ -2184,7 +2287,7 @@ test.describe('Smoke: product sharing', () => {
     await expect(bob.page.locator('#inbox-body')).toContainText('Alice');
     await expect(bob.page.locator('#inbox-body')).toContainText('Oats');
     await bob.page.click('[data-share-accept]');
-    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toContainText('Product added to My products.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toContainText('Added shared product “Oats” to My products.');
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name)).toEqual(['Oats']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
@@ -2277,20 +2380,18 @@ test.describe('Smoke: product sharing', () => {
     expect(backend.tables.product_shares).toHaveLength(20);
   });
 
-  test('an incoming product with a name that already exists asks before replacing it', async ({ page, browser }) => {
+  test('an incoming product with a matching name is saved as a copy without replacing the existing product', async ({ page, browser }) => {
     const backend = createBackend();
     befriend(backend);
     backend.tables.product_shares.push({ id: 'share-1', from_user: 'user-alice', to_user: 'user-bob', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, created_at: new Date().toISOString() });
     const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
     await addProduct(bob.page, 'Oats', '90');
     await bob.page.click('#inbox-open');
-    await autoConfirm(bob.page, false);
     await bob.page.click('[data-share-accept]');
-    expect(backend.tables.product_shares).toHaveLength(1);
-    expect((await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([90]);
-    await autoConfirm(bob.page, true);
-    await bob.page.click('[data-share-accept]');
-    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.kcal)).toEqual([150]);
+    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.kcal).sort((a, b) => a - b)).toEqual([90, 150]);
+    await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name).sort()).toEqual(['Oats', 'Oats copy']);
+    const history = (await readStore(bob.page)).productHistory;
+    expect(history.map((entry) => entry.name).sort()).toEqual(['Oats', 'Oats copy']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
   });
