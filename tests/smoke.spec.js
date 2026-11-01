@@ -3715,27 +3715,24 @@ test.describe('Smoke: current date card', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const date = page.locator('#today-label');
     const expected = await page.evaluate(() => Object.fromEntries(new Intl.DateTimeFormat(lang() === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }).formatToParts(new Date()).map((part) => [part.type, part.value])));
+    const expectedDateMonth = await page.evaluate(() => new Intl.DateTimeFormat(lang() === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' }).format(new Date()));
     await expect(date.locator('.date-weekday')).toHaveText(expected.weekday);
-    await expect(date.locator('.date-day')).toHaveText(expected.day);
-    await expect(date.locator('.date-month')).toHaveText(expected.month);
+    await expect(date.locator('.date-day-month')).toHaveText(expectedDateMonth);
     const layout = await date.evaluate((el) => {
       const weekday = el.querySelector('.date-weekday');
-      const month = el.querySelector('.date-month');
+      const dayMonth = el.querySelector('.date-day-month');
       return {
         width: el.getBoundingClientRect().width,
-        widestLabel: Math.max(weekday.getBoundingClientRect().width, month.getBoundingClientRect().width),
-        dayAlign: getComputedStyle(el.querySelector('.date-day')).textAlign,
-        dayFontSize: parseFloat(getComputedStyle(el.querySelector('.date-day')).fontSize),
+        weekdayWidth: weekday.getBoundingClientRect().width,
+        dayMonthWidth: dayMonth.getBoundingClientRect().width,
+        weekdayAlign: getComputedStyle(weekday).textAlign,
+        dayMonthFontSize: parseFloat(getComputedStyle(dayMonth).fontSize),
         weekdayFontSize: parseFloat(getComputedStyle(weekday).fontSize),
-        monthFontSize: parseFloat(getComputedStyle(month).fontSize),
       };
     });
-    expect(layout.width).toBeGreaterThan(layout.widestLabel + 20);
-    expect(layout.width).toBeLessThan(layout.widestLabel + 50);
-    expect(layout.dayAlign).toBe('right');
-    expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
+    expect(layout.weekdayAlign).toBe('right');
+    expect(layout.dayMonthFontSize).toBeCloseTo(15.4, 1);
     expect(layout.weekdayFontSize).toBeCloseTo(12.9, 1);
-    expect(layout.monthFontSize).toBeCloseTo(12.9, 1);
 
     const bell = page.locator('#notif-bell');
     const headerBoxes = await page.evaluate(() => {
