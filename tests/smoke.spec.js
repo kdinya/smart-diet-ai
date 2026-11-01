@@ -3711,28 +3711,36 @@ test.describe('Smoke: notifications', () => {
 
 
 test.describe('Smoke: current date card', () => {
-  test('shows weekday, a prominent right-aligned day number, and month in a wider card', async ({ page }) => {
+  test('shows weekday on the first row and date with only the day bold on the second row', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const date = page.locator('#today-label');
     const expected = await page.evaluate(() => Object.fromEntries(new Intl.DateTimeFormat(lang() === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }).formatToParts(new Date()).map((part) => [part.type, part.value])));
     const expectedDateMonth = await page.evaluate(() => new Intl.DateTimeFormat(lang() === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' }).format(new Date()));
     await expect(date.locator('.date-weekday')).toHaveText(expected.weekday);
     await expect(date.locator('.date-day-month')).toHaveText(expectedDateMonth);
+    await expect(date.locator('.date-day')).toHaveText(expected.day);
+    await expect(date.locator('.date-month')).toHaveText(expected.month);
     const layout = await date.evaluate((el) => {
       const weekday = el.querySelector('.date-weekday');
-      const dayMonth = el.querySelector('.date-day-month');
+      const day = el.querySelector('.date-day');
+      const month = el.querySelector('.date-month');
       return {
-        width: el.getBoundingClientRect().width,
-        weekdayWidth: weekday.getBoundingClientRect().width,
-        dayMonthWidth: dayMonth.getBoundingClientRect().width,
         weekdayAlign: getComputedStyle(weekday).textAlign,
-        dayMonthFontSize: parseFloat(getComputedStyle(dayMonth).fontSize),
+        dayFontSize: parseFloat(getComputedStyle(day).fontSize),
+        dayFontWeight: parseInt(getComputedStyle(day).fontWeight, 10),
+        monthFontSize: parseFloat(getComputedStyle(month).fontSize),
+        monthFontWeight: parseInt(getComputedStyle(month).fontWeight, 10),
         weekdayFontSize: parseFloat(getComputedStyle(weekday).fontSize),
+        weekdayFontWeight: parseInt(getComputedStyle(weekday).fontWeight, 10),
       };
     });
     expect(layout.weekdayAlign).toBe('right');
-    expect(layout.dayMonthFontSize).toBeCloseTo(15.4, 1);
+    expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
+    expect(layout.dayFontWeight).toBeGreaterThanOrEqual(700);
+    expect(layout.monthFontSize).toBeCloseTo(12.9, 1);
+    expect(layout.monthFontWeight).toBeLessThan(700);
     expect(layout.weekdayFontSize).toBeCloseTo(12.9, 1);
+    expect(layout.weekdayFontWeight).toBeLessThan(700);
 
     const bell = page.locator('#notif-bell');
     const headerBoxes = await page.evaluate(() => {
