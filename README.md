@@ -33,7 +33,7 @@
 - Mark a product as verified in its settings; a check icon then shows next to it in My products.
 
 **Follow your weight**
-- Log your weight by date and see the chart and the trend. Open the trend chart directly from the latest weight card on the Overview screen.
+- Log your weight by date and see the chart and the trend. Open the trend chart directly from the latest weight card on the Overview screen, and browse all weigh-ins in a scrollable history dialog.
 - A BMI gauge shows where you are and what a healthy weight range looks like for your height.
 - Enter your details and get a daily calorie and protein target. You can choose a gentle pace of 0.25, 0.5 or 0.75 kg per week.
 

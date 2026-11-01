@@ -3874,19 +3874,36 @@ test('save buttons keep the product and diary labels after a re-render', async (
   await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveChanges')));
 });
 
-test('latest weight card opens weight trend block in statistics', async ({ page }) => {
+test('latest weight card keeps only the adjacent shortcut to weight trend', async ({ page }) => {
   await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [{ id: 'w-1', value: 74.5, date: '2026-10-30' }] });
   await expect(page.locator('.weight-card')).toBeVisible();
-  await expect(page.locator('.weight-trend-btn')).toBeVisible();
+  await expect(page.locator('.weight-trend-btn')).toHaveCount(0);
   await expect(page.locator('.weight-chart-action')).toBeVisible();
 
-  await page.locator('.weight-trend-btn').click();
-  await expect(page.locator('#view-stats')).toHaveClass(/active/);
-  await expect(page.locator('#card-weight-trend')).toBeVisible();
-
-  await openView(page, 'home');
-  await expect(page.locator('#view-home')).toHaveClass(/active/);
   await page.locator('.weight-chart-action').click();
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
   await expect(page.locator('#card-weight-trend')).toBeVisible();
+});
+
+test('full weight history opens in a scrollable dialog and retains delete controls', async ({ page }) => {
+  const weights = Array.from({ length: 5 }, (_, i) => ({ id: `w-${i}`, value: 74 + i / 10, date: `2026-10-${String(30 - i).padStart(2, '0')}` }));
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights });
+  await openView(page, 'stats');
+  await expect(page.locator('#weight-history .food-row')).toHaveCount(3);
+  await page.locator('#weight-history-more-wrap [data-action="open-weight-history"]').click();
+  await expect(page.locator('#weight-history-modal')).toHaveClass(/open/);
+  await expect(page.locator('#weight-history-modal-list .food-row')).toHaveCount(5);
+  await expect(page.locator('#weight-history-modal-list [data-delete-weight]')).toHaveCount(5);
+  await page.locator('#weight-history-done').click();
+  await expect(page.locator('#weight-history-modal')).not.toHaveClass(/open/);
+});
+
+test('calendar opens above the weight-entry dialog', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await page.locator('[data-action="add-weight"]').click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await page.locator('#weight-date-input').click();
+  await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+  const zIndexes = await page.evaluate(() => ({ calendar: Number(getComputedStyle(document.querySelector('#cal-modal')).zIndex), entry: Number(getComputedStyle(document.querySelector('#modal')).zIndex) }));
+  expect(zIndexes.calendar).toBeGreaterThan(zIndexes.entry);
 });
