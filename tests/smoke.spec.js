@@ -3907,3 +3907,31 @@ test('calendar opens above the weight-entry dialog', async ({ page }) => {
   const zIndexes = await page.evaluate(() => ({ calendar: Number(getComputedStyle(document.querySelector('#cal-modal')).zIndex), entry: Number(getComputedStyle(document.querySelector('#modal')).zIndex) }));
   expect(zIndexes.calendar).toBeGreaterThan(zIndexes.entry);
 });
+
+test('calendar highlights meals in diary and only weigh-ins in weight entry', async ({ page }) => {
+  const foodDate = '2026-10-25';
+  const weightDate = '2026-10-28';
+  await openApp(page, {
+    prefs: BASE_PREFS,
+    foods: [{ id: 'f-cal-1', name: 'Apple', meal: 'breakfast', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, date: foodDate, createdAt: 1 }],
+    weights: [{ id: 'w-cal-1', value: 72.4, date: weightDate, createdAt: 1 }],
+  });
+
+  // 1. Check diary calendar: foodDate is marked, weightDate is NOT marked
+  await page.locator('#diary-date').click();
+  await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+  await expect(page.locator(`[data-cal-date="${foodDate}"]`)).toHaveClass(/has-entries/);
+  await expect(page.locator(`[data-cal-date="${weightDate}"]`)).not.toHaveClass(/has-entries/);
+  await page.locator('#cal-cancel').click();
+  await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+
+  // 2. Check weight entry calendar: weightDate is marked, foodDate is NOT marked
+  await page.locator('[data-action="add-weight"]').click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await page.locator('#weight-date-input').click();
+  await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+  await expect(page.locator(`[data-cal-date="${weightDate}"]`)).toHaveClass(/has-entries/);
+  await expect(page.locator(`[data-cal-date="${foodDate}"]`)).not.toHaveClass(/has-entries/);
+  await page.locator('#cal-cancel').click();
+  await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+});
