@@ -3969,6 +3969,7 @@ test('calendar opens above the weight-entry dialog', async ({ page }) => {
 test('calendar highlights meals in diary and only weigh-ins in weight entry', async ({ page }) => {
   const foodDate = '2026-10-25';
   const weightDate = '2026-10-28';
+  await page.clock.install({ time: new Date(`${foodDate}T12:00:00`) });
   await openApp(page, {
     prefs: BASE_PREFS,
     foods: [{ id: 'f-cal-1', name: 'Apple', meal: 'breakfast', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, date: foodDate, createdAt: 1 }],
@@ -3979,6 +3980,7 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   await openView(page, 'diary');
   await page.locator('#diary-date').click();
   await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+  await expect(page.locator('#cal-title')).toHaveText('October 2026');
   await expect(page.locator(`[data-cal-date="${foodDate}"]`)).toHaveClass(/has-entries/);
   await expect(page.locator(`[data-cal-date="${weightDate}"]`)).not.toHaveClass(/has-entries/);
   await page.locator('#cal-cancel').click();
@@ -3990,6 +3992,7 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await page.locator('#weight-date-input').click();
   await expect(page.locator('#cal-modal')).toHaveClass(/open/);
+  await expect(page.locator('#cal-title')).toHaveText('October 2026');
   await expect(page.locator(`[data-cal-date="${weightDate}"]`)).toHaveClass(/has-entries/);
   await expect(page.locator(`[data-cal-date="${foodDate}"]`)).not.toHaveClass(/has-entries/);
   await page.locator('#cal-cancel').click();
