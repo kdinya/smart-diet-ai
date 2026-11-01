@@ -495,6 +495,17 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-protein-previous')).toBeHidden();
     await expect(page.locator('#food-fat-previous')).toBeHidden();
     await expect(page.locator('#food-carbs-previous')).toBeHidden();
+
+    // Closing the clipboard review modal without confirming clears previous values
+    await page.click('text=Test product');
+    await page.click('#product-import-clipboard');
+    await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
+    await page.click('#product-import-close');
+    await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#food-kcal-previous')).toBeHidden();
+    await expect(page.locator('#food-protein-previous')).toBeHidden();
+    await expect(page.locator('#food-fat-previous')).toBeHidden();
+    await expect(page.locator('#food-carbs-previous')).toBeHidden();
   });
 
   test('calorie search modal opens with google query, hides on tap and closes cleanly', async ({ page }) => {
