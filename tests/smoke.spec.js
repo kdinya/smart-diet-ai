@@ -479,6 +479,26 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-name')).toHaveValue('Test product');
   });
 
+  test('calorie search modal opens with google query, hides on tap and closes cleanly', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Вівсянка');
+    await page.click('#product-calc-search');
+    await expect(page.locator('#calc-search-modal')).toHaveClass(/open/);
+    await expect(page.locator('#calc-search-query')).toHaveText('Вівсянка');
+    await expect(page.locator('#calc-search-open')).toHaveAttribute('href', /site%3Atablycjakalorijnosti\.com\.ua%20%D0%92%D1%96%D0%B2%D1%81%D1%8F%D0%BD%D0%BA%D0%B0/);
+
+    // Pointerdown makes it transparent before navigation
+    await page.locator('#calc-search-open').dispatchEvent('pointerdown');
+    expect(await page.locator('#calc-search-modal').evaluate(el => el.style.opacity)).toBe('0');
+    await page.locator('#calc-search-open').dispatchEvent('pointercancel');
+    expect(await page.locator('#calc-search-modal').evaluate(el => el.style.opacity)).toBe('');
+
+    await page.click('#calc-search-close');
+    await expect(page.locator('#calc-search-modal')).not.toHaveClass(/open/);
+  });
+
   test('shows a warning when copied text has no nutrition values', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
