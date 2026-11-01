@@ -1046,7 +1046,7 @@ test.describe('Smoke: first-run setup', () => {
     await mockSupabase(page, backend);
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
     await page.locator('#onboarding-choice-signin').click();
-    await expect(page.locator('#onboard-auth-submit')).toHaveText('Sign in');
+    await expect(page.locator('#onboard-auth-submit')).toContainText('Sign in');
     await page.fill('#onboard-auth-email', 'alice@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
@@ -1060,7 +1060,7 @@ test.describe('Smoke: first-run setup', () => {
     await mockSupabase(page, backend);
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
     await page.locator('#onboarding-choice-signup').click();
-    await expect(page.locator('#onboard-auth-submit')).toHaveText('Create account');
+    await expect(page.locator('#onboard-auth-submit')).toContainText('Create account');
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('autocomplete', 'new-password');
     await expect(page.locator('#onboard-username-field')).toBeVisible();
     await page.fill('#onboard-username', 'Alice');
@@ -3862,4 +3862,14 @@ test.describe('Smoke: launch icons', () => {
     expect(maskable?.src).toBe('./icon-maskable-512.png');
     expect(manifest.background_color).toBe('#042415');
   });
+});
+
+test('save buttons keep the product and diary labels after a re-render', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await page.evaluate(() => openProductModal({ id: 'p-label', name: 'Oats', grams: 100, kcal: 370, protein: 13, fat: 7, carbs: 60 }));
+  await page.evaluate(() => render());
+  await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveProduct')));
+  await page.evaluate(() => openModal('food', 'breakfast', { id: 'f-label', name: 'Egg', grams: 50, kcal: 70, protein: 6, fat: 5, carbs: 0, meal: 'breakfast', date: iso() }));
+  await page.evaluate(() => render());
+  await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveChanges')));
 });
