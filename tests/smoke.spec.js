@@ -474,6 +474,10 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#import-protein')).toHaveValue('6.93');
     await expect(page.locator('#import-fat')).toHaveValue('11.93');
     await expect(page.locator('#import-carbs')).toHaveValue('30');
+    await expect(page.locator('#import-kcal-previous')).toHaveText('(was: 200)');
+    await expect(page.locator('#import-protein-previous')).toHaveText('(was: 5)');
+    await expect(page.locator('#import-fat-previous')).toHaveText('(was: 4)');
+    await expect(page.locator('#import-carbs-previous')).toHaveText('(was: 25)');
     await page.fill('#import-protein', '7.1');
     await page.click('#product-import-confirm');
     await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
@@ -482,10 +486,10 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-fat')).toHaveValue('11.93');
     await expect(page.locator('#food-carbs')).toHaveValue('30');
     await expect(page.locator('#food-name')).toHaveValue('Test product');
-    await expect(page.locator('#food-kcal-previous')).toHaveText('was: 200');
-    await expect(page.locator('#food-protein-previous')).toHaveText('was: 5');
-    await expect(page.locator('#food-fat-previous')).toHaveText('was: 4');
-    await expect(page.locator('#food-carbs-previous')).toHaveText('was: 25');
+    await expect(page.locator('#food-kcal-previous')).toHaveText('(was: 200)');
+    await expect(page.locator('#food-protein-previous')).toHaveText('(was: 5)');
+    await expect(page.locator('#food-fat-previous')).toHaveText('(was: 4)');
+    await expect(page.locator('#food-carbs-previous')).toHaveText('(was: 25)');
     await page.click('#food-save');
     await expect(page.locator('#food-kcal-previous')).toBeHidden();
     await expect(page.locator('#food-protein-previous')).toBeHidden();
