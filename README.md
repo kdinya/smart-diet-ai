@@ -21,7 +21,7 @@
 **Get help from AI**
 - **AI Dietitian:** type what you want to eat. The app estimates the grams and nutrition and suggests how much fits your calories for that meal. Add the result to your diary with one tap.
 - **Choose a character:** in **Settings → AI personality**, pick *Polite and cultured* or *Playful and cheeky*. The choice applies to the AI Dietitian, meal analysis and short messages in the app.
-- **Choose an AI model:** in **Settings → AI providers**, pick *Auto* (free models first), a model from the list, or type your own model ID. The *Test* button checks that the model answers.
+- **Choose an AI model:** in **Settings → AI providers**, pick *Auto*, a model from the list, or type your own model ID. The *Test* button checks that the model answers. *Auto* uses only Gemini and Groq models, so it needs a Gemini or Groq key. Models from OpenAI, Anthropic and xAI run only when you pick them, and paid models can cost money. Free tiers have limits, and Google may use data sent on Gemini's free tier to improve its products.
 - **Notifications:** short messages appear at the top right for 10 seconds and can be closed with ✕. Messages that disappear on their own are kept in the bell list with a counter, marked as unread. Closed ones are marked as read. You can mark all as read or delete single messages. The list is stored only on this device.
 - **Storage cleanup:** when browser storage is full, the app offers to delete diary entries older than 12 months that are already saved in the cloud. Profile, weight, goals and products stay.
 - **Analyze buttons:** next to each meal and next to today's meals on the Overview and Diary screens, get a short review of that meal or of the whole day, with 2–3 tips.
@@ -39,6 +39,8 @@
 
 **Calendar and backup**
 - Pick any date in the calendar. Days with saved entries are marked with a dot.
+- Meal drafts are stored only in this browser and tied to the account signed in on this device. They are not synced to the cloud and do not move to another device or account.
+- Settings and goals are backed up on this device even before any food, weight or product is logged. The three most recent archives of other accounts are kept; to keep a new archive, the oldest one is removed only after you confirm.
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
 
