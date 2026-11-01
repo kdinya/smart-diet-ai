@@ -3873,3 +3873,20 @@ test('save buttons keep the product and diary labels after a re-render', async (
   await page.evaluate(() => render());
   await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveChanges')));
 });
+
+test('latest weight card opens weight trend block in statistics', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [{ id: 'w-1', value: 74.5, date: '2026-10-30' }] });
+  await expect(page.locator('.weight-card')).toBeVisible();
+  await expect(page.locator('.weight-trend-btn')).toBeVisible();
+  await expect(page.locator('.weight-chart-action')).toBeVisible();
+
+  await page.locator('.weight-trend-btn').click();
+  await expect(page.locator('#view-stats')).toHaveClass(/active/);
+  await expect(page.locator('#card-weight-trend')).toBeVisible();
+
+  await openView(page, 'home');
+  await expect(page.locator('#view-home')).toHaveClass(/active/);
+  await page.locator('.weight-chart-action').click();
+  await expect(page.locator('#view-stats')).toHaveClass(/active/);
+  await expect(page.locator('#card-weight-trend')).toBeVisible();
+});
