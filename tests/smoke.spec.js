@@ -410,26 +410,29 @@ test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
+    await expect(page.locator('#app-version')).toHaveText('2026.11.1');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.10.4');
+    await expect(page.locator('#app-version')).toHaveText('2026.11.1');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
     await page.locator('#app-version').click();
     await expect(page.locator('#release-history-modal')).toBeVisible();
     const versions = page.locator('#release-history-list > details');
-    await expect(versions).toHaveCount(5);
-    await expect(versions.nth(0).locator('summary')).toContainText('2026.10.4');
-    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.3');
-    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.2');
-    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.1');
-    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.0');
+    await expect(versions).toHaveCount(6);
+    await expect(versions.nth(0).locator('summary')).toContainText('2026.11.1');
+    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.4');
+    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.3');
+    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.2');
+    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.1');
+    await expect(versions.nth(5).locator('summary')).toContainText('2026.10.0');
     const latest = versions.first();
-    await expect(latest.locator('summary')).toContainText('2026.10.4');
+    await expect(latest.locator('summary')).toContainText('2026.11.1');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('Replaced raw database permission errors');
+    await expect(latest).toContainText('Import nutrition values from copied clipboard text');
+    await versions.nth(1).locator('summary').click();
+    await expect(versions.nth(1)).toContainText('Replaced raw database permission errors');
     await expect(versions.nth(4)).toContainText('bilingual food diary');
     await expect(versions.nth(4)).toContainText('Added');
     await page.locator('#release-history-close').click();
@@ -437,14 +440,55 @@ test.describe('Smoke: app version', () => {
     await page.locator('#save-lang').click();
     await page.locator('#app-version').click();
     const latestUk = page.locator('#release-history-list > details').first();
-    await expect(latestUk.locator('summary')).toContainText('2026.10.4');
+    await expect(latestUk.locator('summary')).toContainText('2026.11.1');
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
+    await expect(latestUk).toContainText('Імпорт поживних значень зі скопійованого тексту');
+    const previousUk = page.locator('#release-history-list > details').nth(1);
+    await previousUk.locator('summary').click();
+    await expect(previousUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
     const initialUk = page.locator('#release-history-list > details').last();
     await expect(initialUk.locator('summary')).toContainText('2026.10.0');
     await initialUk.locator('summary').click();
     await expect(initialUk).toContainText('Smart Diet AI — двомовний харчовий щоденник');
     await expect(initialUk).toContainText('Додано');
+  });
+});
+
+test.describe('Smoke: product clipboard nutrition import', () => {
+  test('shows copied nutrition text and editable parsed values before filling product form', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await page.evaluate(async () => navigator.clipboard.writeText(`263 ккал\nТакож 1,100 кДж ● Енергія\nБілки\n6.93 г\nРекомендована добова норма споживання: 118 г\nВуглеводи\n30 г\nРекомендована добова норма споживання: 182 г\nЦукор\n12 г\nЖири\n11.93 г\nРекомендована добова норма споживання: 53 г\nНасичені жирні кислоти\n8 г`));
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Test product');
+    await page.click('#product-import-clipboard');
+    await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-import-source')).toHaveValue(/263 ккал/);
+    await expect(page.locator('#import-kcal')).toHaveValue('263');
+    await expect(page.locator('#import-protein')).toHaveValue('6.93');
+    await expect(page.locator('#import-fat')).toHaveValue('11.93');
+    await expect(page.locator('#import-carbs')).toHaveValue('30');
+    await page.fill('#import-protein', '7.1');
+    await page.click('#product-import-confirm');
+    await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#food-kcal')).toHaveValue('263');
+    await expect(page.locator('#food-protein')).toHaveValue('7.1');
+    await expect(page.locator('#food-fat')).toHaveValue('11.93');
+    await expect(page.locator('#food-carbs')).toHaveValue('30');
+    await expect(page.locator('#food-name')).toHaveValue('Test product');
+  });
+
+  test('shows a warning when copied text has no nutrition values', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await page.evaluate(async () => navigator.clipboard.writeText('Just a product description, no nutrition facts.'));
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Test product');
+    await page.click('#product-import-clipboard');
+    await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#notif-stack')).toContainText('Could not confidently find calories');
   });
 });
 

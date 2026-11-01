@@ -29,7 +29,7 @@
 
 **Save products you eat often**
 - Keep foods in "My products" with a standard portion, and add them to your diary in seconds.
-- In the product form, "Find calories" opens a Google search for calorie data in a new tab. The app does not read the results; you enter the values yourself.
+- The product form can read copied nutrition text from the clipboard, show the source beside parsed calories, protein, fat and carbohydrates, and let you correct the values before they fill the product form. Parsing runs locally; nothing is saved until you confirm. "Find calories" still opens a Google search in a new tab.
 - Mark a product as verified in its settings; a check icon then shows next to it in My products.
 
 **Follow your weight**
