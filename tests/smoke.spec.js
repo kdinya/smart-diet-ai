@@ -2068,6 +2068,17 @@ async function shareFirstProductWith(page, friend) {
   await page.click('#share-confirm');
 }
 
+async function shareFirstProductWithMany(page, friends) {
+  await openView(page, 'settings');
+  for (const friend of friends) await expect(page.locator('#friends-list')).toContainText(friend);
+  await openView(page, 'products');
+  await page.locator('#products-list [data-toggle-product]').first().click();
+  await page.locator('#products-list [data-share-product]').first().click();
+  await expect(page.locator('#share-modal')).toHaveClass(/open/);
+  for (const friend of friends) await page.locator('#share-body label', { hasText: friend }).locator('input').check();
+  await page.click('#share-confirm');
+}
+
 test.describe('Smoke: friends', () => {
   test('a request sent by code is accepted by the other person and both see each other', async ({ page, browser }) => {
     const backend = createBackend();
@@ -2176,6 +2187,22 @@ test.describe('Smoke: product sharing', () => {
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name)).toEqual(['Oats']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
+  });
+
+  test('a product can be sent to multiple selected friends at once', async ({ page }) => {
+    const backend = createBackend();
+    befriend(backend);
+    backend.tables.profiles.push({ user_id: 'user-carol', friend_code: 'CCCC4444', display_name: 'Carol' });
+    backend.tables.friendships.push({ id: 'friendship-carol', requester: 'user-alice', addressee: 'user-carol', status: 'accepted', created_at: new Date().toISOString() });
+    await startAlice(page, backend);
+    await addProduct(page, 'Oats', '150');
+    await shareFirstProductWithMany(page, ['Bob', 'Carol']);
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Product sent to 2 friends.');
+    expect(backend.tables.product_shares).toHaveLength(2);
+    expect(backend.tables.product_shares.map(({ to_user, name, kcal }) => ({ to_user, name, kcal }))).toEqual([
+      { to_user: 'user-bob', name: 'Oats', kcal: 150 },
+      { to_user: 'user-carol', name: 'Oats', kcal: 150 },
+    ]);
   });
 
   test('a checked product keeps its check mark when shared and accepted', async ({ page, browser }) => {
