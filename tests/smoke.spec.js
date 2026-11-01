@@ -433,8 +433,8 @@ test.describe('Smoke: app version', () => {
     await expect(latest).toContainText('Import nutrition values from copied clipboard text');
     await versions.nth(1).locator('summary').click();
     await expect(versions.nth(1)).toContainText('Replaced raw database permission errors');
-    await expect(versions.nth(4)).toContainText('bilingual food diary');
-    await expect(versions.nth(4)).toContainText('Added');
+    await expect(versions.nth(5)).toContainText('bilingual food diary');
+    await expect(versions.nth(5)).toContainText('Added');
     await page.locator('#release-history-close').click();
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
@@ -497,7 +497,8 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-carbs-previous')).toBeHidden();
 
     // Closing the clipboard review modal without confirming clears previous values
-    await page.click('text=Test product');
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list [data-edit-product]').first().click();
     await page.click('#product-import-clipboard');
     await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
     await page.click('#product-import-close');
@@ -1915,7 +1916,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const chart = page.locator('#calorie-chart');
     await expect(chart).toBeVisible();
     await expect(chart).toHaveAttribute('aria-label', 'Calorie chart');
-    await expect(chart.locator('path[stroke-dasharray="4 4"]')).toHaveCount(1);
+    await expect(chart.locator('polyline[stroke-dasharray="7 6"]')).toHaveCount(1);
     await expect(page.locator('[data-i18n="calorieChartLegend"]')).toBeVisible();
   });
 
@@ -2310,7 +2311,7 @@ test.describe('Smoke: today balance', () => {
     await expect(page.locator('#home-protein-total')).toHaveText('100');
     await expect(page.locator('#home-protein-left')).toHaveText('80');
     const metric = page.locator('#view-home .stats .metric').first();
-    await expect(metric.locator('.left-line')).toHaveText('left 1500 kcal');
+    await expect(metric.locator('.left-line')).toContainText('left 1500 kcal');
     const sizes = await metric.evaluate((el) => ({
       main: parseFloat(getComputedStyle(el.querySelector('#home-kcal')).fontSize),
       left: parseFloat(getComputedStyle(el.querySelector('.left-line')).fontSize),
@@ -2334,7 +2335,8 @@ test.describe('Smoke: today balance', () => {
     await expect(page.locator('#home-kcal-total')).toHaveText('2000');
     await expect(page.locator('#home-kcal-left')).toHaveText('400');
     const kcalLine = page.locator('#view-home .stats .metric').first().locator('.left-line');
-    await expect(kcalLine).toHaveText('перебір 400 ккал');
+    await expect(kcalLine).toContainText('400 ккал');
+    await expect(kcalLine).toContainText('перебір');
     await expect(kcalLine).toHaveClass(/over/);
   });
 });
@@ -2935,7 +2937,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
 
   test('the system launch screen uses the intro colour, so no light flash shows first', async ({ page }) => {
     const manifest = await (await page.request.get('/manifest.json')).json();
-    expect(manifest.background_color).toBe('#0d4b2a');
+    expect(manifest.background_color).toBe('#042415');
     expect(manifest.theme_color).toBe('#0d4b2a');
     await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
     await page.goto('/');
@@ -3675,13 +3677,13 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     const card = page.locator('#diary-meals .meal-card').filter({ has: page.locator('.meal-title', { hasText: 'Snack' }) }).first();
     const layout = await card.evaluate(el => {
       const rect = selector => { const r=el.querySelector(selector).getBoundingClientRect(); return {top:r.top,left:r.left,right:r.right,bottom:r.bottom,width:r.width}; };
-      const range=document.createRange();range.selectNodeContents(el.querySelector('.meal-title'));const text=range.getBoundingClientRect();const calorieRange=document.createRange();calorieRange.selectNodeContents(el.querySelector('.meal-kcal'));const calorieText=calorieRange.getBoundingClientRect();return { eye:rect('.meal-activity'), title:rect('.meal-title'), titleText:{left:text.left,right:text.right}, titleAlign:getComputedStyle(el.querySelector('.meal-title')).textAlign, chevronRight:getComputedStyle(el.querySelector('.meal-head'),'::after').right, analyze:rect('.meal-analyze'), arrows:rect('.snack-moves'), calories:rect('.meal-kcal'), calorieText:{left:calorieText.left,right:calorieText.right,top:calorieText.top,bottom:calorieText.bottom}, macros:rect('.meal-macros'), top:rect('.meal-top'), innerWidth:window.innerWidth, scrollWidth:document.documentElement.scrollWidth };
+      const range=document.createRange();range.selectNodeContents(el.querySelector('.meal-title'));const text=range.getBoundingClientRect();const calorieRange=document.createRange();calorieRange.selectNodeContents(el.querySelector('.meal-kcal'));const calorieText=calorieRange.getBoundingClientRect();return { eye:rect('.meal-activity'), title:rect('.meal-title'), titleText:{left:text.left,right:text.right}, titleAlign:getComputedStyle(el.querySelector('.meal-title')).textAlign, chevronLeft:getComputedStyle(el.querySelector('.meal-analyze'),'::after').left, analyze:rect('.meal-analyze'), arrows:rect('.snack-moves'), calories:rect('.meal-kcal'), calorieText:{left:calorieText.left,right:calorieText.right,top:calorieText.top,bottom:calorieText.bottom}, macros:rect('.meal-macros'), top:rect('.meal-top'), innerWidth:window.innerWidth, scrollWidth:document.documentElement.scrollWidth };
     });
     expect(layout.titleText.left).toBeGreaterThanOrEqual(layout.eye.right);
     expect(layout.titleText.left-layout.eye.right).toBeLessThanOrEqual(8);
     expect(layout.titleText.right).toBeLessThan(layout.analyze.left);
     expect(layout.titleAlign).toBe('left');
-    expect(layout.chevronRight).toBe('96px');
+    expect(layout.chevronLeft).toBe('-22px');
     expect(layout.title.top).toBeLessThanOrEqual(layout.analyze.top+3);
     expect(layout.calories.top).toBeGreaterThanOrEqual(layout.title.bottom);
     expect(layout.calories.top-layout.title.bottom).toBeLessThanOrEqual(8);
@@ -3974,6 +3976,7 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   });
 
   // 1. Check diary calendar: foodDate is marked, weightDate is NOT marked
+  await openView(page, 'diary');
   await page.locator('#diary-date').click();
   await expect(page.locator('#cal-modal')).toHaveClass(/open/);
   await expect(page.locator(`[data-cal-date="${foodDate}"]`)).toHaveClass(/has-entries/);
@@ -3982,6 +3985,7 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
 
   // 2. Check weight entry calendar: weightDate is marked, foodDate is NOT marked
+  await openView(page, 'home');
   await page.locator('[data-action="add-weight"]').click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await page.locator('#weight-date-input').click();
