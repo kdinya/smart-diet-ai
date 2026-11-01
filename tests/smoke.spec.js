@@ -482,10 +482,10 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-fat')).toHaveValue('11.93');
     await expect(page.locator('#food-carbs')).toHaveValue('30');
     await expect(page.locator('#food-name')).toHaveValue('Test product');
-    await expect(page.locator('#food-kcal-previous')).toHaveText('Before import: 200');
-    await expect(page.locator('#food-protein-previous')).toHaveText('Before import: 5');
-    await expect(page.locator('#food-fat-previous')).toHaveText('Before import: 4');
-    await expect(page.locator('#food-carbs-previous')).toHaveText('Before import: 25');
+    await expect(page.locator('#food-kcal-previous')).toHaveText('was: 200');
+    await expect(page.locator('#food-protein-previous')).toHaveText('was: 5');
+    await expect(page.locator('#food-fat-previous')).toHaveText('was: 4');
+    await expect(page.locator('#food-carbs-previous')).toHaveText('was: 25');
     await page.click('#food-save');
     await expect(page.locator('#food-kcal-previous')).toBeHidden();
     await expect(page.locator('#food-protein-previous')).toBeHidden();
