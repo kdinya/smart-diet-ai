@@ -462,6 +462,11 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await openView(page, 'products');
     await page.click('#product-new');
     await page.fill('#food-name', 'Test product');
+    await page.fill('#food-grams', '100');
+    await page.fill('#food-kcal', '200');
+    await page.fill('#food-protein', '5');
+    await page.fill('#food-fat', '4');
+    await page.fill('#food-carbs', '25');
     await page.click('#product-import-clipboard');
     await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-import-source')).toHaveValue(/263 ккал/);
@@ -477,6 +482,15 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-fat')).toHaveValue('11.93');
     await expect(page.locator('#food-carbs')).toHaveValue('30');
     await expect(page.locator('#food-name')).toHaveValue('Test product');
+    await expect(page.locator('#food-kcal-previous')).toHaveText('Before import: 200');
+    await expect(page.locator('#food-protein-previous')).toHaveText('Before import: 5');
+    await expect(page.locator('#food-fat-previous')).toHaveText('Before import: 4');
+    await expect(page.locator('#food-carbs-previous')).toHaveText('Before import: 25');
+    await page.click('#food-save');
+    await expect(page.locator('#food-kcal-previous')).toBeHidden();
+    await expect(page.locator('#food-protein-previous')).toBeHidden();
+    await expect(page.locator('#food-fat-previous')).toBeHidden();
+    await expect(page.locator('#food-carbs-previous')).toBeHidden();
   });
 
   test('calorie search modal opens with google query, hides on tap and closes cleanly', async ({ page }) => {
