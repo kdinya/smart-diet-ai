@@ -1817,7 +1817,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'settings');
     await expect(page.locator('#pref-kcal')).toHaveValue('1500');
     await page.fill('#profile-weight', '90');
-    await page.click('#save-profile');
+    await page.locator('#profile-weight').press('Tab');
     await expect(page.locator('#pref-kcal')).not.toHaveValue('1500');
     const kcal = await page.locator('#pref-kcal').inputValue();
     await expect(page.locator('#daily-rec-result')).toContainText(kcal);
@@ -1831,7 +1831,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     });
     await openView(page, 'settings');
     await page.fill('#profile-weight', '90');
-    await page.click('#save-profile');
+    await page.locator('#profile-weight').press('Tab');
     const kcal = await page.locator('#pref-kcal').inputValue();
     expect(kcal).not.toBe('2000');
     await expect(page.locator('#daily-rec-result')).toContainText(kcal);
