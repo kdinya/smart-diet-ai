@@ -720,6 +720,33 @@ test.describe('Smoke: food deletion', () => {
     await other.close();
   });
 
+  test('profile weight date syncs to the cloud and loads on a fresh device', async ({ page, browser }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    const enteredDate = await page.evaluate(() => iso());
+    await openView(page, 'settings');
+    await page.fill('#pref-name', 'Weight tester');
+    await page.fill('#profile-weight', '97');
+    await page.locator('#profile-weight').dispatchEvent('change');
+    await page.locator('#profile-weight-date').click();
+    await page.locator('#cal-today').click();
+    await page.locator('#cal-done').click();
+    await page.locator('#save-profile').click();
+    await expect.poll(() => backend.tables.user_profiles[0]?.data.currentWeightDate).toBe(enteredDate);
+
+    const other = await browser.newContext({ serviceWorkers: 'block' });
+    const second = await other.newPage();
+    await mockSupabase(second, backend);
+    await openApp(second, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await connectSupabase(second);
+    await signIn(second, 'alice@example.test');
+    await expect.poll(async () => (await readStore(second)).prefs.currentWeightDate).toBe(enteredDate);
+    await other.close();
+  });
+
   test('a new device that was touched before sign-in does not overwrite the saved profile', async ({ page, browser }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
@@ -858,6 +885,7 @@ const IMPORT_BACKUP = {
     sex: 'male',
     height: 180,
     currentWeight: 80.2,
+    currentWeightDate: '2026-10-22',
     targetWeight: 75,
     activity: 'light',
     pace: 0.5,
@@ -890,6 +918,7 @@ test.describe('Smoke: backup import', () => {
     expect(imported.foods.map((food) => food.name).sort()).toEqual(['Imported oatmeal', 'Imported soup']);
     expect(imported.weights.map((weight) => [weight.date, weight.value])).toEqual([['2026-10-24', 80.2]]);
     expect(imported.prefs.kcal).toBe(1800);
+    expect(imported.prefs.currentWeightDate).toBe('2026-10-22');
     expect(imported.prefs.name).toBe('Imported');
     expect(imported.prefs.mealActivity['2026-10-24|lunch']).toBe(false);
     expect(imported.prefs.snackPositions['2026-10-24|snack-id']).toEqual({after:'breakfast',order:0});
@@ -1143,7 +1172,7 @@ test.describe('Smoke: first-run setup', () => {
 test.describe('Smoke: accessibility', () => {
   test('settings fields and the diary date have accessible names', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    const ids = ['auth-email', 'auth-password', 'pref-name', 'pref-lang', 'pref-kcal', 'pref-protein', 'pref-carbs', 'pref-fat', 'profile-birth', 'profile-sex', 'profile-height', 'profile-weight', 'profile-target', 'profile-activity', 'profile-pace', 'profile-notes', 'diary-date'];
+    const ids = ['auth-email', 'auth-password', 'pref-name', 'pref-lang', 'pref-kcal', 'pref-protein', 'pref-carbs', 'pref-fat', 'profile-birth', 'profile-sex', 'profile-height', 'profile-weight', 'profile-weight-date', 'profile-target', 'profile-activity', 'profile-pace', 'profile-notes', 'diary-date'];
     const unnamed = await page.evaluate((list) => list.filter((id) => {
       const el = document.getElementById(id);
       return !el || !((el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'));
@@ -4033,6 +4062,89 @@ test('save buttons keep the product and diary labels after a re-render', async (
   await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveChanges')));
 });
 
+test('profile weight uses its entered date for the exact weekly rate and survives unrelated edits', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, name: 'Weight tester', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [{ id: 'w-after-profile', value: 95.5, date: '2026-11-01' }],
+  });
+  await openView(page, 'stats');
+  await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.5, 8);
+  await expect(page.locator('#weight-history')).toContainText('10/25/2026');
+
+  await openView(page, 'settings');
+  await expect(page.locator('#profile-weight-date')).toHaveValue('2026-10-25');
+  await page.fill('#pref-name', 'Weight tester updated');
+  await page.locator('#save-profile').click();
+  await expect.poll(async () => (await readStore(page)).prefs.currentWeightDate).toBe('2026-10-25');
+  await page.reload();
+  await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+  expect((await readStore(page)).prefs.currentWeightDate).toBe('2026-10-25');
+});
+
+test('profile weight date can be backfilled from the calendar and a new weight defaults to today', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, name: 'Weight tester', currentWeight: 97 }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  await page.locator('#profile-weight-date').click();
+  await expect(page.locator('#cal-title')).toHaveText('November 2026');
+  await page.locator('#cal-prev').click();
+  await page.locator('[data-cal-date="2026-10-25"]').click();
+  await page.locator('#cal-done').click();
+  await page.locator('#save-profile').click();
+  await expect.poll(async () => (await readStore(page)).prefs.currentWeightDate).toBe('2026-10-25');
+
+  await page.fill('#profile-weight', '95.5');
+  await page.locator('#profile-weight').dispatchEvent('change');
+  await expect(page.locator('#profile-weight-date')).toHaveValue('2026-11-02');
+  await page.locator('#save-profile').click();
+  await expect.poll(async () => (await readStore(page)).prefs.currentWeight).toBe(95.5);
+  expect((await readStore(page)).prefs.currentWeightDate).toBe('2026-11-02');
+});
+
+test('home weight card uses the newest date across profile and diary records', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, currentWeight: 95.5, currentWeightDate: '2026-11-02' },
+    foods: [],
+    weights: [{ id: 'w-older', value: 97, date: '2026-11-01' }],
+  });
+  await expect(page.locator('#home-weight')).toHaveText('95.5');
+  await expect(page.locator('#weight-date')).toContainText('11/2/2026');
+  await expect(page.locator('#weight-history .food-row').first()).toContainText('95.5');
+});
+
+test('future profile weight dates cannot appear as recorded observations', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, name: 'Future date tester', currentWeight: 95.5, currentWeightDate: '2026-11-03' },
+    foods: [],
+    weights: [{ id: 'w-today', value: 97, date: '2026-11-02' }, { id: 'w-future', value: 94, date: '2026-11-04' }],
+  });
+  expect(await page.evaluate(() => weightObservations())).toEqual([{ d: '2026-11-02', v: 97, source: 'weigh-in' }]);
+  expect(await page.evaluate(() => weightHistoryRows().map(({ date, value }) => ({ date, value })))).toEqual([{ date: '2026-11-02', value: 97 }, { date: '', value: 95.5 }]);
+  await expect(page.locator('#home-weight')).toHaveText('97.0');
+  await openView(page, 'settings');
+  await page.locator('#profile-weight-date').click();
+  await expect(page.locator('[data-cal-date="2026-11-03"]')).toBeDisabled();
+  await expect(page.locator('[data-cal-date="2026-11-02"]')).toBeEnabled();
+  await page.locator('#cal-cancel').click();
+  await page.locator('#save-profile').click();
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('cannot be in the future');
+});
+
+test('diary weigh-in takes precedence over a profile weight on the same date', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, currentWeight: 97, currentWeightDate: '2026-11-01' },
+    foods: [],
+    weights: [{ id: 'w-same-day', value: 95.5, date: '2026-11-01' }],
+  });
+  expect(await page.evaluate(() => weightObservations())).toEqual([{ d: '2026-11-01', v: 95.5, source: 'weigh-in' }]);
+  expect(await page.evaluate(() => progressInfo().rate)).toBeNull();
+});
+
 test('weight rate and forecast start on day seven, use all weigh-ins, and refresh daily', async ({ page }) => {
   await openApp(page, {
     prefs: { ...BASE_PREFS, targetWeight: 70 },
@@ -4048,12 +4160,12 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   await openView(page, 'stats');
   const rate = page.locator('#progress-stats .metric').nth(1).locator('strong');
   await expect(rate).toHaveText('—');
-  await expect(page.locator('#progress-notes')).toContainText('at least 3 weigh-ins');
+  await expect(page.locator('#progress-notes')).toContainText('at least 7 days');
 
   await page.clock.setFixedTime(new Date('2026-11-01T12:01:00'));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(rate).not.toHaveText('—');
-  await expect(page.locator('#progress-notes')).not.toContainText('at least 3 weigh-ins');
+  await expect(page.locator('#progress-notes')).not.toContainText('at least 7 days');
   const forecast = page.locator('#progress-stats .metric').last().locator('strong');
   await expect(forecast).not.toHaveText('—');
   const firstForecast = await forecast.textContent();
@@ -4068,12 +4180,12 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   });
   const allHistoryRate = await page.evaluate(() => progressInfo().rate);
   const expectedAllHistoryRate = await page.evaluate(() => {
-    const points = trendSeries().map((item) => ({ n: dayNum(item.d), v: item.tr }));
+    const points = weightObservations().map((item) => ({ n: dayNum(item.d), v: item.v }));
     return slopePerDay(points) * 7;
   });
   const recentWindowRate = await page.evaluate(() => {
     const today = dayNum(iso());
-    const points = trendSeries().filter((item) => dayNum(item.d) > today - 28).map((item) => ({ n: dayNum(item.d), v: item.tr }));
+    const points = weightObservations().filter((item) => dayNum(item.d) > today - 28).map((item) => ({ n: dayNum(item.d), v: item.v }));
     return slopePerDay(points) * 7;
   });
   expect(allHistoryRate).toBeCloseTo(expectedAllHistoryRate, 8);
@@ -4118,7 +4230,7 @@ test('calendar opens above the weight-entry dialog', async ({ page }) => {
 test('calendar highlights meals in diary and only weigh-ins in weight entry', async ({ page }) => {
   const foodDate = '2026-10-25';
   const weightDate = '2026-10-28';
-  await page.clock.install({ time: new Date(`${foodDate}T12:00:00`) });
+  await page.clock.install({ time: new Date('2026-10-29T12:00:00') });
   await openApp(page, {
     prefs: BASE_PREFS,
     foods: [{ id: 'f-cal-1', name: 'Apple', meal: 'breakfast', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, date: foodDate, createdAt: 1 }],
