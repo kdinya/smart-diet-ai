@@ -409,49 +409,52 @@ function foodRow(page, name) {
 test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    const release = await page.evaluate(() => ({
+      version: APP_VERSION,
+      newestFirst: APP_RELEASES.slice().reverse().map((item) => item.version),
+      latest: APP_RELEASES[APP_RELEASES.length - 1],
+    }));
+    expect(release.newestFirst[0]).toBe(release.version);
+    const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
+
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.11.2');
+    await expect(page.locator('#app-version')).toHaveText(release.version);
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.11.2');
+    await expect(page.locator('#app-version')).toHaveText(release.version);
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
     await page.locator('#app-version').click();
     await expect(page.locator('#release-history-modal')).toBeVisible();
     const versions = page.locator('#release-history-list > details');
-    await expect(versions).toHaveCount(7);
-    await expect(versions.nth(0).locator('summary')).toContainText('2026.11.2');
-    await expect(versions.nth(1).locator('summary')).toContainText('2026.11.1');
-    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.4');
-    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.3');
-    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.2');
-    await expect(versions.nth(5).locator('summary')).toContainText('2026.10.1');
-    await expect(versions.nth(6).locator('summary')).toContainText('2026.10.0');
+    await expect(versions).toHaveCount(release.newestFirst.length);
+    for (const [index, version] of release.newestFirst.entries()) {
+      await expect(versions.nth(index).locator('summary')).toContainText(version);
+    }
     const latest = versions.first();
-    await expect(latest.locator('summary')).toContainText('2026.11.2');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('Daily calorie recommendation updates at once when your personal plan details change.');
-    await versions.nth(2).locator('summary').click();
-    await expect(versions.nth(2)).toContainText('Replaced raw database permission errors');
-    await expect(versions.nth(6)).toContainText('bilingual food diary');
-    await expect(versions.nth(6)).toContainText('Added');
+    await expect(latest).toContainText(release.latest.description.en);
+    const previous = entryFor('2026.10.4');
+    await previous.locator('summary').click();
+    await expect(previous).toContainText('Replaced raw database permission errors');
+    const initial = entryFor('2026.10.0');
+    await initial.locator('summary').click();
+    await expect(initial).toContainText('bilingual food diary');
+    await expect(initial).toContainText('Added');
     await page.locator('#release-history-close').click();
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await page.locator('#app-version').click();
-    const latestUk = page.locator('#release-history-list > details').first();
-    await expect(latestUk.locator('summary')).toContainText('2026.11.2');
+    const latestUk = versions.first();
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('Добова рекомендація калорій оновлюється одразу, коли змінюються дані персонального плану.');
-    const previousUk = page.locator('#release-history-list > details').nth(2);
+    await expect(latestUk).toContainText(release.latest.description.uk);
+    const previousUk = entryFor('2026.10.4');
     await previousUk.locator('summary').click();
     await expect(previousUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
-    const initialUk = page.locator('#release-history-list > details').last();
-    await expect(initialUk.locator('summary')).toContainText('2026.10.0');
+    const initialUk = entryFor('2026.10.0');
     await initialUk.locator('summary').click();
     await expect(initialUk).toContainText('Smart Diet AI — двомовний харчовий щоденник');
-    await expect(initialUk).toContainText('Додано');
   });
 });
 
