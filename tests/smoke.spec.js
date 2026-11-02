@@ -948,11 +948,13 @@ test.describe('Smoke: backup import', () => {
     await page.setInputFiles('#import-file', backupFile(backup));
     await expect.poll(async () => (await readStore(page)).products.map((product) => [product.name, product.kcal]).sort((a, b) => a[1] - b[1])).toEqual([['Oats', 90], ['Oats copy', 150]]);
     const imported = await readStore(page);
-    expect(imported.productHistory).toHaveLength(2);
-    expect(imported.productHistory.map((entry) => entry.name).sort()).toEqual(['Oats', 'Oats copy']);
+    expect(imported.productHistory.some((entry) => entry.action === 'backup_imported')).toBe(true);
+    const productLog = imported.productHistory.filter((entry) => entry.action !== 'backup_imported');
+    expect(productLog).toHaveLength(2);
+    expect(productLog.map((entry) => entry.name).sort()).toEqual(['Oats', 'Oats copy']);
     await page.reload();
     expect((await readStore(page)).products).toHaveLength(2);
-    expect((await readStore(page)).productHistory).toHaveLength(2);
+    expect((await readStore(page)).productHistory.filter((entry) => entry.action !== 'backup_imported')).toHaveLength(2);
   });
 
   test('declining the confirmation keeps the current local data', async ({ page }) => {
@@ -1802,6 +1804,21 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#weight-history [data-delete-weight] svg')).toHaveCount(1);
   });
 
+  test('changing personal plan details recalculates the daily calorie recommendation at once', async ({ page }) => {
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, name: 'Anna', kcal: 1500, sex: 'female', birthDate: '1990-01-01', height: 170, currentWeight: 80, targetWeight: 70, activity: 'low', pace: 20, recommendation: { pace: 20, tdee: 2200 } },
+      foods: [],
+      weights: [],
+    });
+    await openView(page, 'settings');
+    await expect(page.locator('#pref-kcal')).toHaveValue('1500');
+    await page.fill('#profile-weight', '90');
+    await page.click('#save-profile');
+    await expect(page.locator('#pref-kcal')).not.toHaveValue('1500');
+    const kcal = await page.locator('#pref-kcal').inputValue();
+    await expect(page.locator('#daily-rec-result')).toContainText(kcal);
+  });
+
   test('editing the weight recalculates calories and macros proportionally', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, {
@@ -2421,7 +2438,7 @@ test.describe('Smoke: product sharing', () => {
     await bob.page.click('[data-share-accept]');
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.kcal).sort((a, b) => a - b)).toEqual([90, 150]);
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name).sort()).toEqual(['Oats', 'Oats copy']);
-    const history = (await readStore(bob.page)).productHistory;
+    const history = (await readStore(bob.page)).productHistory.filter((entry) => entry.action === 'created');
     expect(history.map((entry) => entry.name).sort()).toEqual(['Oats', 'Oats copy']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
