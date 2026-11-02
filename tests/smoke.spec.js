@@ -3139,7 +3139,7 @@ test.describe('Smoke: dietitian launcher', () => {
     await openView(page, 'settings');
     await page.locator('#pref-tone').selectOption('playful');
     await page.locator('#save-tone').click();
-    await expect(page.locator('.chat-fab-label')).toHaveText('Dietitian 🐾');
+    await expect(page.locator('.chat-fab-label')).toHaveText('AI Dietitian');
   });
 
   test('assistant appearance sliders, localized label and overlays behave correctly', async ({ page }) => {
@@ -3164,6 +3164,9 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('#pref-bot-offset-v')).toHaveCSS('flex-grow', '1');
   await expect(page.locator('#pref-bot-offset-v')).toHaveCSS('min-width', '0px');
   await expect(page.locator('#pref-bot-size')).toHaveCSS('touch-action', 'pan-y');
+  await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('min', '-1.5');
+  await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('max', '1.5');
+  await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('step', '0.05');
   await expect(page.locator('#pref-bot-offset-h')).toHaveValue('0.5');
   await expect(page.locator('#bot-offset-h-value')).toHaveText('0.5rem');
   await expect(page.locator('#pref-bot-side').locator('xpath=..')).toHaveClass(/dd/);
@@ -3200,16 +3203,19 @@ test.describe('Smoke: dietitian launcher', () => {
   const bottomPlacement = await mascot.evaluate(el => ({ top: parseFloat(el.style.top), available: innerHeight - el.offsetHeight - (parseFloat(getComputedStyle(el).getPropertyValue('--bot-safe-bottom')) || 0) }));
   expect(Math.abs(bottomPlacement.top - bottomPlacement.available)).toBeLessThanOrEqual(1);
   await expect(mascot).toHaveCSS('left', '8px');
-  await page.locator('#pref-bot-offset-h').fill('5.625');
-  await expect(mascot).toHaveCSS('--bot-offset-h', '5.625rem');
-  await expect(mascot).toHaveCSS('left', '90px');
+  await page.locator('#pref-bot-offset-h').fill('-1.5');
+  await expect(mascot).toHaveCSS('--bot-offset-h', '-1.5rem');
+  await expect(mascot).toHaveCSS('left', '-24px');
+  await page.locator('#pref-bot-offset-h').fill('1.5');
+  await expect(mascot).toHaveCSS('--bot-offset-h', '1.5rem');
+  await expect(mascot).toHaveCSS('left', '24px');
   await expect(mascot).toHaveClass(/bot-side-left/);
   await page.locator('#pref-bot-size').fill('100');
-  await expect(mascot).toHaveCSS('--bot-offset-h', '5.625rem');
+  await expect(mascot).toHaveCSS('--bot-offset-h', '1.5rem');
   await page.locator('#pref-bot-offset-v').fill('100');
   await expect(mascot).toHaveCSS('top', '0px');
   await page.locator('#pref-bot-size').fill('30');
-  await expect(mascot).toHaveCSS('--bot-offset-h', '5.625rem');
+  await expect(mascot).toHaveCSS('--bot-offset-h', '1.5rem');
   await page.locator('#pref-bot-frequency').selectOption('0');
   await page.locator('#save-bot-settings').click();
   await page.locator('#pref-bot-enabled').click();
@@ -3224,21 +3230,26 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.locator('#pref-bot-enabled').click();
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'true');
   await expect(mascot).toBeVisible();
-  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '5.625rem', botFrequency: 0 });
+  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem', botFrequency: 0 });
   await expect(mascot).toHaveCSS('--bot-scale', '0.3');
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toHaveClass(/fab-popped/);
+  await expect(page.locator('#bot-settings-fab')).toBeVisible();
   await page.clock.runFor(350);
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#chat-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
   expect(parseFloat(aligned.side)).toBeGreaterThan(0);
-  await page.clock.runFor(4500);
+  await page.clock.runFor(4649);
   await expect(fab).toBeVisible();
   await page.clock.runFor(1);
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toBeVisible();
+  await page.locator('#bot-settings-fab').click();
+  await expect(page.locator('#bot-appearance-card')).toBeInViewport();
+  await expect(fab).toBeHidden();
+  await mascot.click();
   await page.locator('#view-settings h2').first().click();
   await expect(fab).toBeHidden();
   await mascot.click();
@@ -3251,8 +3262,8 @@ test.describe('Smoke: dietitian launcher', () => {
   await openView(page, 'settings');
   await page.locator('#pref-tone').selectOption('playful');
   await page.locator('#save-tone').click();
-  await expect(page.locator('.chat-fab-label')).toHaveText('Дієтолог 🐾');
-  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '5.625rem' });
+  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ-дієтолог');
+  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
 });
 
 test('disabled assistant restores the original one-click dietitian launcher', async ({ page }) => {
