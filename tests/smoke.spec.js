@@ -4135,6 +4135,41 @@ test('home weight card uses the newest date across profile and diary records', a
   await expect(page.locator('#weight-history .food-row').first()).toContainText('95.5');
 });
 
+test('lower profile weight makes only older higher weigh-ins inactive without deleting them', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, name: 'Weight baseline tester', lang: 'en', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 70 },
+    foods: [],
+    weights: [
+      { id: 'w-old-high', value: 101, date: '2026-10-10' },
+      { id: 'w-old-lower', value: 94, date: '2026-10-20' },
+      { id: 'w-pre-baseline-high', value: 98, date: '2026-10-30' },
+      { id: 'w-current', value: 95.5, date: '2026-11-03' },
+    ],
+  });
+  await openView(page, 'settings');
+  await page.fill('#profile-weight', '95.5');
+  await page.locator('#profile-weight').dispatchEvent('change');
+  await expect(page.locator('#profile-weight-date')).toHaveValue('2026-11-03');
+  await page.locator('#save-profile').click();
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('saved');
+  await openView(page, 'stats');
+  const result = await page.evaluate(() => ({
+    all: allWeightObservations().map(x => [x.d, x.v]),
+    active: weightObservations().map(x => [x.d, x.v]),
+    inactive: weightHistoryRows().filter(x => x.inactive).map(x => [x.date, x.value]),
+    savedWeightCount: state.weights.length,
+  }));
+  expect(result.all).toHaveLength(4);
+  expect(result.active).toEqual([['2026-10-20', 94], ['2026-11-03', 95.5]]);
+  expect(result.inactive).toEqual([['2026-10-30', 98], ['2026-10-10', 101]]);
+  expect(result.savedWeightCount).toBe(4);
+  await expect(page.locator('#weight-chart .weight-point-inactive')).toHaveCount(2);
+  await page.clock.setFixedTime(new Date('2026-11-04T12:00:00'));
+  await page.evaluate(() => { state.weights.push({ id: 'w-new-after-baseline', value: 96, date: '2026-11-04' }); save(); render(); });
+  expect(await page.evaluate(() => weightObservations().map(x => [x.d, x.v]))).toEqual([['2026-10-20', 94], ['2026-11-03', 95.5], ['2026-11-04', 96]]);
+});
+
 test('future profile weight dates cannot appear as recorded observations', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
