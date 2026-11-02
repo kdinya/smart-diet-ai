@@ -4482,3 +4482,39 @@ test('progress statistics cards follow the two-column mobile order: trend/goal/f
   await expect(metrics.nth(3)).toContainText('За останні 7 днів');
   await expect(metrics.nth(5)).toContainText('Загальна втрата від ваги в профілі');
 });
+
+test('stats metrics display info button and clicking it opens detailed description modal', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [
+      { id: 'w-oct-26', value: 96.5, date: '2026-10-26' },
+      { id: 'w-oct-30', value: 96, date: '2026-10-30' },
+      { id: 'w-oct-31', value: 95.6, date: '2026-10-31' },
+      { id: 'w-nov-02', value: 95.5, date: '2026-11-02' },
+    ],
+  });
+  await page.evaluate(() => showView('stats'));
+  const infoButtons = page.locator('#progress-stats .metric-info-btn');
+  await expect(infoButtons).toHaveCount(6);
+
+  // Click info on Trend weight
+  await infoButtons.nth(0).click();
+  await expect(page.locator('#info-modal')).toHaveClass(/open/);
+  await expect(page.locator('#info-title')).toContainText('Трендова вага');
+  await expect(page.locator('#info-body')).toContainText('7');
+
+  // Close modal via close button
+  await page.locator('#info-close').click();
+  await expect(page.locator('#info-modal')).not.toHaveClass(/open/);
+
+  // Click info on Daily loss
+  await infoButtons.nth(1).click();
+  await expect(page.locator('#info-modal')).toHaveClass(/open/);
+  await expect(page.locator('#info-title')).toContainText('Середня втрата');
+
+  // Close modal via backdrop click
+  await page.locator('#info-modal').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#info-modal')).not.toHaveClass(/open/);
+});
