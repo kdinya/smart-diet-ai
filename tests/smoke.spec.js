@@ -4105,13 +4105,13 @@ test('progress shows recent weekly and average daily change, while keeping the f
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
   await expect(page.locator('#progress-stats .metric')).toHaveCount(6);
   await expect(page.locator('#progress-stats .metric').nth(0)).toContainText('згладжене середнє за останні 7 днів');
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.00');
-  await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('За останні 7 днів');
-  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('0.188');
-  await expect(page.locator('#progress-stats .metric').nth(2)).toContainText('Середня втрата ваги за день');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('Середня втрата ваги за день');
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.00');
+  await expect(page.locator('#progress-stats .metric').nth(3)).toContainText('За останні 7 днів');
   await expect(page.locator('#progress-stats')).not.toContainText('Довгостроковий тренд для прогнозу');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
-  await expect(page.locator('#progress-stats .metric').last().locator('strong')).not.toHaveText('—');
+  await expect(page.locator('#progress-stats .metric').nth(4).locator('strong')).not.toHaveText('—');
 });
 
 test('recent weekly rate uses the actual last seven-day window from screenshot weigh-ins', async ({ page }) => {
@@ -4129,8 +4129,8 @@ test('recent weekly rate uses the actual last seven-day window from screenshot w
   await page.evaluate(() => showView('stats'));
   await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1, 8);
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.00');
-  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.00');
   await expect.poll(() => page.evaluate(() => progressInfo().averageDailyLoss)).toBeCloseTo(0.1875, 8);
   await expect(page.locator('#progress-stats')).toContainText('Загальна втрата від ваги в профілі');
   await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('1.5');
@@ -4284,9 +4284,9 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   });
   await page.evaluate(() => showView('stats'));
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
-  const recentRate = page.locator('#progress-stats .metric').nth(1).locator('strong');
+  const recentRate = page.locator('#progress-stats .metric').nth(3).locator('strong');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeNull();
-  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('—');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('—');
   await expect(recentRate).toHaveText('—');
   await expect(page.locator('#progress-notes')).toContainText('at least 7 days');
 
@@ -4294,7 +4294,7 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).not.toBeNull();
   await expect(page.locator('#progress-notes')).not.toContainText('at least 7 days');
-  const forecast = page.locator('#progress-stats .metric').last().locator('strong');
+  const forecast = page.locator('#progress-stats .metric').nth(4).locator('strong');
   await expect(forecast).not.toHaveText('—');
   const firstForecast = await forecast.textContent();
 
@@ -4388,4 +4388,97 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   await expect(page.locator(`[data-cal-date="${foodDate}"]`)).not.toHaveClass(/has-entries/);
   await page.locator('#cal-cancel').click();
   await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
+});
+
+
+test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk' },
+    foods: [],
+    weights: [],
+  });
+
+  // 1. Switch to Diary and select yesterday
+  await openView(page, 'diary');
+  await page.fill('#diary-date', '2026-11-01');
+  await page.locator('#diary-date').dispatchEvent('change');
+  await expect(page.locator('#diary-date')).toHaveValue('2026-11-01');
+
+  // 2. Switch back to Home (today) and add food to Snack
+  await openView(page, 'home');
+  await page.locator('#today-meals [data-action="add-food"][data-meal="snack"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await expect(page.locator('#food-date')).toHaveValue('2026-11-02');
+
+  // 3. Fill and save food
+  await page.fill('#food-name', 'Яблуко');
+  await page.fill('#food-grams', '150');
+  await page.fill('#food-kcal', '75');
+  await page.locator('#food-save').click();
+
+  // 4. Toast must indicate the meal and today's date
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Перекус');
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Сьогодні');
+
+  // 5. Food must be saved under today's date (2026-11-02), not yesterday
+  const foods = await page.evaluate(() => state.foods);
+  expect(foods).toHaveLength(1);
+  expect(foods[0].date).toBe('2026-11-02');
+  expect(foods[0].meal).toBe('snack');
+});
+
+test('adding food directly from diary retains historical date and announces meal and date in toast', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk' },
+    foods: [],
+    weights: [],
+  });
+
+  await openView(page, 'diary');
+  await page.fill('#diary-date', '2026-10-25');
+  await page.locator('#diary-date').dispatchEvent('change');
+
+  await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await expect(page.locator('#food-date')).toHaveValue('2026-10-25');
+
+  await page.fill('#food-name', 'Гречка');
+  await page.fill('#food-grams', '200');
+  await page.fill('#food-kcal', '220');
+  await page.locator('#food-save').click();
+
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Обід');
+  const foods = await page.evaluate(() => state.foods);
+  expect(foods).toHaveLength(1);
+  expect(foods[0].date).toBe('2026-10-25');
+  expect(foods[0].meal).toBe('lunch');
+});
+
+test('progress statistics cards follow the two-column mobile order: trend/goal/forecast and daily/weekly/total', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [
+      { id: 'w-oct-26', value: 96.5, date: '2026-10-26' },
+      { id: 'w-oct-30', value: 96, date: '2026-10-30' },
+      { id: 'w-oct-31', value: 95.6, date: '2026-10-31' },
+      { id: 'w-nov-02', value: 95.5, date: '2026-11-02' },
+    ],
+  });
+  await page.evaluate(() => showView('stats'));
+  const metrics = page.locator('#progress-stats .metric');
+  await expect(metrics).toHaveCount(6);
+
+  // Column 1 (Left column in row-based 2-col grid: indices 0, 2, 4)
+  await expect(metrics.nth(0)).toContainText('Трендова вага');
+  await expect(metrics.nth(2)).toContainText('До цілі');
+  await expect(metrics.nth(4)).toContainText('Прогноз досягнення цілі');
+
+  // Column 2 (Right column in row-based 2-col grid: indices 1, 3, 5)
+  await expect(metrics.nth(1)).toContainText('Середня втрата ваги за день');
+  await expect(metrics.nth(3)).toContainText('За останні 7 днів');
+  await expect(metrics.nth(5)).toContainText('Загальна втрата від ваги в профілі');
 });
