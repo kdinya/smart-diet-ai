@@ -410,40 +410,41 @@ test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'settings');
-    await expect(page.locator('#app-version')).toHaveText('2026.11.1');
+    await expect(page.locator('#app-version')).toHaveText('2026.11.2');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('Версія застосунку');
     await page.selectOption('#pref-lang', 'en');
     await page.locator('#save-lang').click();
-    await expect(page.locator('#app-version')).toHaveText('2026.11.1');
+    await expect(page.locator('#app-version')).toHaveText('2026.11.2');
     await expect(page.locator('[data-i18n="appVersion"]')).toHaveText('App version');
     await page.locator('#app-version').click();
     await expect(page.locator('#release-history-modal')).toBeVisible();
     const versions = page.locator('#release-history-list > details');
-    await expect(versions).toHaveCount(6);
-    await expect(versions.nth(0).locator('summary')).toContainText('2026.11.1');
-    await expect(versions.nth(1).locator('summary')).toContainText('2026.10.4');
-    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.3');
-    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.2');
-    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.1');
-    await expect(versions.nth(5).locator('summary')).toContainText('2026.10.0');
+    await expect(versions).toHaveCount(7);
+    await expect(versions.nth(0).locator('summary')).toContainText('2026.11.2');
+    await expect(versions.nth(1).locator('summary')).toContainText('2026.11.1');
+    await expect(versions.nth(2).locator('summary')).toContainText('2026.10.4');
+    await expect(versions.nth(3).locator('summary')).toContainText('2026.10.3');
+    await expect(versions.nth(4).locator('summary')).toContainText('2026.10.2');
+    await expect(versions.nth(5).locator('summary')).toContainText('2026.10.1');
+    await expect(versions.nth(6).locator('summary')).toContainText('2026.10.0');
     const latest = versions.first();
-    await expect(latest.locator('summary')).toContainText('2026.11.1');
+    await expect(latest.locator('summary')).toContainText('2026.11.2');
     await latest.locator('summary').click();
     await expect(latest).toHaveAttribute('open', '');
-    await expect(latest).toContainText('Import nutrition values from copied clipboard text');
-    await versions.nth(1).locator('summary').click();
-    await expect(versions.nth(1)).toContainText('Replaced raw database permission errors');
-    await expect(versions.nth(5)).toContainText('bilingual food diary');
-    await expect(versions.nth(5)).toContainText('Added');
+    await expect(latest).toContainText('Daily calorie recommendation updates at once when your personal plan details change.');
+    await versions.nth(2).locator('summary').click();
+    await expect(versions.nth(2)).toContainText('Replaced raw database permission errors');
+    await expect(versions.nth(6)).toContainText('bilingual food diary');
+    await expect(versions.nth(6)).toContainText('Added');
     await page.locator('#release-history-close').click();
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await page.locator('#app-version').click();
     const latestUk = page.locator('#release-history-list > details').first();
-    await expect(latestUk.locator('summary')).toContainText('2026.11.1');
+    await expect(latestUk.locator('summary')).toContainText('2026.11.2');
     await latestUk.locator('summary').click();
-    await expect(latestUk).toContainText('Імпорт поживних значень зі скопійованого тексту');
-    const previousUk = page.locator('#release-history-list > details').nth(1);
+    await expect(latestUk).toContainText('Добова рекомендація калорій оновлюється одразу, коли змінюються дані персонального плану.');
+    const previousUk = page.locator('#release-history-list > details').nth(2);
     await previousUk.locator('summary').click();
     await expect(previousUk).toContainText('Зрозуміліші помилки акаунта й синхронізації');
     const initialUk = page.locator('#release-history-list > details').last();
@@ -4094,7 +4095,8 @@ test('profile weight uses its entered date for the exact weekly rate and survive
   await expect(page.locator('#weight-history')).toContainText('10/25/2026');
   await page.evaluate(() => openWeightHistory());
   const profileHistoryRow = page.locator('#weight-history-modal-list .food-row').filter({ hasText: '97.0 kg' });
-  await expect(profileHistoryRow).toContainText('From your profile · 10/25/2026');
+  await expect(profileHistoryRow).toContainText('From your profile');
+  await expect(profileHistoryRow).toContainText('10/25/2026');
   await page.locator('#weight-history-done').click();
 
   await page.evaluate(() => showView('settings'));
@@ -4185,10 +4187,13 @@ test('new profiles assign the profile weight date automatically without a date i
     const nameEl = document.querySelector('#onboard-name');
     if (nameEl) { nameEl.value = 'Guest User'; nameEl.dispatchEvent(new Event('input', { bubbles: true })); }
     const el = document.querySelector('#onboard-weight'); el.value = '70'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    const birth = document.querySelector('#onboard-birth'); birth.value = '1990-01-01'; birth.dispatchEvent(new Event('change', { bubbles: true }));
+    const height = document.querySelector('#onboard-height'); height.value = '170'; height.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#onboarding-save').click();
   await expect.poll(async () => (await readStore(page)).prefs.currentWeightDate).toBe('2026-11-02');
-  await openView(page, 'settings');
+  await page.evaluate(() => showView('settings'));
+  await expect(page.locator('#view-settings')).toHaveClass(/active/);
   await expect(page.locator('#profile-weight-date-field')).toBeHidden();
 });
 
@@ -4415,6 +4420,17 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
 });
 
 
+async function selectDiaryDate(page, date) {
+  await page.click('#diary-date');
+  while (true) {
+    const visibleMonth = (await page.locator('#cal-days .cal-day').first().getAttribute('data-cal-date')).slice(0, 7);
+    if (visibleMonth === date.slice(0, 7)) break;
+    await page.locator(visibleMonth < date.slice(0, 7) ? '#cal-next' : '#cal-prev').click();
+  }
+  await page.locator(`[data-cal-date="${date}"]`).click();
+  await page.click('#cal-done');
+}
+
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
@@ -4425,8 +4441,7 @@ test('adding food defaults to today even when a past diary date was viewed, and 
 
   // 1. Switch to Diary and select yesterday
   await openView(page, 'diary');
-  await page.fill('#diary-date', '2026-11-01');
-  await page.locator('#diary-date').dispatchEvent('change');
+  await selectDiaryDate(page, '2026-11-01');
   await expect(page.locator('#diary-date')).toHaveValue('2026-11-01');
 
   // 2. Switch back to Home (today) and add food to Snack
@@ -4462,8 +4477,7 @@ test('adding food directly from diary retains historical date and announces meal
   });
 
   await openView(page, 'diary');
-  await page.fill('#diary-date', '2026-10-25');
-  await page.locator('#diary-date').dispatchEvent('change');
+  await selectDiaryDate(page, '2026-10-25');
 
   await page.locator('#diary-meals [data-toggle-meal]').filter({ hasText: 'Обід' }).click();
   await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').first().click();
