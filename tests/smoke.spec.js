@@ -337,9 +337,7 @@ async function readStore(page) {
 }
 
 async function openDietitianChat(page) {
-  await page.locator('#chat-fab').click();
-  await expect(page.locator('#chat-fab')).toHaveClass(/is-expanded/);
-  await page.locator('#chat-fab').click();
+  await page.locator('#bot-peeker').click();
   await expect(page.locator('#chat-panel')).toHaveClass(/open/);
 }
 
@@ -3127,8 +3125,38 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
 });
 
 test.describe('Smoke: dietitian launcher', () => {
-  test('compact launcher expands on first click and opens chat on second click', async ({ page }) => {
+  test('settings switch between the peeking mascot and the two-step button', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const fab = page.locator('#chat-fab');
+    const mascot = page.locator('#bot-peeker');
+    await expect(mascot).toBeVisible();
+    await expect(fab).toBeHidden();
+    await openView(page, 'settings');
+    await page.selectOption('#pref-bot-mode', 'button');
+    await page.selectOption('#pref-bot-size', '0.8');
+    await page.selectOption('#pref-bot-frequency', '0');
+    await page.locator('#save-tone').click();
+    await expect(fab).toBeVisible();
+    await expect(mascot).toBeHidden();
+    await expect(page.locator('#pref-bot-size')).toHaveValue('0.8');
+    expect((await readStore(page)).prefs).toMatchObject({ botMode: 'button', botSize: '0.8', botFrequency: 0 });
+    await page.reload();
+    await expect(page.locator('#chat-fab')).toBeVisible();
+    await expect(page.locator('#bot-peeker')).toBeHidden();
+    await openView(page, 'settings');
+    await page.selectOption('#pref-bot-mode', 'mascot');
+    await page.selectOption('#pref-bot-size', '1.2');
+    await page.selectOption('#pref-bot-frequency', '60000');
+    await page.locator('#save-tone').click();
+    await expect(page.locator('#bot-peeker')).toBeVisible();
+    await expect(page.locator('#chat-fab')).toBeHidden();
+    await expect(page.locator('#bot-peeker')).toHaveCSS('--bot-scale', '1.2');
+    await page.locator('#bot-peeker').click();
+    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+  });
+
+  test('button launcher expands on first click and opens chat on second click', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button' }, foods: [], weights: [] });
     const fab = page.locator('#chat-fab');
     await expect(fab).toBeVisible();
     await expect(fab).not.toHaveClass(/is-expanded/);
