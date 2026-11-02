@@ -3141,20 +3141,28 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot.locator('.eco-stage img')).toHaveCount(6);
   await expect(page.locator('.chat-fab-label')).toHaveText('ШІ-дієтолог 😉');
   await openView(page, 'settings');
+  await expect(page.locator('#pref-bot-size')).toHaveAttribute('min', '50');
+  await expect(page.locator('#pref-bot-size')).toHaveAttribute('max', '150');
+  await expect(page.locator('#pref-bot-size')).toHaveValue('65');
+  await expect(page.locator('#pref-bot-side')).toHaveValue('right');
+  await expect(page.locator('#pref-bot-offset-v')).toHaveValue('20');
+  await expect(page.locator('#pref-bot-offset-h')).toHaveValue('50');
   const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards);
   const personalityIndex = orderedCards.findIndex(card => card.querySelector('#pref-tone'));
   const appearanceIndex = orderedCards.findIndex(card => card.id === 'bot-appearance-card');
   const friendsIndex = orderedCards.findIndex(card => card.id === 'friends-card');
   expect(appearanceIndex).toBeGreaterThan(personalityIndex);
   expect(appearanceIndex).toBeLessThan(friendsIndex);
-  await page.locator('#pref-bot-size').fill('80');
+  await page.locator('#pref-bot-size').fill('50');
+  await page.locator('#pref-bot-side').selectOption('left');
   await page.locator('#pref-bot-offset-v').fill('28');
   await page.locator('#pref-bot-offset-h').fill('90');
   await expect(mascot).toHaveCSS('--bot-offset-h', '90px');
+  await expect(mascot).toHaveClass(/bot-side-left/);
   await page.locator('#pref-bot-frequency').selectOption('0');
   await page.locator('#save-bot-settings').click();
-  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.8', botOffsetV: '28vh', botOffsetH: '90px', botFrequency: 0 });
-  await expect(mascot).toHaveCSS('--bot-scale', '0.8');
+  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.5', botSide: 'left', botOffsetV: '28vh', botOffsetH: '90px', botFrequency: 0 });
+  await expect(mascot).toHaveCSS('--bot-scale', '0.5');
   await mascot.click();
   await expect(fab).toHaveClass(/fab-popped/);
   await page.clock.runFor(4999);
@@ -3177,7 +3185,7 @@ test.describe('Smoke: dietitian launcher', () => {
   await openView(page, 'settings');
   await page.locator('#pref-tone').selectOption('playful');
   await page.locator('#save-tone').click();
-  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.8', botOffsetV: '28vh', botOffsetH: '90px' });
+  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.5', botSide: 'left', botOffsetV: '28vh', botOffsetH: '90px' });
 });
 
 test('button launcher expands on first click and opens chat on second click', async ({ page }) => {
