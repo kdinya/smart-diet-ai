@@ -1879,7 +1879,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(stored.productHistory.map((entry) => entry.action)).toEqual(['created']);
     await expect(page.locator('.toast-msg').last()).toContainText('Buckwheat copy');
 
-    await page.locator('#product-history-open').click();
+    await openView(page, 'settings');
+    await page.locator('#product-history-open-settings').click();
     await expect(page.locator('#product-history-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-history-list')).toContainText('Created');
     await expect(page.locator('#product-history-list')).toContainText('Buckwheat copy');
@@ -1900,7 +1901,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect.poll(async () => (await readStore(page)).productHistory[0].action).toBe('deleted');
     await page.reload();
     await openView(page, 'products');
-    await page.locator('#product-history-open').click();
+    await openView(page, 'settings');
+    await page.locator('#product-history-open-settings').click();
     await expect(page.locator('#product-history-list')).toContainText('Deleted');
     await expect(page.locator('#product-history-list')).toContainText('Buckwheat');
   });
@@ -4524,4 +4526,43 @@ test('stats metrics display info button and clicking it opens detailed descripti
   // Close modal via backdrop click
   await page.locator('#info-modal').click({ position: { x: 5, y: 5 } });
   await expect(page.locator('#info-modal')).not.toHaveClass(/open/);
+});
+
+test.describe('Smoke: calorie deficit fills goals and keeps pace', () => {
+  const profileWithTarget = {
+    ...BASE_PREFS,
+    name: 'Pace tester',
+    birthDate: '1995-05-10',
+    sex: 'female',
+    height: 165,
+    currentWeight: 70,
+    currentWeightDate: new Date().toLocaleDateString('en-CA'),
+    targetWeight: 60,
+    activity: 'low',
+    pace: 20,
+  };
+
+  test('choosing a deficit fills goals, and the pace survives moving to another block', async ({ page }) => {
+    await openApp(page, { prefs: profileWithTarget, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.locator('#profile-pace').locator('xpath=..').locator('.dd-btn').click();
+    await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt').nth(3).click();
+    await expect(page.locator('#pref-kcal')).not.toHaveValue('2000');
+    const kcalAfterPick = await page.locator('#pref-kcal').inputValue();
+    await page.locator('#pref-lang').locator('xpath=..').locator('.dd-btn').click();
+    await expect.poll(async () => (await readStore(page)).prefs.pace).toBe(25);
+    await expect(page.locator('#profile-pace')).toHaveValue('25');
+    const stored = await readStore(page);
+    expect(stored.prefs.kcal).toBe(Number(kcalAfterPick));
+    expect(stored.prefs.pace).toBe(25);
+  });
+
+  test('a deficit without a target weight explains what is missing and leaves goals unchanged', async ({ page }) => {
+    await openApp(page, { prefs: { ...profileWithTarget, targetWeight: null }, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.locator('#profile-pace').locator('xpath=..').locator('.dd-btn').click();
+    await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt').nth(3).click();
+    await expect(page.locator('#profile-pace-preview')).toContainText('target weight');
+    await expect(page.locator('#pref-kcal')).toHaveValue('2000');
+  });
 });
