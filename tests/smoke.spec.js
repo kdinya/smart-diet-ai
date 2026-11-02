@@ -4163,6 +4163,8 @@ test('new profiles assign the profile weight date automatically without a date i
   await page.locator('#onboarding-choice-guest').click();
   await expect(page.locator('#onboard-weight-date-field')).toBeHidden();
   await page.evaluate(() => {
+    const nameEl = document.querySelector('#onboard-name');
+    if (nameEl) { nameEl.value = 'Guest User'; nameEl.dispatchEvent(new Event('input', { bubbles: true })); }
     const el = document.querySelector('#onboard-weight'); el.value = '70'; el.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#onboarding-save').click();
@@ -4189,7 +4191,10 @@ test('weight and kg stay on one line in mobile weight history', async ({ page })
   const value = page.locator('#weight-history .weight-value').first();
   await expect(value).toContainText('kg');
   await expect.poll(() => value.evaluate(el => getComputedStyle(el).whiteSpace)).toBe('nowrap');
-  const dimensions = await value.evaluate(el => ({ height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight) }));
+  const dimensions = await value.evaluate(el => ({
+    height: el.getBoundingClientRect().height,
+    lineHeight: parseFloat(getComputedStyle(el).lineHeight) || (parseFloat(getComputedStyle(el).fontSize || '14') * 1.2),
+  }));
   expect(dimensions.height).toBeLessThanOrEqual(dimensions.lineHeight + 1);
 });
 
@@ -4286,7 +4291,7 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
   const recentRate = page.locator('#progress-stats .metric').nth(3).locator('strong');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeNull();
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('—');
+  await expect(page.locator('#progress-stats .metric').nth(4).locator('strong')).toHaveText('—');
   await expect(recentRate).toHaveText('—');
   await expect(page.locator('#progress-notes')).toContainText('at least 7 days');
 
@@ -4407,7 +4412,8 @@ test('adding food defaults to today even when a past diary date was viewed, and 
 
   // 2. Switch back to Home (today) and add food to Snack
   await openView(page, 'home');
-  await page.locator('#today-meals [data-action="add-food"][data-meal="snack"]').first().click();
+  await page.locator('#home-meals [data-toggle-meal]').filter({ hasText: 'Перекус' }).click();
+  await page.locator('#home-meals [data-action="add-food"][data-meal="snack"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await expect(page.locator('#food-date')).toHaveValue('2026-11-02');
 
@@ -4440,6 +4446,7 @@ test('adding food directly from diary retains historical date and announces meal
   await page.fill('#diary-date', '2026-10-25');
   await page.locator('#diary-date').dispatchEvent('change');
 
+  await page.locator('#diary-meals [data-toggle-meal]').filter({ hasText: 'Обід' }).click();
   await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await expect(page.locator('#food-date')).toHaveValue('2026-10-25');
@@ -4475,7 +4482,7 @@ test('progress statistics cards follow the two-column mobile order: trend/goal/f
   // Column 1 (Left column in row-based 2-col grid: indices 0, 2, 4)
   await expect(metrics.nth(0)).toContainText('Трендова вага');
   await expect(metrics.nth(2)).toContainText('До цілі');
-  await expect(metrics.nth(4)).toContainText('Прогноз досягнення цілі');
+  await expect(metrics.nth(4)).toContainText('Прогноз дати');
 
   // Column 2 (Right column in row-based 2-col grid: indices 1, 3, 5)
   await expect(metrics.nth(1)).toContainText('Середня втрата ваги за день');
