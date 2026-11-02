@@ -4089,23 +4089,29 @@ test('profile weight uses its entered date for the exact weekly rate and survive
   expect((await readStore(page)).prefs.currentWeightDate).toBe('2026-10-25');
 });
 
-test('progress displays the recent exact weekly rate separately from the long-term forecast rate', async ({ page }) => {
+test('progress shows recent weekly and average daily change, while keeping the forecast trend internal', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
-    prefs: { ...BASE_PREFS, lang: 'uk', targetWeight: 80 },
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
     foods: [],
     weights: [
-      { id: 'w-old', value: 100, date: '2026-10-01' },
-      { id: 'w-profile-start', value: 97, date: '2026-10-25' },
-      { id: 'w-current', value: 95.5, date: '2026-11-01' },
+      { id: 'w-oct-26', value: 96.5, date: '2026-10-26' },
+      { id: 'w-oct-30', value: 96, date: '2026-10-30' },
+      { id: 'w-oct-31', value: 95.6, date: '2026-10-31' },
+      { id: 'w-nov-02', value: 95.5, date: '2026-11-02' },
     ],
   });
   await page.evaluate(() => showView('stats'));
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.50');
-  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).not.toHaveText('-1.50');
+  await expect(page.locator('#progress-stats .metric')).toHaveCount(6);
+  await expect(page.locator('#progress-stats .metric').nth(0)).toContainText('згладжене середнє за останні 7 днів');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.00');
   await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('За останні 7 днів');
-  await expect(page.locator('#progress-stats .metric').nth(2)).toContainText('Довгостроковий тренд для прогнозу');
+  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(2)).toContainText('Середня втрата ваги за день');
+  await expect(page.locator('#progress-stats')).not.toContainText('Довгостроковий тренд для прогнозу');
+  await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
+  await expect(page.locator('#progress-stats .metric').last().locator('strong')).not.toHaveText('—');
 });
 
 test('recent weekly rate uses the actual last seven-day window from screenshot weigh-ins', async ({ page }) => {
@@ -4124,7 +4130,11 @@ test('recent weekly rate uses the actual last seven-day window from screenshot w
   await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1, 8);
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
   await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.00');
-  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('-1.26');
+  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('0.188');
+  await expect.poll(() => page.evaluate(() => progressInfo().averageDailyLoss)).toBeCloseTo(0.1875, 8);
+  await expect(page.locator('#progress-stats')).toContainText('Загальна втрата від ваги в профілі');
+  await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('1.5');
+  await expect.poll(() => page.evaluate(() => progressInfo().totalLost)).toBeCloseTo(1.5, 8);
 });
 
 test('profile weight date can be backfilled from the calendar and a new weight defaults to today', async ({ page }) => {
@@ -4145,6 +4155,42 @@ test('profile weight date can be backfilled from the calendar and a new weight d
   await page.locator('#save-profile').click();
   await expect.poll(async () => (await readStore(page)).prefs.currentWeight).toBe(95.5);
   expect((await readStore(page)).prefs.currentWeightDate).toBe('2026-11-02');
+});
+
+test('new profiles assign the profile weight date automatically without a date input', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false, currentWeight: null, currentWeightDate: null }, foods: [], weights: [] });
+  await page.locator('#onboarding-choice-guest').click();
+  await expect(page.locator('#onboard-weight-date-field')).toBeHidden();
+  await page.evaluate(() => {
+    const el = document.querySelector('#onboard-weight'); el.value = '70'; el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#onboarding-save').click();
+  await expect.poll(async () => (await readStore(page)).prefs.currentWeightDate).toBe('2026-11-02');
+  await openView(page, 'settings');
+  await expect(page.locator('#profile-weight-date-field')).toBeHidden();
+});
+
+test('legacy profiles without a saved weight date keep the manual backfill field', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, name: 'Legacy profile', currentWeight: 97, currentWeightDate: null }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  await expect(page.locator('#profile-weight-date-field')).toBeVisible();
+  await page.locator('#profile-weight-date').click();
+  await expect(page.locator('#cal-title')).toBeVisible();
+});
+
+test('weight and kg stay on one line in mobile weight history', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, currentWeight: 97, currentWeightDate: '2026-10-25' },
+    foods: [],
+    weights: [{ id: 'w-mobile', value: 95.5, date: '2026-11-02' }],
+  });
+  const value = page.locator('#weight-history .weight-value').first();
+  await expect(value).toContainText('kg');
+  await expect.poll(() => value.evaluate(el => getComputedStyle(el).whiteSpace)).toBe('nowrap');
+  const dimensions = await value.evaluate(el => ({ height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight) }));
+  expect(dimensions.height).toBeLessThanOrEqual(dimensions.lineHeight + 1);
 });
 
 test('home weight card uses the newest date across profile and diary records', async ({ page }) => {
@@ -4239,14 +4285,14 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
   await page.evaluate(() => showView('stats'));
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
   const recentRate = page.locator('#progress-stats .metric').nth(1).locator('strong');
-  const rate = page.locator('#progress-stats .metric').nth(2).locator('strong');
-  await expect(rate).toHaveText('—');
+  await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeNull();
+  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).toHaveText('—');
   await expect(recentRate).toHaveText('—');
   await expect(page.locator('#progress-notes')).toContainText('at least 7 days');
 
   await page.clock.setFixedTime(new Date('2026-11-01T12:01:00'));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect(rate).not.toHaveText('—');
+  await expect.poll(() => page.evaluate(() => progressInfo().rate)).not.toBeNull();
   await expect(page.locator('#progress-notes')).not.toContainText('at least 7 days');
   const forecast = page.locator('#progress-stats .metric').last().locator('strong');
   await expect(forecast).not.toHaveText('—');
