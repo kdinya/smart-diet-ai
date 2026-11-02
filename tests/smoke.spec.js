@@ -336,6 +336,13 @@ async function readStore(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-v1') || '{}'));
 }
 
+async function openDietitianChat(page) {
+  await page.locator('#chat-fab').click();
+  await expect(page.locator('#chat-fab')).toHaveClass(/is-expanded/);
+  await page.locator('#chat-fab').click();
+  await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+}
+
 async function openView(page, view) {
   await page.locator(`#nav:visible [data-view="${view}"], #mobile-nav:visible [data-view="${view}"]`).click();
   await expect(page.locator(`#view-${view}`)).toHaveClass(/active/);
@@ -1658,7 +1665,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('dietitian has no meal selector and shows meal choice only in add configuration', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    await page.click('#chat-fab');
+    await openDietitianChat(page);
     await expect(page.locator('#chat-meal')).toHaveCount(0);
     await expect(page.locator('#chat-panel .chat-context select')).toHaveCount(0);
   });
@@ -1697,13 +1704,13 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const meals = await page.evaluate(() => [8, 12, 15, 16, 21].map((h) => autoMeal(h)));
     expect(meals).toEqual(['breakfast', 'lunch', 'lunch', 'dinner', 'dinner']);
-    await page.click('#chat-fab');
+    await openDietitianChat(page);
     await expect(page.locator('#chat-meal')).toHaveCount(0);
   });
 
   test('dietitian input grows up to five lines and then scrolls', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    await page.click('#chat-fab');
+    await openDietitianChat(page);
     const input = page.locator('#chat-input');
     const one = (await input.boundingBox()).height;
     await input.fill('1\n2\n3');
@@ -2834,7 +2841,7 @@ test.describe('Smoke: AI provider fallback', () => {
         }) }] } }],
       }),
     }));
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await page.locator('#chat-input').fill('chicken');
     await page.locator('#chat-send').click();
     const addButton = page.locator('#chatbox .chat-product-plus');
@@ -3119,10 +3126,31 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
   });
 });
 
+test.describe('Smoke: dietitian launcher', () => {
+  test('compact launcher expands on first click and opens chat on second click', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const fab = page.locator('#chat-fab');
+    await expect(fab).toBeVisible();
+    await expect(fab).not.toHaveClass(/is-expanded/);
+    await expect(fab).toHaveAttribute('aria-expanded', 'false');
+    await fab.click();
+    await expect(fab).toHaveClass(/is-expanded/);
+    await expect(fab).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
+    await fab.click();
+    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+    await expect(fab).toHaveAttribute('aria-expanded', 'true');
+    await expect(fab).not.toHaveClass(/is-expanded/);
+    await page.locator('#chat-close').click();
+    await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
+    await expect(fab).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
 test.describe('Smoke: dialog focus', () => {
   test('opening the dietitian chat does not open the keyboard by itself', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await expect(page.locator('#chat-panel')).toHaveClass(/open/);
     await expect(page.locator('#chat-input')).not.toBeFocused();
   });
@@ -3711,7 +3739,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
       { name: 'Йогурт', grams: 120, kcal: 90, protein: 8, fat: 2, carbs: 10 },
     ], total: { kcal: 280, protein: 15, fat: 5, carbs: 42 }, note: '' });
     await page.route('https://api.groq.com/**', (route) => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: json } }] }) }));
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await page.locator('#chat-input').fill('перекус');
     await page.locator('#chat-send').click();
 
@@ -3760,16 +3788,16 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
     const reply = JSON.stringify({ items: [{ name: 'Вівсянка', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 }], total: { kcal: 190, protein: 7, fat: 3, carbs: 32 }, note: 'Орієнтовна порція.' });
     await page.route('https://api.groq.com/**', route => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: reply } }] }) }));
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await page.locator('#chat-input').fill('вівсянка');
     await page.locator('#chat-send').click();
     await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
     await page.locator('#chat-close').click();
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await expect(page.locator('#chatbox .chat-product-row')).toHaveCount(1);
     const savedKey = await page.evaluate(() => Object.keys(localStorage).find(key => key === 'smartdiet-dietitian-chat-v1:local'));
     expect(savedKey).toBe('smartdiet-dietitian-chat-v1:local');
@@ -3803,7 +3831,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('smartdiet-dietitian-chat-v1:local') || '[]'))).toEqual([]);
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await expect(page.locator('#chatbox .bubble:not(#chat-welcome)')).toHaveCount(0);
   });
 
@@ -3869,7 +3897,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
       sent = route.request().postData() || '';
       return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ items: [{ name: 'Млинці на молоці', grams: 180, kcal: 360, protein: 12, fat: 10, carbs: 55 }], total: { kcal: 360, protein: 12, fat: 10, carbs: 55 }, note: 'Орієнтовна оцінка готової страви.' }) } }] }) });
     });
-    await page.locator('#chat-fab').click();
+    await openDietitianChat(page);
     await page.locator('#chat-input').fill('млинці на молоці');
     await page.locator('#chat-send').click();
     await expect.poll(() => sent).toContain('рахуй це як ОДНУ готову страву');
