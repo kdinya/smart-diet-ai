@@ -1,5 +1,5 @@
-const CACHE='smart-diet-shell-v145';
-const SHELL=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js'];
+const CACHE='smart-diet-shell-v146';
+const SHELL=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js','./eco-bot-realistic.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())
