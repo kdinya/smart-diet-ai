@@ -113,6 +113,14 @@
 
 ## 3. Pre-Flight Verification Checklist
 
+### Test Requirements
+- Before changing code, inspect `package.json` and the relevant CI workflow to identify the available test commands and checks.
+- For every code change, run the most relevant targeted test(s). For UI behavior, use the matching Playwright smoke tests; run the full smoke suite when practical and whenever the change may affect shared flows.
+- Run the applicable syntax/static checks from CI for the files changed. Do not claim a test passed unless it was actually run and its result was observed.
+- Do not weaken, remove, or broadly skip a test just to make a run green. Fix stale assertions only when they conflict with the intended behavior, and add regression coverage for the behavior being changed.
+- In the completion report, name the commands run and summarize pass/fail counts. Clearly state any suite that could not be completed and why.
+
+
 Before pushing any commit:
 
 1. **Syntax & Integrity Checks:**

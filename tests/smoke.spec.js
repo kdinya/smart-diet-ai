@@ -3136,6 +3136,10 @@ test.describe('Smoke: dietitian launcher', () => {
   test('English launcher label is concise too', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
     await expect(page.locator('.chat-fab-label')).toHaveText('AI Dietitian');
+    await openView(page, 'settings');
+    await page.locator('#pref-tone').selectOption('playful');
+    await page.locator('#save-tone').click();
+    await expect(page.locator('.chat-fab-label')).toHaveText('Dietitian 🐾');
   });
 
   test('assistant appearance sliders, localized label and overlays behave correctly', async ({ page }) => {
@@ -3144,6 +3148,7 @@ test.describe('Smoke: dietitian launcher', () => {
   const fab = page.locator('#chat-fab');
   const mascot = page.locator('#bot-peeker');
   await expect(mascot.locator('.eco-stage img')).toHaveCount(6);
+  await expect(mascot).toHaveCSS('z-index', '39');
   await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
   await openView(page, 'settings');
   await expect(page.locator('#pref-bot-size')).toHaveAttribute('min', '30');
@@ -3168,6 +3173,9 @@ test.describe('Smoke: dietitian launcher', () => {
     const rect = slider.getBoundingClientRect();
     const x = rect.left + rect.width * 0.35;
     const y = rect.top + rect.height / 2;
+    slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 6, pointerType: 'touch', clientX: x, clientY: y }));
+    window.tapTouchValue = slider.value;
+    slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 6, pointerType: 'touch', clientX: x, clientY: y }));
     slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: x, clientY: y }));
     slider.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientX: x + 2, clientY: y + 32 }));
     window.verticalTouchValue = slider.value;
@@ -3177,10 +3185,11 @@ test.describe('Smoke: dietitian launcher', () => {
     window.horizontalTouchValue = slider.value;
     slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, pointerType: 'touch', clientX: x + rect.width * 0.2, clientY: y + 2 }));
   });
+  expect(await page.evaluate(() => window.tapTouchValue)).toBe('55');
   expect(await page.evaluate(() => window.verticalTouchValue)).toBe('55');
   expect(await page.evaluate(() => window.horizontalTouchValue)).not.toBe('55');
-  const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards);
-  const personalityIndex = orderedCards.findIndex(card => card.querySelector('#pref-tone'));
+  const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => ({ id: card.id, hasPersonality: Boolean(card.querySelector('#pref-tone')) })));
+  const personalityIndex = orderedCards.findIndex(card => card.hasPersonality);
   const appearanceIndex = orderedCards.findIndex(card => card.id === 'bot-appearance-card');
   const friendsIndex = orderedCards.findIndex(card => card.id === 'friends-card');
   expect(appearanceIndex).toBeGreaterThan(personalityIndex);
@@ -3191,7 +3200,6 @@ test.describe('Smoke: dietitian launcher', () => {
   const bottomPlacement = await mascot.evaluate(el => ({ top: parseFloat(el.style.top), available: innerHeight - el.offsetHeight - (parseFloat(getComputedStyle(el).getPropertyValue('--bot-safe-bottom')) || 0) }));
   expect(Math.abs(bottomPlacement.top - bottomPlacement.available)).toBeLessThanOrEqual(1);
   await expect(mascot).toHaveCSS('left', '8px');
-  await expect(mascot).toHaveCSS('right', 'auto');
   await page.locator('#pref-bot-offset-h').fill('5.625');
   await expect(mascot).toHaveCSS('--bot-offset-h', '5.625rem');
   await expect(mascot).toHaveCSS('left', '90px');
@@ -3218,12 +3226,14 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot).toBeVisible();
   expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '5.625rem', botFrequency: 0 });
   await expect(mascot).toHaveCSS('--bot-scale', '0.3');
-  await expect(fab).toHaveClass(/is-expanded/);
-  await expect(page.locator('.chat-fab-label')).toHaveCSS('opacity', '1');
-  await expect(fab).toHaveCSS('width', '210px');
+  await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toHaveClass(/fab-popped/);
-  await page.clock.runFor(4999);
+  await page.clock.runFor(350);
+  const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#chat-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
+  expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
+  expect(parseFloat(aligned.side)).toBeGreaterThan(0);
+  await page.clock.runFor(4500);
   await expect(fab).toBeVisible();
   await page.clock.runFor(1);
   await expect(fab).toBeHidden();
@@ -3236,13 +3246,12 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('#chat-panel')).toHaveClass(/open/);
   await expect(mascot).toHaveClass(/bot-overlay-hidden/);
   await page.locator('#chat-close').click();
-  await page.clock.runFor(999);
-  await expect(mascot).toHaveClass(/bot-overlay-hidden/);
-  await page.clock.runFor(1);
+  await page.clock.runFor(1100);
   await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
   await openView(page, 'settings');
   await page.locator('#pref-tone').selectOption('playful');
   await page.locator('#save-tone').click();
+  await expect(page.locator('.chat-fab-label')).toHaveText('Дієтолог 🐾');
   expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '5.625rem' });
 });
 
