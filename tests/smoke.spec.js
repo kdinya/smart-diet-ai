@@ -4069,11 +4069,13 @@ test('profile weight uses its entered date for the exact weekly rate and survive
     foods: [],
     weights: [{ id: 'w-after-profile', value: 95.5, date: '2026-11-01' }],
   });
-  await openView(page, 'stats');
-  await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.5, 8);
+  await page.evaluate(() => showView('stats'));
+  await expect(page.locator('#view-stats')).toHaveClass(/active/);
+  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1.5, 8);
   await expect(page.locator('#weight-history')).toContainText('10/25/2026');
 
-  await openView(page, 'settings');
+  await page.evaluate(() => showView('settings'));
+  await expect(page.locator('#view-settings')).toHaveClass(/active/);
   await expect(page.locator('#profile-weight-date')).toHaveValue('2026-10-25');
   await page.fill('#pref-name', 'Weight tester updated');
   await page.locator('#save-profile').click();
@@ -4081,6 +4083,24 @@ test('profile weight uses its entered date for the exact weekly rate and survive
   await page.reload();
   await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
   expect((await readStore(page)).prefs.currentWeightDate).toBe('2026-10-25');
+});
+
+test('progress displays the recent exact weekly rate separately from the all-history forecast rate', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', targetWeight: 80 },
+    foods: [],
+    weights: [
+      { id: 'w-old', value: 100, date: '2026-10-01' },
+      { id: 'w-profile-start', value: 97, date: '2026-10-25' },
+      { id: 'w-current', value: 95.5, date: '2026-11-01' },
+    ],
+  });
+  await page.evaluate(() => showView('stats'));
+  await expect(page.locator('#view-stats')).toHaveClass(/active/);
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-1.50');
+  await expect(page.locator('#progress-stats .metric').nth(2).locator('strong')).not.toHaveText('-1.50');
+  await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('За останні 7 днів');
 });
 
 test('profile weight date can be backfilled from the calendar and a new weight defaults to today', async ({ page }) => {
@@ -4146,6 +4166,7 @@ test('diary weigh-in takes precedence over a profile weight on the same date', a
 });
 
 test('weight rate and forecast start on day seven, use all weigh-ins, and refresh daily', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-31T12:00:00') });
   await openApp(page, {
     prefs: { ...BASE_PREFS, targetWeight: 70 },
     foods: [],
@@ -4153,13 +4174,15 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
       { id: 'w-day-1', value: 80, date: '2026-10-25' },
       { id: 'w-day-3', value: 79.6, date: '2026-10-28' },
       { id: 'w-day-6', value: 79.2, date: '2026-10-31' },
+      { id: 'w-day-7', value: 79.1, date: '2026-11-01' },
     ],
   });
-  await page.clock.install({ time: new Date('2026-10-31T12:00:00') });
-  await page.evaluate(() => render());
-  await openView(page, 'stats');
-  const rate = page.locator('#progress-stats .metric').nth(1).locator('strong');
+  await page.evaluate(() => showView('stats'));
+  await expect(page.locator('#view-stats')).toHaveClass(/active/);
+  const recentRate = page.locator('#progress-stats .metric').nth(1).locator('strong');
+  const rate = page.locator('#progress-stats .metric').nth(2).locator('strong');
   await expect(rate).toHaveText('—');
+  await expect(recentRate).toHaveText('—');
   await expect(page.locator('#progress-notes')).toContainText('at least 7 days');
 
   await page.clock.setFixedTime(new Date('2026-11-01T12:01:00'));
@@ -4179,6 +4202,7 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
     save();
   });
   const allHistoryRate = await page.evaluate(() => progressInfo().rate);
+  const recentWeekRate = await page.evaluate(() => progressInfo().lastWeekRate);
   const expectedAllHistoryRate = await page.evaluate(() => {
     const points = weightObservations().map((item) => ({ n: dayNum(item.d), v: item.v }));
     return slopePerDay(points) * 7;
@@ -4189,8 +4213,9 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
     return slopePerDay(points) * 7;
   });
   expect(allHistoryRate).toBeCloseTo(expectedAllHistoryRate, 8);
+  expect(recentWeekRate).toBeCloseTo(-0.9, 8);
   expect(allHistoryRate).not.toBeCloseTo(recentWindowRate, 2);
-  expect((await readStore(page)).weights).toHaveLength(4);
+  expect((await readStore(page)).weights).toHaveLength(5);
 });
 
 test('latest weight card keeps only the adjacent shortcut to weight trend', async ({ page }) => {
