@@ -6,8 +6,10 @@ module.exports = defineConfig({
   testDir: './tests',
   testMatch: '**/*.spec.js',
   timeout: 60_000,
-  workers: 1,
+  fullyParallel: true,
+  workers: Number(process.env.PW_WORKERS || 2),
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: Boolean(process.env.CI),
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${port}`,
@@ -24,7 +26,7 @@ module.exports = defineConfig({
   webServer: {
     command: `node tests/serve.js ${port}`,
     url: `http://localhost:${port}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 15_000,
   },
 });

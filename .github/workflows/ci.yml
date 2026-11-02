@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '15 3 * * *'
 
 jobs:
   smoke:
@@ -24,15 +26,24 @@ jobs:
           node --check tests/smoke.spec.js
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Record test runtime versions
+        run: |
+          node --version
+          npm --version
+          npx playwright --version
+          node -e "console.log('Playwright Chromium:', require('@playwright/test').chromium.executablePath())"
       - run: npm run test:smoke
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-results
-          path: test-results/
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
 
   database:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
