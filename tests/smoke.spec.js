@@ -1823,6 +1823,20 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#daily-rec-result')).toContainText(kcal);
   });
 
+  test('changing plan details calculates the daily calorie recommendation even without an earlier one', async ({ page }) => {
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, name: 'Anna', kcal: 2000, sex: 'female', birthDate: '1990-01-01', height: 170, currentWeight: 80, targetWeight: 70, activity: 'low', pace: 20 },
+      foods: [],
+      weights: [],
+    });
+    await openView(page, 'settings');
+    await page.fill('#profile-weight', '90');
+    await page.click('#save-profile');
+    const kcal = await page.locator('#pref-kcal').inputValue();
+    expect(kcal).not.toBe('2000');
+    await expect(page.locator('#daily-rec-result')).toContainText(kcal);
+  });
+
   test('editing the weight recalculates calories and macros proportionally', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, {
