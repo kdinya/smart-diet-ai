@@ -4033,6 +4033,54 @@ test('save buttons keep the product and diary labels after a re-render', async (
   await expect(page.locator('#food-save')).toHaveText(await page.evaluate(() => t('saveChanges')));
 });
 
+test('weight rate and forecast start on day seven, use all weigh-ins, and refresh daily', async ({ page }) => {
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, targetWeight: 70 },
+    foods: [],
+    weights: [
+      { id: 'w-day-1', value: 80, date: '2026-10-25' },
+      { id: 'w-day-3', value: 79.6, date: '2026-10-28' },
+      { id: 'w-day-6', value: 79.2, date: '2026-10-31' },
+    ],
+  });
+  await page.clock.install({ time: new Date('2026-10-31T12:00:00') });
+  await page.evaluate(() => render());
+  await openView(page, 'stats');
+  const rate = page.locator('#progress-stats .metric').nth(1).locator('strong');
+  await expect(rate).toHaveText('—');
+  await expect(page.locator('#progress-notes')).toContainText('at least 3 weigh-ins');
+
+  await page.clock.setFixedTime(new Date('2026-11-01T12:01:00'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(rate).not.toHaveText('—');
+  await expect(page.locator('#progress-notes')).not.toContainText('at least 3 weigh-ins');
+  const forecast = page.locator('#progress-stats .metric').last().locator('strong');
+  await expect(forecast).not.toHaveText('—');
+  const firstForecast = await forecast.textContent();
+
+  await page.clock.setFixedTime(new Date('2026-11-02T12:02:00'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(forecast).not.toHaveText(firstForecast);
+
+  await page.evaluate(() => {
+    state.weights.push({ id: 'w-older-than-28-days', value: 100, date: '2026-09-01' });
+    save();
+  });
+  const allHistoryRate = await page.evaluate(() => progressInfo().rate);
+  const expectedAllHistoryRate = await page.evaluate(() => {
+    const points = trendSeries().map((item) => ({ n: dayNum(item.d), v: item.tr }));
+    return slopePerDay(points) * 7;
+  });
+  const recentWindowRate = await page.evaluate(() => {
+    const today = dayNum(iso());
+    const points = trendSeries().filter((item) => dayNum(item.d) > today - 28).map((item) => ({ n: dayNum(item.d), v: item.tr }));
+    return slopePerDay(points) * 7;
+  });
+  expect(allHistoryRate).toBeCloseTo(expectedAllHistoryRate, 8);
+  expect(allHistoryRate).not.toBeCloseTo(recentWindowRate, 2);
+  expect((await readStore(page)).weights).toHaveLength(4);
+});
+
 test('latest weight card keeps only the adjacent shortcut to weight trend', async ({ page }) => {
   await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [{ id: 'w-1', value: 74.5, date: '2026-10-30' }] });
   await expect(page.locator('.weight-card')).toBeVisible();
