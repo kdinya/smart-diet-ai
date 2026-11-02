@@ -3133,53 +3133,52 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
 });
 
 test.describe('Smoke: dietitian launcher', () => {
-  test('settings switch between the peeking mascot and the two-step button with position and vertical controls', async ({ page }) => {
-    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    const fab = page.locator('#chat-fab');
-    const mascot = page.locator('#bot-peeker');
-    await expect(mascot).toBeVisible();
-    await expect(fab).toBeHidden();
-    await mascot.click();
-    await expect(fab).toHaveClass(/fab-popped/);
-    await fab.click();
-    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
-    await page.locator('#chat-close').click();
-    await expect(page.locator('#chat-panel')).toBeHidden();
+  test('assistant appearance sliders, localized label and overlays behave correctly', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  await page.clock.install();
+  const fab = page.locator('#chat-fab');
+  const mascot = page.locator('#bot-peeker');
+  await expect(mascot.locator('.eco-stage img')).toHaveCount(6);
+  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ-дієтолог 😉');
+  await openView(page, 'settings');
+  const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards);
+  const personalityIndex = orderedCards.findIndex(card => card.querySelector('#pref-tone'));
+  const appearanceIndex = orderedCards.findIndex(card => card.id === 'bot-appearance-card');
+  const friendsIndex = orderedCards.findIndex(card => card.id === 'friends-card');
+  expect(appearanceIndex).toBeGreaterThan(personalityIndex);
+  expect(appearanceIndex).toBeLessThan(friendsIndex);
+  await page.locator('#pref-bot-size').fill('80');
+  await page.locator('#pref-bot-offset-v').fill('28');
+  await page.locator('#pref-bot-frequency').selectOption('0');
+  await page.locator('#save-bot-settings').click();
+  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.8', botOffsetV: '28vh', botFrequency: 0 });
+  await expect(mascot).toHaveCSS('--bot-scale', '0.8');
+  await mascot.click();
+  await expect(fab).toHaveClass(/fab-popped/);
+  await page.clock.runFor(4999);
+  await expect(fab).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(fab).toBeHidden();
+  await mascot.click();
+  await expect(fab).toBeVisible();
+  await page.locator('#view-settings h2').first().click();
+  await expect(fab).toBeHidden();
+  await mascot.click();
+  await fab.click();
+  await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+  await expect(mascot).toHaveClass(/bot-overlay-hidden/);
+  await page.locator('#chat-close').click();
+  await page.clock.runFor(999);
+  await expect(mascot).toHaveClass(/bot-overlay-hidden/);
+  await page.clock.runFor(1);
+  await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
+  await openView(page, 'settings');
+  await page.locator('#pref-tone').selectOption('playful');
+  await page.locator('#save-tone').click();
+  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.8', botOffsetV: '28vh' });
+});
 
-    await openView(page, 'settings');
-    await page.selectOption('#pref-bot-mode', 'button');
-    await page.selectOption('#pref-bot-size', '0.8');
-    await page.selectOption('#pref-bot-frequency', '0');
-    await page.locator('#save-bot-settings').click();
-    await expect(fab).toBeVisible();
-    await expect(mascot).toBeHidden();
-    await expect(page.locator('#pref-bot-size')).toHaveValue('0.8');
-    expect((await readStore(page)).prefs).toMatchObject({ botMode: 'button', botSize: '0.8', botFrequency: 0 });
-
-    await page.reload();
-    await expect(page.locator('#chat-fab')).toBeVisible();
-    await expect(page.locator('#bot-peeker')).toBeHidden();
-
-    await openView(page, 'settings');
-    await page.selectOption('#pref-bot-mode', 'mascot');
-    await page.selectOption('#pref-bot-size', '1.2');
-    await page.selectOption('#pref-bot-side', 'left');
-    await page.selectOption('#pref-bot-offset-v', '28vh');
-    await page.selectOption('#pref-bot-frequency', '60000');
-    await page.locator('#save-bot-settings').click();
-    await expect(page.locator('#bot-peeker')).toBeVisible();
-    await expect(page.locator('#chat-fab')).toBeHidden();
-    await expect(page.locator('#bot-peeker')).toHaveClass(/bot-side-left/);
-    await expect(page.locator('#bot-peeker')).toHaveCSS('--bot-scale', '1.2');
-    await expect(page.locator('#bot-peeker')).toHaveCSS('--bot-offset-v', '28vh');
-
-    await page.locator('#bot-peeker').click();
-    await expect(page.locator('#chat-fab')).toHaveClass(/fab-popped/);
-    await page.locator('#chat-fab').click();
-    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
-  });
-
-  test('button launcher expands on first click and opens chat on second click', async ({ page }) => {
+test('button launcher expands on first click and opens chat on second click', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button' }, foods: [], weights: [] });
     const fab = page.locator('#chat-fab');
     await expect(fab).toBeVisible();
