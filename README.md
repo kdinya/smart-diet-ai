@@ -41,6 +41,7 @@
 - Pick any date in the calendar. The food diary highlights days with meals, and the weight-entry calendar highlights days with recorded weigh-ins.
 - Meal drafts are stored only in this browser and tied to the account signed in on this device. They are not synced to the cloud and do not move to another device or account.
 - Settings and goals are backed up on this device even before any food, weight or product is logged. The three most recent archives of other accounts are kept; to keep a new archive, the oldest one is removed only after you confirm.
+- **Activity log:** the app keeps a log of recent actions on this device: diary entries, weight, goals, profile, product changes, shared products and backups. Open it from Settings or from My products.
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
 
