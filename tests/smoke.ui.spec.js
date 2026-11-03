@@ -2580,8 +2580,14 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
   await expect(page.locator('.bot-sleepwear-art')).toBeVisible();
-  await expect(page.locator('.pajama-shirt .fabric')).toBeVisible();
-  await expect(page.locator('.sleep-cap .fabric')).toBeVisible();
+  const shirtFabric = page.locator('.pajama-shirt .fabric');
+  await expect(shirtFabric).toHaveCount(2);
+  await expect(shirtFabric.first()).toBeVisible();
+  await expect(shirtFabric.nth(1)).toBeVisible();
+  const capFabric = page.locator('.sleep-cap .fabric');
+  await expect(capFabric).toHaveCount(2);
+  await expect(capFabric.first()).toBeVisible();
+  await expect(capFabric.nth(1)).toBeVisible();
   await expect(zzz).toHaveClass(/is-sleeping/);
 
   await mascot.click();
