@@ -3263,6 +3263,11 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('#bot-settings-fab')).toBeVisible();
   await expect(page.locator('#bot-settings-fab svg circle')).toHaveCount(4);
   await expect(page.locator('#bot-settings-fab svg path')).toHaveCount(2);
+  await expect(fab).toHaveCSS('animation-name', 'bot-action-unfurl');
+  await expect(page.locator('#bot-settings-fab')).toHaveCSS('animation-name', 'bot-action-unfurl');
+  await expect(fab).toHaveCSS('animation-duration', '0.9s');
+  await expect(fab).toHaveCSS('--bot-menu-from-x', /px$/);
+  await expect(page.locator('#bot-settings-fab')).toHaveCSS('--bot-menu-from-y', /px$/);
   await page.clock.runFor(350);
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
