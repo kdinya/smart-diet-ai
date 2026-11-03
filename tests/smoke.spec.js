@@ -3358,6 +3358,51 @@ test.describe('Smoke: dietitian launcher', () => {
   expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
 });
 
+test('mirrored assistant is opt-in, symmetric, persistent, and opens the same actions', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  await page.clock.install();
+  const mirror = page.locator('#bot-peeker-mirror');
+  const mirrorSwitch = page.locator('#pref-bot-mirror-enabled');
+  const main = page.locator('#bot-peeker');
+  await expect(mirror).toBeHidden();
+  await openView(page, 'settings');
+  await expect(mirrorSwitch).toHaveAttribute('role', 'switch');
+  await expect(mirrorSwitch).toHaveAttribute('aria-checked', 'false');
+  await expect(page.locator('#bot-appearance-card [data-i18n="botMirrorLabel"]')).toHaveText('Показувати дзеркального помічника');
+  await page.clock.runFor(3100);
+  await mirrorSwitch.click();
+  await expect(mirrorSwitch).toHaveAttribute('aria-checked', 'true');
+  await expect(mirror).toBeVisible();
+  await expect(mirror).toHaveClass(/is-arrived/);
+  await expect(main).not.toHaveClass(/bot-side-left/);
+  await expect(mirror).toHaveClass(/bot-side-left/);
+  await expect(mirror.locator('.eco-stage img')).toHaveCount(6);
+  await page.locator('#save-bot-settings').click();
+  expect((await readStore(page)).prefs.botMirrorEnabled).toBe(true);
+  await page.clock.runFor(3000);
+  await mirror.click();
+  await expect(page.locator('#bot-chat-action-fab')).toBeVisible();
+  await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
+  const actionPlacement = await page.evaluate(() => {
+    const bot = document.querySelector('#bot-peeker-mirror').getBoundingClientRect();
+    const chat = document.querySelector('#bot-chat-action-fab');
+    return { botCenter: bot.top + bot.height / 2, actionCenter: parseFloat(chat.style.top) + chat.offsetHeight / 2, side: parseFloat(chat.style.left) };
+  });
+  expect(Math.abs(actionPlacement.botCenter - actionPlacement.actionCenter)).toBeLessThanOrEqual(1);
+  expect(actionPlacement.side).toBeGreaterThan(0);
+  await page.locator('#bot-chat-action-fab').click();
+  await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+  await expect(main).toHaveClass(/bot-overlay-hidden/);
+  await expect(mirror).toHaveClass(/bot-overlay-hidden/);
+  await page.locator('#chat-close').click();
+  await page.clock.runFor(1100);
+  await expect(mirror).not.toHaveClass(/bot-overlay-hidden/);
+  await page.reload();
+  await openView(page, 'settings');
+  await expect(page.locator('#pref-bot-mirror-enabled')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#bot-peeker-mirror')).toBeVisible();
+});
+
 test('disabled assistant restores the original one-click dietitian launcher', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button' }, foods: [], weights: [] });
     const fab = page.locator('#chat-fab');
