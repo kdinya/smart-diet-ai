@@ -3179,6 +3179,18 @@ test.describe('Smoke: dietitian launcher', () => {
     const rect = slider.getBoundingClientRect();
     const x = rect.left + rect.width * 0.35;
     const y = rect.top + rect.height / 2;
+    window.trackTapValues = Object.fromEntries(['#pref-bot-size', '#pref-bot-offset-v', '#pref-bot-offset-h'].map((selector, index) => {
+      const range = document.querySelector(selector);
+      const initial = range.value;
+      const box = range.getBoundingClientRect();
+      const pointerId = 20 + index;
+      range.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId, pointerType: 'touch', clientX: box.left + box.width * 0.4, clientY: box.top + 8 }));
+      range.value = range.min;
+      range.dispatchEvent(new Event('input', { bubbles: true }));
+      const afterTrackInput = range.value;
+      range.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId, pointerType: 'touch' }));
+      return [selector, { initial, afterTrackInput, afterPointerUp: range.value }];
+    }));
     slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 6, pointerType: 'touch', clientX: x, clientY: y }));
     window.tapTouchValue = slider.value;
     slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 6, pointerType: 'touch', clientX: x, clientY: y }));
@@ -3193,6 +3205,11 @@ test.describe('Smoke: dietitian launcher', () => {
     slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, pointerType: 'touch', clientX: x + rect.width * 0.2, clientY: y + 2 }));
   });
   expect(await page.evaluate(() => window.tapTouchValue)).toBe('55');
+  expect(await page.evaluate(() => window.trackTapValues)).toEqual({
+    '#pref-bot-size': { initial: '55', afterTrackInput: '55', afterPointerUp: '55' },
+    '#pref-bot-offset-v': { initial: '11', afterTrackInput: '11', afterPointerUp: '11' },
+    '#pref-bot-offset-h': { initial: '0.5', afterTrackInput: '0.5', afterPointerUp: '0.5' },
+  });
   expect(await page.evaluate(() => window.verticalTouchValue)).toBe('55');
   expect(await page.evaluate(() => window.horizontalTouchValue)).toBe(await page.evaluate(() => window.expectedHorizontalTouchValue));
   const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => ({ id: card.id, hasPersonality: Boolean(card.querySelector('#pref-tone')) })));
@@ -3244,6 +3261,8 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
   await expect(legacyFab).toBeHidden();
   await expect(page.locator('#bot-settings-fab')).toBeVisible();
+  await expect(page.locator('#bot-settings-fab svg circle')).toHaveCount(4);
+  await expect(page.locator('#bot-settings-fab svg path')).toHaveCount(2);
   await page.clock.runFor(350);
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
