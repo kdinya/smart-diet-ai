@@ -12,6 +12,11 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Check JSON and inline script syntax
+        if: matrix.shardIndex == 1
         run: |
           node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8'))"
           node -e "const vm = require('vm'); const html = require('fs').readFileSync('index.html', 'utf8'); [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach((m) => new vm.Script(m[1]))"
@@ -28,18 +34,26 @@ jobs:
           node --check tests/smoke.sync.spec.js
           node --check tests/smoke.ai.spec.js
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium with system dependencies
+        run: npx playwright install --with-deps chromium
       - name: Record test runtime versions
         run: |
           node --version
           npm --version
           npx playwright --version
           node -e "console.log('Playwright Chromium:', require('@playwright/test').chromium.executablePath())"
-      - run: npm run test:smoke
+      - name: Run Playwright smoke tests shard
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-results
+          name: test-results-shard-${{ matrix.shardIndex }}
           path: |
             test-results/
             playwright-report/
@@ -73,7 +87,7 @@ jobs:
             fi
           done
           node --input-type=module <<'NODE'
-          const productionRef = 'wscprmtjjbevesrchhjr';
+          const productionRef = 'wscpmrtjjbevesrchhjq';
           const app = new URL(process.env.TEST_SUPABASE_URL);
           const match = app.hostname.toLowerCase().match(/^([a-z0-9_-]+)\.supabase\.co$/);
           if (!match) throw new Error('TEST_SUPABASE_URL must use <project-ref>.supabase.co');
