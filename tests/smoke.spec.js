@@ -5094,7 +5094,18 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   await page.reload();
   await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
   await expect(page.locator('#bot-peeker')).toHaveClass(/bot-side-left/);
+  await expect(page.locator('#bot-peeker')).toHaveClass(/is-arrived/);
   expect((await readStore(page)).prefs.botSide).toBe('left');
+
+  const box2 = await page.locator('#bot-peeker').boundingBox();
+  const lx = box2.x + box2.width / 2;
+  const ly = box2.y + box2.height / 2;
+  await page.mouse.move(lx, ly);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) await page.mouse.move(lx + i * 40, ly);
+  await page.mouse.up();
+  await expect(page.locator('#bot-peeker')).not.toHaveClass(/bot-side-left/, { timeout: 5000 });
+  await expect.poll(async () => (await readStore(page)).prefs.botSide).toBe('right');
 });
 
 test('a small drag snaps the assistant back and keeps its side on a wide screen', async ({ page }) => {

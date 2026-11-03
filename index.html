@@ -1179,21 +1179,20 @@ let peeker=document.getElementById('bot-peeker'),scratchGesture=null;function en
     }
   };
   async function settle(side,dx){
-    let from=sideOf(),sA=flipOf(from),sB=flipOf(side),A=restOf(from),B=restOf(side),dxRest=B.left-A.left;
+    let from=sideOf(),sA=flipOf(from);
     if(side===from){
       await play([{transform:`translateX(${dx}px) scaleX(${sA})`},{transform:`translateX(0px) scaleX(${sA})`}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});
       finish(from,false);
     }else{
-      await play([{transform:`translateX(${dx}px) scaleX(${sA})`},{transform:`translateX(${dxRest}px) scaleX(${sB})`}],{duration:340,easing:'cubic-bezier(.2,.8,.2,1)'});
-      finish(side,true);
+      await fling(side,dx);
     }
   }
   async function fling(side,dx){
     let from=sideOf(),sA=flipOf(from),sB=flipOf(side),A=restOf(from),B=restOf(side),W=window.innerWidth;
-    let outLeft=side==='left'?-A.width*0.3:W-A.width*0.7;
+    let outLeft=side==='left'?-A.width*1.4:W+A.width*0.4;
     let dxOut=outLeft-A.left,dxRest=B.left-A.left;
     await play([{transform:`translateX(${dx}px) scaleX(${sA})`},{transform:`translateX(${dxOut}px) scaleX(${sA})`}],{duration:320,easing:'cubic-bezier(.55,0,.9,.4)'});
-    await play([{transform:`translateX(${dxOut}px) scaleX(${sA})`},{transform:`translateX(${dxOut}px) scaleX(0)`,offset:.5},{transform:`translateX(${dxOut}px) scaleX(${sB})`}],{duration:300,easing:'ease-in-out'});
+    await play([{transform:`translateX(${dxOut}px) scaleX(${sA})`},{transform:`translateX(${dxOut}px) scaleX(0)`,offset:.5},{transform:`translateX(${dxOut}px) scaleX(${sB})`}],{duration:260,easing:'ease-in-out'});
     await play([{transform:`translateX(${dxOut}px) scaleX(${sB})`},{transform:`translateX(${dxRest}px) scaleX(${sB})`}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
     finish(side,true);
   }
@@ -1227,8 +1226,7 @@ let peeker=document.getElementById('bot-peeker'),scratchGesture=null;function en
     let vx=recent.length>1?(recent[recent.length-1].x-recent[0].x)/Math.max(1,recent[recent.length-1].t-recent[0].t):0;
     let toward=s.side==='right'?-1:1,target=s.side==='right'?'left':'right';
     let towardOpposite=Math.sign(s.dx)===toward;
-    if(towardOpposite&&Math.abs(s.dx)>=48&&Math.abs(vx)>=0.5&&Math.sign(vx)===toward)fling(target,s.dx);
-    else if(towardOpposite&&Math.abs(s.dx)>=window.innerWidth/2)settle(target,s.dx);
+    if(towardOpposite&&((Math.abs(s.dx)>=48&&Math.abs(vx)>=0.5&&Math.sign(vx)===toward)||Math.abs(s.dx)>=window.innerWidth/3))fling(target,s.dx);
     else settle(s.side,s.dx);
   }
   host.addEventListener('pointerdown',e=>{
