@@ -337,3 +337,17 @@ grant select, insert, delete on public.product_shares to authenticated;
 -- Optional metadata preserves snack grouping and diary order across devices.
 alter table public.food_entries add column if not exists snack_id text;
 alter table public.food_entries add column if not exists meal_order numeric;
+
+-- App user nicknames for the Friends counter: display names only, no ids, codes or emails.
+create or replace function public.app_user_names()
+returns table (display_name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.display_name from public.profiles p
+  order by lower(p.display_name), p.user_id;
+$$;
+revoke all on function public.app_user_names() from public, anon;
+grant execute on function public.app_user_names() to authenticated;

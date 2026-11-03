@@ -181,6 +181,8 @@ async function run() {
   check('Anonymous visitor cannot read profiles table', emptyOrDenied(rAnon), describe(rAnon));
   rAnon = await rpc('request_friend', { body: { code: 'AAAAAAAA' } });
   check('Anonymous visitor cannot call request_friend', denied(rAnon), describe(rAnon));
+  rAnon = await rpc('app_user_names', { body: {} });
+  check('Anonymous visitor cannot call app_user_names', denied(rAnon), describe(rAnon));
   let rLimits = await rest('friend_request_limits', { as: 'a' });
   check('Friend rate-limit table is hidden from users', denied(rLimits), describe(rLimits));
 
@@ -296,6 +298,10 @@ async function run() {
   check('Profile is hidden after unfriending', emptyOrDenied(r), describe(r));
   r = await rest('product_shares', { as: 'a', method: 'POST', body: shareBody(A, B, 'CI after unfriend') });
   check('Cannot share after unfriending', denied(r), describe(r));
+
+  r = await rpc('app_user_names', { as: 'a', body: {} });
+  check('Signed-in user can read app user names', Array.isArray(r.json) && r.json.length >= 2, describe(r));
+  check('App user names expose only display_name', Array.isArray(r.json) && r.json.every(row => Object.keys(row).join() === 'display_name'), describe(r));
 
   // Deleting an account removes its data
   r = await admin('DELETE', `/users/${A}`);

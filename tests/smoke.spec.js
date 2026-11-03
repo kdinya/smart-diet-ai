@@ -143,6 +143,11 @@ async function mockSupabase(page, backend) {
       return handleRequestFriend(req, backend, json);
     }
 
+    if (url.pathname === '/rest/v1/rpc/app_user_names') {
+      if (!userIdFromRequest(req)) return json(401, { message: 'JWT required' });
+      return json(200, backend.tables.profiles.map((row) => ({ display_name: row.display_name })));
+    }
+
     if (url.pathname === '/rest/v1/weight_entries' && req.method() === 'POST' && backend.delayWeightWrites) {
       await new Promise((resolve) => setTimeout(resolve, backend.delayWeightWrites));
     }
@@ -3300,12 +3305,13 @@ test.describe('Smoke: dietitian launcher', () => {
     for (const actionLayer of assistantLayers.actions) expect(actionLayer).toBeGreaterThan(overlayLayer);
     expect(assistantLayers.poppedChat).toBeLessThan(overlayLayer);
   }
-  for (const action of [fab, page.locator('#bot-settings-fab')]) {
+  for (const [action, iconSize] of [[fab, '39px'], [page.locator('#bot-settings-fab'), '43.5px']]) {
     const icon = action.locator('svg');
     await expect(icon).toHaveCSS('animation-name', 'bot-action-icon-spin');
     await expect(icon).toHaveCSS('animation-duration', '0.9s');
     await expect(icon).toHaveCSS('animation-timing-function', 'linear');
     await expect(icon).toHaveCSS('animation-iteration-count', '1');
+    await expect(icon).toHaveCSS('width', iconSize);
   }
   const spinKeyframes = await page.evaluate(() => {
     const rules = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules]; } catch { return []; } });
@@ -3313,7 +3319,7 @@ test.describe('Smoke: dietitian launcher', () => {
     const move = rules.find(rule => rule.type === CSSRule.KEYFRAMES_RULE && rule.name === 'bot-action-unfurl');
     return { from: spin?.cssRules[0]?.style.transform, to: spin?.cssRules[spin.cssRules.length - 1]?.style.transform, buttonMovesWithoutRotation: move ? [...move.cssRules].every(rule => !rule.style.transform.includes('rotate')) : false };
   });
-  expect(spinKeyframes).toEqual({ from: 'rotate(0deg)', to: 'rotate(1080deg)', buttonMovesWithoutRotation: true });
+  expect(spinKeyframes).toEqual({ from: 'rotate(0deg)', to: 'rotate(360deg)', buttonMovesWithoutRotation: true });
   await expect(fab).toHaveCSS('--bot-menu-from-x', /px$/);
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('--bot-menu-from-y', /px$/);
   await page.clock.runFor(350);
@@ -4954,5 +4960,47 @@ test.describe('Smoke: calorie deficit fills goals and keeps pace', () => {
     await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt').nth(3).click();
     await expect(page.locator('#profile-pace-preview')).toContainText('target weight');
     await expect(page.locator('#pref-kcal')).toHaveValue('2000');
+  });
+});
+
+test.describe('Smoke: assistant buttons hide on interaction', () => {
+  test('the assistant action buttons close on a tap, a drag or a scroll', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    const mascot = page.locator('#bot-peeker');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    const openButtons = async () => {
+      await mascot.click();
+      await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
+    };
+    await openButtons();
+    await page.locator('main h1').first().click();
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await openButtons();
+    await page.mouse.move(300, 300);
+    await page.mouse.down();
+    await page.mouse.move(300, 200, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await openButtons();
+    await page.mouse.move(300, 300);
+    await page.mouse.wheel(0, 200);
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+  });
+});
+
+test.describe('Smoke: app user count', () => {
+  test('Friends shows the number of app users and lists their nicknames on tap', async ({ page }) => {
+    const backend = createBackend();
+    await startAlice(page, backend);
+    await openView(page, 'settings');
+    await expect(page.locator('#app-users')).toBeVisible();
+    await expect(page.locator('#app-users-count')).toHaveText('2');
+    await expect(page.locator('#app-users-list')).toBeHidden();
+    await page.locator('#app-users-toggle').click();
+    await expect(page.locator('#app-users-list')).toContainText('Alice');
+    await expect(page.locator('#app-users-list')).toContainText('Bob');
+    await expect(page.locator('#app-users-list')).not.toContainText('AAAA2222');
+    await page.locator('#app-users-toggle').click();
+    await expect(page.locator('#app-users-list')).toBeHidden();
   });
 });
