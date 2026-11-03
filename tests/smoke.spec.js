@@ -3358,7 +3358,7 @@ test.describe('Smoke: dietitian launcher', () => {
   expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
 });
 
-test('mirrored assistant is opt-in, symmetric, persistent, and opens the same actions', async ({ page }) => {
+test('second Spine assistant is opt-in, uses the archived rig, persists, and opens the same actions', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   await page.clock.install();
   const mirror = page.locator('#bot-peeker-mirror');
@@ -3368,7 +3368,7 @@ test('mirrored assistant is opt-in, symmetric, persistent, and opens the same ac
   await openView(page, 'settings');
   await expect(mirrorSwitch).toHaveAttribute('role', 'switch');
   await expect(mirrorSwitch).toHaveAttribute('aria-checked', 'false');
-  await expect(page.locator('#bot-appearance-card [data-i18n="botMirrorLabel"]')).toHaveText('Показувати дзеркального помічника');
+  await expect(page.locator('#bot-appearance-card [data-i18n="botMirrorLabel"]')).toHaveText('Показувати другого помічника');
   await page.clock.runFor(3100);
   await mirrorSwitch.click();
   await expect(mirrorSwitch).toHaveAttribute('aria-checked', 'true');
@@ -3376,7 +3376,18 @@ test('mirrored assistant is opt-in, symmetric, persistent, and opens the same ac
   await expect(mirror).toHaveClass(/is-arrived/);
   await expect(main).not.toHaveClass(/bot-side-left/);
   await expect(mirror).toHaveClass(/bot-side-left/);
-  await expect(mirror.locator('.eco-stage img')).toHaveCount(6);
+  await expect(mirror.locator('canvas.bot-spine-canvas')).toHaveCount(1);
+  await expect(mirror).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await expect(mirror).toHaveAttribute('data-spine-animations', 'idle,blink,wave,thinking,celebrate');
+  await page.clock.runFor(100);
+  const spineRender = await mirror.locator('canvas').evaluate(canvas => { const ctx = canvas.getContext('2d'); const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data; let visible = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) visible++; return { width: canvas.width, height: canvas.height, visiblePixels: visible }; });
+  expect(spineRender.width).toBeGreaterThan(0);
+  expect(spineRender.height).toBeGreaterThan(0);
+  expect(spineRender.visiblePixels).toBeGreaterThan(100);
+  await page.evaluate(() => window.nutritionBot.wave());
+  await expect(mirror).toHaveAttribute('data-spine-action', 'wave');
+  await page.evaluate(() => window.nutritionBot.idle());
+  await expect(mirror).toHaveAttribute('data-spine-action', 'idle');
   await page.locator('#save-bot-settings').click();
   expect((await readStore(page)).prefs.botMirrorEnabled).toBe(true);
   await page.clock.runFor(3000);
@@ -3401,6 +3412,7 @@ test('mirrored assistant is opt-in, symmetric, persistent, and opens the same ac
   await openView(page, 'settings');
   await expect(page.locator('#pref-bot-mirror-enabled')).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('#bot-peeker-mirror')).toBeVisible();
+  await expect(page.locator('#bot-peeker-mirror')).toHaveAttribute('data-spine-ready', 'true');
 });
 
 test('disabled assistant restores the original one-click dietitian launcher', async ({ page }) => {
