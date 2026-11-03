@@ -3152,7 +3152,7 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot.locator('canvas.bot-spine-canvas')).toHaveCount(1);
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
   await expect(mascot).toHaveAttribute('data-spine-animations', 'idle,blink,wave,thinking,celebrate');
-  await expect(mascot).toHaveAttribute('data-spine-motion-layer', 'breathing,gaze,head,leaves,hand');
+  await expect(mascot).toHaveAttribute('data-spine-motion-layer', 'breathing,gaze,head,face,leaves,arms');
   await expect.poll(() => mascot.locator('canvas.bot-spine-canvas').evaluate(canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; let visible = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) visible++; return visible; })).toBeGreaterThan(0);
   await expect(mascot.locator('.eco-stage, img[src*="eco-bot/"]')).toHaveCount(0);
   await expect(mascot).toHaveCSS('z-index', '39');
@@ -3403,7 +3403,7 @@ test('single Spine assistant uses the new rig and keeps legacy appearance settin
   const autoCount = Number(await mascot.getAttribute('data-spine-auto-motion-count') || 0);
   await page.evaluate(() => configureBotAnimations(1000));
   await page.clock.runFor(1000);
-  await expect.poll(() => Number(mascot.getAttribute('data-spine-auto-motion-count') || 0)).toBeGreaterThan(autoCount);
+  await expect.poll(async () => Number(await mascot.getAttribute('data-spine-auto-motion-count') || 0)).toBeGreaterThan(autoCount);
   await page.evaluate(() => configureBotAnimations(15000));
   await page.evaluate(() => window.nutritionBot.idle());
   const scratchCount = Number(await mascot.getAttribute('data-spine-scratch-count') || 0);
@@ -3414,7 +3414,7 @@ test('single Spine assistant uses the new rig and keeps legacy appearance settin
   await page.mouse.down();
   for (const offset of [22, -22, 22, -22, 22]) await page.mouse.move(scratchX + offset, scratchY, { steps: 2 });
   await page.mouse.up();
-  await expect.poll(() => Number(mascot.getAttribute('data-spine-scratch-count') || 0)).toBe(scratchCount + 1);
+  await expect.poll(async () => Number(await mascot.getAttribute('data-spine-scratch-count') || 0)).toBe(scratchCount + 1);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'scratch');
   await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
   await page.evaluate(async () => { await addFood({ name: 'Bot reaction meal', meal: 'lunch', grams: 100, kcal: 100, protein: 5, fat: 2, carbs: 10, date: iso() }); });
