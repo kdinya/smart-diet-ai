@@ -3155,20 +3155,20 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot).toHaveAttribute('data-spine-motion-layer', 'breathing,gaze,head,face,leaves,arms');
   await expect.poll(() => mascot.locator('canvas.bot-spine-canvas').evaluate(canvas => { const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; let visible = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) visible++; return visible; })).toBeGreaterThan(0);
   await expect(mascot.locator('.eco-stage, img[src*="eco-bot/"]')).toHaveCount(0);
-  await expect(mascot).toHaveCSS('z-index', '39');
+  await expect(mascot).toHaveCSS('z-index', '250');
   await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
   await expect(fab.locator('svg')).toHaveCount(1);
   await expect(fab).toHaveAttribute('aria-label', 'Відкрити чат ШІ-дієтолога');
   await openView(page, 'settings');
   await expect(page.locator('#pref-bot-size')).toHaveAttribute('min', '30');
   await expect(page.locator('#pref-bot-size')).toHaveAttribute('max', '100');
-  await expect(page.locator('#pref-bot-size')).toHaveValue('55');
+  await expect(page.locator('#pref-bot-size')).toHaveValue('60');
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('role', 'switch');
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('#pref-bot-side')).toHaveValue('right');
   await expect(page.locator('#pref-bot-offset-v')).toHaveAttribute('min', '0');
   await expect(page.locator('#pref-bot-offset-v')).toHaveAttribute('max', '100');
-  await expect(page.locator('#pref-bot-offset-v')).toHaveValue('11');
+  await expect(page.locator('#pref-bot-offset-v')).toHaveValue('10');
   await expect(page.locator('#bot-appearance-card [data-bot-position]')).toHaveCount(0);
   await expect(page.locator('#pref-bot-offset-v')).toHaveCSS('flex-grow', '1');
   await expect(page.locator('#pref-bot-offset-v')).toHaveCSS('min-width', '0px');
@@ -3176,8 +3176,8 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('min', '-1.5');
   await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('max', '1.5');
   await expect(page.locator('#pref-bot-offset-h')).toHaveAttribute('step', '0.05');
-  await expect(page.locator('#pref-bot-offset-h')).toHaveValue('0.5');
-  await expect(page.locator('#bot-offset-h-value')).toHaveText('0.5rem');
+  await expect(page.locator('#pref-bot-offset-h')).toHaveValue('0.4');
+  await expect(page.locator('#bot-offset-h-value')).toHaveText('0.4rem');
   await expect(page.locator('#pref-bot-side').locator('xpath=..')).toHaveClass(/dd/);
   await expect(page.locator('#pref-bot-frequency').locator('xpath=..')).toHaveClass(/dd/);
   await page.evaluate(() => {
@@ -3210,13 +3210,13 @@ test.describe('Smoke: dietitian launcher', () => {
     window.expectedHorizontalTouchValue = String(30 + Math.round(Math.max(0, Math.min(1, (x + rect.width * 0.2 - rect.left - 9) / Math.max(1, rect.width - 18))) * 70));
     slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, pointerType: 'touch', clientX: x + rect.width * 0.2, clientY: y + 2 }));
   });
-  expect(await page.evaluate(() => window.tapTouchValue)).toBe('55');
+  expect(await page.evaluate(() => window.tapTouchValue)).toBe('60');
   expect(await page.evaluate(() => window.trackTapValues)).toEqual({
-    '#pref-bot-size': { initial: '55', afterTrackInput: '55', afterPointerUp: '55' },
-    '#pref-bot-offset-v': { initial: '11', afterTrackInput: '11', afterPointerUp: '11' },
-    '#pref-bot-offset-h': { initial: '0.5', afterTrackInput: '0.5', afterPointerUp: '0.5' },
+    '#pref-bot-size': { initial: '60', afterTrackInput: '60', afterPointerUp: '60' },
+    '#pref-bot-offset-v': { initial: '10', afterTrackInput: '10', afterPointerUp: '10' },
+    '#pref-bot-offset-h': { initial: '0.4', afterTrackInput: '0.4', afterPointerUp: '0.4' },
   });
-  expect(await page.evaluate(() => window.verticalTouchValue)).toBe('55');
+  expect(await page.evaluate(() => window.verticalTouchValue)).toBe('60');
   expect(await page.evaluate(() => window.horizontalTouchValue)).toBe(await page.evaluate(() => window.expectedHorizontalTouchValue));
   const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => ({ id: card.id, hasPersonality: Boolean(card.querySelector('#pref-tone')) })));
   const personalityIndex = orderedCards.findIndex(card => card.hasPersonality);
@@ -3229,7 +3229,7 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.locator('#pref-bot-offset-v').fill('0');
   const bottomPlacement = await mascot.evaluate(el => ({ top: parseFloat(el.style.top), available: innerHeight - el.offsetHeight - (parseFloat(getComputedStyle(el).getPropertyValue('--bot-safe-bottom')) || 0) }));
   expect(Math.abs(bottomPlacement.top - bottomPlacement.available)).toBeLessThanOrEqual(1);
-  await expect(mascot).toHaveCSS('left', '8px');
+  await expect(mascot).toHaveCSS('left', '6.4px');
   await page.locator('#pref-bot-offset-h').fill('-1.5');
   await expect(mascot).toHaveCSS('--bot-offset-h', '-1.5rem');
   await expect(mascot).toHaveCSS('left', '-24px');
@@ -3243,7 +3243,7 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot).toHaveCSS('top', '0px');
   await page.locator('#pref-bot-size').fill('30');
   await expect(mascot).toHaveCSS('--bot-offset-h', '1.5rem');
-  await page.locator('#pref-bot-frequency').selectOption('0');
+  await page.locator('#pref-bot-frequency').selectOption('15000');
   await page.locator('#save-bot-settings').click();
   await page.locator('#pref-bot-enabled').click();
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'false');
@@ -3258,10 +3258,12 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.locator('#pref-bot-enabled').click();
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'true');
   await expect(mascot).toBeVisible();
-  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem', botFrequency: 0 });
+  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem', botFrequency: 15000 });
   await expect(mascot).toHaveCSS('--bot-scale', '0.3');
   await expect(fab).toBeHidden();
   await expect(legacyFab).toBeHidden();
+  await page.clock.runFor(6000);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await mascot.click();
   await expect(fab).toBeVisible();
   await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
@@ -3291,11 +3293,12 @@ test.describe('Smoke: dietitian launcher', () => {
     ].map(getZ).filter(Number.isFinite);
     return { actions, poppedChat, mascot, overlays };
   });
-  expect(assistantLayers.actions).toEqual([38, 38]);
+  expect(assistantLayers.actions).toEqual([249, 249]);
   expect(assistantLayers.actions.every(layer => layer < assistantLayers.mascot)).toBeTruthy();
   expect(assistantLayers.poppedChat).toBe(39);
-  for (const assistantLayer of [...assistantLayers.actions, assistantLayers.poppedChat]) {
-    for (const overlayLayer of assistantLayers.overlays) expect(assistantLayer).toBeLessThan(overlayLayer);
+  for (const overlayLayer of assistantLayers.overlays) {
+    for (const actionLayer of assistantLayers.actions) expect(actionLayer).toBeGreaterThan(overlayLayer);
+    expect(assistantLayers.poppedChat).toBeLessThan(overlayLayer);
   }
   for (const action of [fab, page.locator('#bot-settings-fab')]) {
     const icon = action.locator('svg');
@@ -3339,16 +3342,19 @@ test.describe('Smoke: dietitian launcher', () => {
     const actions = ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => Number.parseInt(getComputedStyle(document.querySelector(selector)).zIndex, 10));
     return { mascot, actions };
   });
-  expect(closingLayers.actions).toEqual([38, 38]);
+  expect(closingLayers.actions).toEqual([249, 249]);
   expect(closingLayers.actions.every(layer => layer < closingLayers.mascot)).toBeTruthy();
+  await page.clock.runFor(1460);
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toBeVisible();
   await page.locator('#bot-settings-fab').click();
   await expect(page.locator('#bot-appearance-card')).toBeInViewport();
+  await page.clock.runFor(760);
   await expect(fab).toBeHidden();
   await mascot.click();
   await page.locator('#view-settings h2').first().click();
+  await page.clock.runFor(760);
   await expect(fab).toBeHidden();
   await mascot.click();
   await fab.click();
