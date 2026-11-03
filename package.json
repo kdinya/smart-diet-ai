@@ -3,7 +3,10 @@
   "private": true,
   "description": "Client-side nutrition tracker. Browser smoke tests only; the app itself has no build step.",
   "scripts": {
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "test:smoke:ui": "playwright test tests/smoke.ui.spec.js",
+    "test:smoke:sync": "playwright test tests/smoke.sync.spec.js",
+    "test:smoke:ai": "playwright test tests/smoke.ai.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"
