@@ -1919,13 +1919,26 @@ test('progress shows recent weekly and average daily change, while keeping the f
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
   await expect(page.locator('#progress-stats .metric')).toHaveCount(6);
   await expect(page.locator('#progress-stats .metric').nth(0)).toContainText('згладжене середнє за останні 7 днів');
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-0.188');
   await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('Середня втрата ваги за день');
   await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.31');
   await expect(page.locator('#progress-stats .metric').nth(3)).toContainText('Середнє за тиждень');
   await expect(page.locator('#progress-stats')).not.toContainText('Довгостроковий тренд для прогнозу');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
   await expect(page.locator('#progress-stats .metric').nth(4).locator('strong')).not.toHaveText('—');
+});
+
+
+test('weight progress shows a plus sign when weight increases', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [{ id: 'w-gain', value: 98, date: '2026-11-02' }],
+  });
+  await page.evaluate(() => showView('stats'));
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('+0.125');
+  await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('+1.0');
 });
 
 test('weekly rate averages the change since the profile weight from screenshot weigh-ins', async ({ page }) => {
@@ -1943,11 +1956,11 @@ test('weekly rate averages the change since the profile weight from screenshot w
   await page.evaluate(() => showView('stats'));
   await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1.3125, 8);
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
-  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
+  await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('-0.188');
   await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.31');
   await expect.poll(() => page.evaluate(() => progressInfo().averageDailyLoss)).toBeCloseTo(0.1875, 8);
   await expect(page.locator('#progress-stats')).toContainText('Загальна втрата від ваги в профілі');
-  await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('1.5');
+  await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('-1.5');
   await expect.poll(() => page.evaluate(() => progressInfo().totalLost)).toBeCloseTo(1.5, 8);
 });
 
