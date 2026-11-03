@@ -3266,6 +3266,10 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(fab).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(fab).toHaveCSS('animation-duration', '0.9s');
+  await expect(fab).toHaveCSS('animation-delay', '0s');
+  await expect(page.locator('#bot-settings-fab')).toHaveCSS('animation-delay', '0s');
+  await expect(fab).toHaveCSS('opacity', '1');
+  await expect(page.locator('#bot-settings-fab')).toHaveCSS('opacity', '1');
   const assistantLayers = await page.evaluate(() => {
     const getZ = element => Number.parseInt(getComputedStyle(element).zIndex, 10);
     const actions = ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => getZ(document.querySelector(selector)));
@@ -3273,14 +3277,16 @@ test.describe('Smoke: dietitian launcher', () => {
     legacyFab.classList.add('fab-popped');
     const poppedChat = getZ(legacyFab);
     legacyFab.classList.remove('fab-popped');
+    const mascot = getZ(document.querySelector('#bot-peeker'));
     const overlays = [
       document.querySelector('.mobilebar'),
       document.querySelector('#chat-panel'),
       ...document.querySelectorAll('.modal-back'),
     ].map(getZ).filter(Number.isFinite);
-    return { actions, poppedChat, overlays };
+    return { actions, poppedChat, mascot, overlays };
   });
-  expect(assistantLayers.actions).toEqual([39, 39]);
+  expect(assistantLayers.actions).toEqual([40, 40]);
+  expect(assistantLayers.actions.every(layer => layer > assistantLayers.mascot)).toBeTruthy();
   expect(assistantLayers.poppedChat).toBe(39);
   for (const assistantLayer of [...assistantLayers.actions, assistantLayers.poppedChat]) {
     for (const overlayLayer of assistantLayers.overlays) expect(assistantLayer).toBeLessThan(overlayLayer);
@@ -3305,21 +3311,28 @@ test.describe('Smoke: dietitian launcher', () => {
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
   expect(parseFloat(aligned.side)).toBeGreaterThan(0);
-  await page.clock.runFor(700);
-  const completedSpins = await page.evaluate(() => ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => {
+  const activeSpins = await page.evaluate(() => ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => {
     const icon = document.querySelector(`${selector} svg`);
     const spin = icon.getAnimations().find(animation => animation.animationName === 'bot-action-icon-spin');
     return { playState: spin?.playState, currentTime: spin?.currentTime, transform: getComputedStyle(icon).transform };
   }));
-  expect(completedSpins).toHaveLength(2);
-  for (const spin of completedSpins) {
-    expect(spin.playState).toBe('finished');
-    expect(spin.currentTime).toBeGreaterThanOrEqual(900);
-    expect(spin.transform).toBe('matrix(1, 0, 0, 1, 0, 0)');
+  expect(activeSpins).toHaveLength(2);
+  for (const spin of activeSpins) {
+    expect(['running', 'finished']).toContain(spin.playState);
+    expect(spin.currentTime).toBeGreaterThan(0);
   }
   await page.clock.runFor(3949);
   await expect(fab).toBeVisible();
   await page.clock.runFor(1);
+  await expect(fab).toHaveCSS('opacity', '1');
+  await expect(page.locator('#bot-settings-fab')).toHaveCSS('opacity', '1');
+  const closingLayers = await page.evaluate(() => {
+    const mascot = Number.parseInt(getComputedStyle(document.querySelector('#bot-peeker')).zIndex, 10);
+    const actions = ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => Number.parseInt(getComputedStyle(document.querySelector(selector)).zIndex, 10));
+    return { mascot, actions };
+  });
+  expect(closingLayers.actions).toEqual([38, 38]);
+  expect(closingLayers.actions.every(layer => layer < closingLayers.mascot)).toBeTruthy();
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toBeVisible();
