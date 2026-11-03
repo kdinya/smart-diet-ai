@@ -3572,7 +3572,22 @@ test.describe('Smoke: AI character', () => {
 });
 
 test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
-  test('all close buttons share one style', async ({ page }) => {
+  test('deleting one app message asks for confirmation first', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await page.evaluate(() => toast('Confirm delete test'));
+  await page.evaluate(() => openNotifications());
+  await expect(page.locator('#notif-list .notif-item')).toHaveCount(1);
+  await page.locator('#notif-list [data-notif-delete]').click();
+  await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+  await expect(page.locator('#confirm-message')).toHaveText('Delete this message?');
+  await page.locator('#confirm-cancel').click();
+  await expect(page.locator('#notif-list .notif-item')).toHaveCount(1);
+  await page.locator('#notif-list [data-notif-delete]').click();
+  await page.locator('#confirm-ok').click();
+  await expect(page.locator('#notif-list .notif-item')).toHaveCount(0);
+});
+
+test('all close buttons share one style', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const info = await page.$$eval('button', bs => bs.filter(b => /✕|×/.test(b.textContent) && !b.closest('.install-banner')).map(b => ({ cls: b.className, id: b.id })));
     expect(info.length).toBeGreaterThanOrEqual(9);
