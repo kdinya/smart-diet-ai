@@ -1,5 +1,12 @@
 const { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate } = require('./smoke.helpers');
 
+async function waitForTransformTransition(locator) {
+  await expect.poll(() => locator.evaluate((element) => {
+    const transition = element.getAnimations().find((animation) => animation.transitionProperty === 'transform');
+    return !transition || transition.playState === 'finished';
+  })).toBe(true);
+}
+
 test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
@@ -2472,7 +2479,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   const bot = page.locator('#bot-peeker');
   await expect(bot).toHaveClass(/is-arrived/);
   await expect(bot).not.toHaveClass(/bot-side-left/);
-  await page.waitForTimeout(700);
+  await waitForTransformTransition(bot);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -2488,7 +2495,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   await expect(page.locator('#bot-peeker')).toHaveClass(/bot-side-left/);
   await expect(page.locator('#bot-peeker')).toHaveClass(/is-arrived/);
   expect((await readStore(page)).prefs.botSide).toBe('left');
-  await page.waitForTimeout(700);
+  await waitForTransformTransition(bot);
 
   const box2 = await page.locator('#bot-peeker').boundingBox();
   const lx = box2.x + box2.width / 2;
@@ -2506,7 +2513,7 @@ test('a small drag snaps the assistant back and keeps its side on a wide screen'
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botSide: 'right' }, foods: [], weights: [] });
   const bot = page.locator('#bot-peeker');
   await expect(bot).toHaveClass(/is-arrived/);
-  await page.waitForTimeout(700);
+  await waitForTransformTransition(bot);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
