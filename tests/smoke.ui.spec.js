@@ -2563,12 +2563,64 @@ test('assistant celebrates nutrition goals and shows its target-overage and slee
   }));
   await expect(mascot).toHaveAttribute('data-spine-mood', 'oops');
 
-  await page.clock.fastForward(120000);
-  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
-  await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
+  await page.clock.fastForward(3000);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
+  await expect(page.locator('#bot-zzz')).not.toHaveClass(/is-sleeping/);
   await page.mouse.move(200, 200);
   await expect.poll(() => page.evaluate(() => window.botGaze?.t)).toBeGreaterThan(0);
+});
+
+test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  const mascot = page.locator('#bot-peeker');
+  const zzz = page.locator('#bot-zzz');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await expect(mascot).toHaveAttribute('data-time-period', 'night');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await expect(zzz).toHaveClass(/is-sleeping/);
+
+  await mascot.click();
   await expect(mascot).toHaveAttribute('data-spine-mood', 'surprise');
+  await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await page.clock.fastForward(1200);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await page.clock.fastForward(15000);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(zzz).toHaveClass(/is-sleeping/);
+
+  const setTime = async (date) => {
+    await page.clock.setSystemTime(new Date(date));
+    await page.evaluate(() => syncBotTimePeriod());
+  };
+  await setTime('2026-11-03T04:59:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'night');
+  await setTime('2026-11-03T05:00:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'morning');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await setTime('2026-11-03T08:59:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'morning');
+  await setTime('2026-11-03T09:00:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
+  await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+  await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await setTime('2026-11-03T19:59:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await setTime('2026-11-03T20:00:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'evening');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await setTime('2026-11-03T23:59:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'evening');
+  await setTime('2026-11-04T00:00:00');
+  await expect(mascot).toHaveAttribute('data-time-period', 'night');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(zzz).toHaveClass(/is-sleeping/);
 });
 
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {

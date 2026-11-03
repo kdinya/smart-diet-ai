@@ -828,8 +828,8 @@ test.describe('Smoke: dietitian launcher', () => {
 });
 
 test('single Spine assistant uses the new rig and keeps legacy appearance settings', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', botSize: '0.72', botSide: 'left', botOffsetV: '37%', botOffsetH: '1.25rem', botFrequency: 15000, botMirrorEnabled: true }, foods: [], weights: [] });
-  await page.clock.install();
   const mascot = page.locator('#bot-peeker');
   await expect(mascot).toBeVisible();
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
