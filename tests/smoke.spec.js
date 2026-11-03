@@ -4296,6 +4296,8 @@ test.describe('Smoke: notifications', () => {
     await expect(page.locator('#notif-list .notif-item.unread')).toHaveCount(0);
 
     await items.nth(2).locator('.notif-del').click();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.click('#confirm-ok');
     await expect(items).toHaveCount(2);
 
     await page.click('#notif-delete-all');
