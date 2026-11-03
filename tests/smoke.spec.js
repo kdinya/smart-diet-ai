@@ -3261,18 +3261,44 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
   await expect(legacyFab).toBeHidden();
   await expect(page.locator('#bot-settings-fab')).toBeVisible();
-  await expect(page.locator('#bot-settings-fab svg circle')).toHaveCount(4);
+  await expect(page.locator('#bot-settings-fab svg circle')).toHaveCount(1);
   await expect(page.locator('#bot-settings-fab svg path')).toHaveCount(2);
   await expect(fab).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(fab).toHaveCSS('animation-duration', '0.9s');
+  for (const action of [fab, page.locator('#bot-settings-fab')]) {
+    const icon = action.locator('svg');
+    await expect(icon).toHaveCSS('animation-name', 'bot-action-icon-spin');
+    await expect(icon).toHaveCSS('animation-duration', '0.9s');
+    await expect(icon).toHaveCSS('animation-timing-function', 'linear');
+    await expect(icon).toHaveCSS('animation-iteration-count', '1');
+  }
+  const spinKeyframes = await page.evaluate(() => {
+    const rules = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules]; } catch { return []; } });
+    const spin = rules.find(rule => rule.type === CSSRule.KEYFRAMES_RULE && rule.name === 'bot-action-icon-spin');
+    const move = rules.find(rule => rule.type === CSSRule.KEYFRAMES_RULE && rule.name === 'bot-action-unfurl');
+    return { from: spin?.cssRules[0]?.style.transform, to: spin?.cssRules[spin.cssRules.length - 1]?.style.transform, buttonMovesWithoutRotation: move ? [...move.cssRules].every(rule => !rule.style.transform.includes('rotate')) : false };
+  });
+  expect(spinKeyframes).toEqual({ from: 'rotate(0deg)', to: 'rotate(1080deg)', buttonMovesWithoutRotation: true });
   await expect(fab).toHaveCSS('--bot-menu-from-x', /px$/);
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('--bot-menu-from-y', /px$/);
   await page.clock.runFor(350);
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
   expect(parseFloat(aligned.side)).toBeGreaterThan(0);
-  await page.clock.runFor(4649);
+  await page.clock.runFor(700);
+  const completedSpins = await page.evaluate(() => ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => {
+    const icon = document.querySelector(`${selector} svg`);
+    const spin = icon.getAnimations().find(animation => animation.animationName === 'bot-action-icon-spin');
+    return { playState: spin?.playState, currentTime: spin?.currentTime, transform: getComputedStyle(icon).transform };
+  }));
+  expect(completedSpins).toHaveLength(2);
+  for (const spin of completedSpins) {
+    expect(spin.playState).toBe('finished');
+    expect(spin.currentTime).toBeGreaterThanOrEqual(900);
+    expect(spin.transform).toBe('matrix(1, 0, 0, 1, 0, 0)');
+  }
+  await page.clock.runFor(3949);
   await expect(fab).toBeVisible();
   await page.clock.runFor(1);
   await expect(fab).toBeHidden();
