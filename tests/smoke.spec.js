@@ -338,12 +338,12 @@ async function readStore(page) {
 
 async function openDietitianChat(page) {
   const mascot = page.locator('#bot-peeker');
+  const chatAction = page.locator('#bot-chat-action-fab');
   if (await mascot.isVisible()) {
     await mascot.click();
-    await expect(page.locator('#chat-fab')).toHaveClass(/fab-popped/);
-    await page.locator('#chat-fab').click();
+    await expect(chatAction).toBeVisible();
+    await chatAction.click();
   } else {
-    await page.locator('#chat-fab').click();
     await page.locator('#chat-fab').click();
   }
   await expect(page.locator('#chat-panel')).toHaveClass(/open/);
@@ -3145,11 +3145,14 @@ test.describe('Smoke: dietitian launcher', () => {
   test('assistant appearance sliders, localized label and overlays behave correctly', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   await page.clock.install();
-  const fab = page.locator('#chat-fab');
+  const fab = page.locator('#bot-chat-action-fab');
+  const legacyFab = page.locator('#chat-fab');
   const mascot = page.locator('#bot-peeker');
   await expect(mascot.locator('.eco-stage img')).toHaveCount(6);
   await expect(mascot).toHaveCSS('z-index', '39');
   await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
+  await expect(fab.locator('svg')).toHaveCount(1);
+  await expect(fab).toHaveAttribute('aria-label', 'Відкрити чат ШІ-дієтолога');
   await openView(page, 'settings');
   await expect(page.locator('#pref-bot-size')).toHaveAttribute('min', '30');
   await expect(page.locator('#pref-bot-size')).toHaveAttribute('max', '100');
@@ -3186,11 +3189,12 @@ test.describe('Smoke: dietitian launcher', () => {
     slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: x, clientY: y }));
     slider.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: x + rect.width * 0.2, clientY: y + 2 }));
     window.horizontalTouchValue = slider.value;
+    window.expectedHorizontalTouchValue = String(30 + Math.round(Math.max(0, Math.min(1, (x + rect.width * 0.2 - rect.left - 9) / Math.max(1, rect.width - 18))) * 70));
     slider.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 8, pointerType: 'touch', clientX: x + rect.width * 0.2, clientY: y + 2 }));
   });
   expect(await page.evaluate(() => window.tapTouchValue)).toBe('55');
   expect(await page.evaluate(() => window.verticalTouchValue)).toBe('55');
-  expect(await page.evaluate(() => window.horizontalTouchValue)).not.toBe('55');
+  expect(await page.evaluate(() => window.horizontalTouchValue)).toBe(await page.evaluate(() => window.expectedHorizontalTouchValue));
   const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => ({ id: card.id, hasPersonality: Boolean(card.querySelector('#pref-tone')) })));
   const personalityIndex = orderedCards.findIndex(card => card.hasPersonality);
   const appearanceIndex = orderedCards.findIndex(card => card.id === 'bot-appearance-card');
@@ -3221,23 +3225,27 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.locator('#pref-bot-enabled').click();
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'false');
   await expect(mascot).toBeHidden();
-  await expect(fab).toHaveClass(/is-expanded/);
+  await expect(legacyFab).toHaveClass(/is-expanded/);
   await expect(page.locator('.chat-fab-label')).toHaveCSS('opacity', '1');
   await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
-  await expect(fab).toHaveCSS('right', '24px');
-  await expect(fab).toHaveCSS('width', '210px');
-  await expect(fab).toHaveCSS('bottom', /px$/);
+  await expect(legacyFab).toHaveCSS('right', '24px');
+  await expect(legacyFab).toHaveCSS('width', '210px');
+  await expect(legacyFab).toHaveCSS('bottom', /px$/);
+  await expect(legacyFab.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
   await page.locator('#pref-bot-enabled').click();
   await expect(page.locator('#pref-bot-enabled')).toHaveAttribute('aria-checked', 'true');
   await expect(mascot).toBeVisible();
   expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem', botFrequency: 0 });
   await expect(mascot).toHaveCSS('--bot-scale', '0.3');
   await expect(fab).toBeHidden();
+  await expect(legacyFab).toBeHidden();
   await mascot.click();
-  await expect(fab).toHaveClass(/fab-popped/);
+  await expect(fab).toBeVisible();
+  await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
+  await expect(legacyFab).toBeHidden();
   await expect(page.locator('#bot-settings-fab')).toBeVisible();
   await page.clock.runFor(350);
-  const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#chat-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
+  const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
   expect(parseFloat(aligned.side)).toBeGreaterThan(0);
   await page.clock.runFor(4649);
