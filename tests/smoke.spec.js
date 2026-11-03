@@ -4474,7 +4474,7 @@ test('profile weight uses its entered date for the exact weekly rate and survive
   });
   await page.evaluate(() => showView('stats'));
   await expect(page.locator('#view-stats')).toHaveClass(/active/);
-  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1.5, 8);
+  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1.3125, 8);
   await expect(page.locator('#weight-history')).toContainText('10/25/2026');
   await page.evaluate(() => openWeightHistory());
   const profileHistoryRow = page.locator('#weight-history-modal-list .food-row').filter({ hasText: '97.0 kg' });
@@ -4512,13 +4512,13 @@ test('progress shows recent weekly and average daily change, while keeping the f
   await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
   await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('Середня втрата ваги за день');
   await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.00');
-  await expect(page.locator('#progress-stats .metric').nth(3)).toContainText('За останні 7 днів');
+  await expect(page.locator('#progress-stats .metric').nth(3)).toContainText('Середнє за тиждень');
   await expect(page.locator('#progress-stats')).not.toContainText('Довгостроковий тренд для прогнозу');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
   await expect(page.locator('#progress-stats .metric').nth(4).locator('strong')).not.toHaveText('—');
 });
 
-test('recent weekly rate uses the actual last seven-day window from screenshot weigh-ins', async ({ page }) => {
+test('weekly rate averages the change since the profile weight from screenshot weigh-ins', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
     prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
@@ -4531,14 +4531,38 @@ test('recent weekly rate uses the actual last seven-day window from screenshot w
     ],
   });
   await page.evaluate(() => showView('stats'));
-  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1, 8);
+  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-1.3125, 8);
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
   await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
-  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.00');
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.31');
   await expect.poll(() => page.evaluate(() => progressInfo().averageDailyLoss)).toBeCloseTo(0.1875, 8);
   await expect(page.locator('#progress-stats')).toContainText('Загальна втрата від ваги в профілі');
   await expect(page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' }).locator('strong')).toHaveText('1.5');
   await expect.poll(() => page.evaluate(() => progressInfo().totalLost)).toBeCloseTo(1.5, 8);
+});
+
+test('weekly rate under one week uses the days elapsed since the profile weight', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-27T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [{ id: 'w-oct-27', value: 96, date: '2026-10-27' }],
+  });
+  await page.evaluate(() => showView('stats'));
+  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(-3.5, 8);
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-3.50');
+});
+
+test('weekly rate shows zero instead of an empty value when nothing was weighed in after the profile weight', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 97, currentWeightDate: '2026-10-25', targetWeight: 80 },
+    foods: [],
+    weights: [],
+  });
+  await page.evaluate(() => showView('stats'));
+  await expect.poll(() => page.evaluate(() => progressInfo().lastWeekRate)).toBeCloseTo(0, 8);
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('0.00');
 });
 
 test('profile weight date can be backfilled from the calendar and a new weight defaults to today', async ({ page }) => {
@@ -4730,7 +4754,7 @@ test('weight rate and forecast start on day seven, use all weigh-ins, and refres
     return slopePerDay(points) * 7;
   });
   expect(allHistoryRate).toBeCloseTo(expectedAllHistoryRate, 8);
-  expect(recentWeekRate).toBeCloseTo(-0.9, 8);
+  expect(recentWeekRate).toBeNull();
   expect(allHistoryRate).not.toBeCloseTo(recentWindowRate, 2);
   expect((await readStore(page)).weights).toHaveLength(5);
 });
