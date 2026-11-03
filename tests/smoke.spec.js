@@ -3285,8 +3285,8 @@ test.describe('Smoke: dietitian launcher', () => {
     ].map(getZ).filter(Number.isFinite);
     return { actions, poppedChat, mascot, overlays };
   });
-  expect(assistantLayers.actions).toEqual([40, 40]);
-  expect(assistantLayers.actions.every(layer => layer > assistantLayers.mascot)).toBeTruthy();
+  expect(assistantLayers.actions).toEqual([38, 38]);
+  expect(assistantLayers.actions.every(layer => layer < assistantLayers.mascot)).toBeTruthy();
   expect(assistantLayers.poppedChat).toBe(39);
   for (const assistantLayer of [...assistantLayers.actions, assistantLayers.poppedChat]) {
     for (const overlayLayer of assistantLayers.overlays) expect(assistantLayer).toBeLessThan(overlayLayer);
@@ -3308,6 +3308,8 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(fab).toHaveCSS('--bot-menu-from-x', /px$/);
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('--bot-menu-from-y', /px$/);
   await page.clock.runFor(350);
+  const settingsClearOfMascot = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const button = document.querySelector('#bot-settings-fab').getBoundingClientRect(); return button.bottom <= bot.top || button.top >= bot.bottom || button.right <= bot.left || button.left >= bot.right; });
+  expect(settingsClearOfMascot).toBeTruthy();
   const aligned = await page.evaluate(() => { const bot = document.querySelector('#bot-peeker').getBoundingClientRect(); const fab = document.querySelector('#bot-chat-action-fab'); return { botCenter: bot.top + bot.height / 2, buttonCenter: parseFloat(fab.style.top) + fab.offsetHeight / 2, side: getComputedStyle(fab).left }; });
   expect(Math.abs(aligned.botCenter - aligned.buttonCenter)).toBeLessThanOrEqual(1);
   expect(parseFloat(aligned.side)).toBeGreaterThan(0);
