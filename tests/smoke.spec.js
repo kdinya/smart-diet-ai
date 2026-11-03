@@ -3266,6 +3266,25 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(fab).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(page.locator('#bot-settings-fab')).toHaveCSS('animation-name', 'bot-action-unfurl');
   await expect(fab).toHaveCSS('animation-duration', '0.9s');
+  const assistantLayers = await page.evaluate(() => {
+    const getZ = element => Number.parseInt(getComputedStyle(element).zIndex, 10);
+    const actions = ['#bot-chat-action-fab', '#bot-settings-fab'].map(selector => getZ(document.querySelector(selector)));
+    const legacyFab = document.querySelector('#chat-fab');
+    legacyFab.classList.add('fab-popped');
+    const poppedChat = getZ(legacyFab);
+    legacyFab.classList.remove('fab-popped');
+    const overlays = [
+      document.querySelector('.mobilebar'),
+      document.querySelector('#chat-panel'),
+      ...document.querySelectorAll('.modal-back'),
+    ].map(getZ).filter(Number.isFinite);
+    return { actions, poppedChat, overlays };
+  });
+  expect(assistantLayers.actions).toEqual([39, 39]);
+  expect(assistantLayers.poppedChat).toBe(39);
+  for (const assistantLayer of [...assistantLayers.actions, assistantLayers.poppedChat]) {
+    for (const overlayLayer of assistantLayers.overlays) expect(assistantLayer).toBeLessThan(overlayLayer);
+  }
   for (const action of [fab, page.locator('#bot-settings-fab')]) {
     const icon = action.locator('svg');
     await expect(icon).toHaveCSS('animation-name', 'bot-action-icon-spin');
