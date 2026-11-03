@@ -5081,6 +5081,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   const bot = page.locator('#bot-peeker');
   await expect(bot).toHaveClass(/is-arrived/);
   await expect(bot).not.toHaveClass(/bot-side-left/);
+  await page.waitForTimeout(700);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -5096,6 +5097,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   await expect(page.locator('#bot-peeker')).toHaveClass(/bot-side-left/);
   await expect(page.locator('#bot-peeker')).toHaveClass(/is-arrived/);
   expect((await readStore(page)).prefs.botSide).toBe('left');
+  await page.waitForTimeout(700);
 
   const box2 = await page.locator('#bot-peeker').boundingBox();
   const lx = box2.x + box2.width / 2;
@@ -5113,6 +5115,7 @@ test('a small drag snaps the assistant back and keeps its side on a wide screen'
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botSide: 'right' }, foods: [], weights: [] });
   const bot = page.locator('#bot-peeker');
   await expect(bot).toHaveClass(/is-arrived/);
+  await page.waitForTimeout(700);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
