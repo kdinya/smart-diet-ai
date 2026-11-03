@@ -5125,3 +5125,49 @@ test('a small drag snaps the assistant back and keeps its side on a wide screen'
   await expect(bot).not.toHaveClass(/bot-side-left/);
   expect((await readStore(page)).prefs.botSide).toBe('right');
 });
+
+test('assistant celebrates nutrition goals and shows its target-overage and sleep reactions', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', currentWeight: 90, targetWeight: 80 },
+    foods: [],
+    weights: [],
+  });
+  const mascot = page.locator('#bot-peeker');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+
+  await page.evaluate(async () => addFood({
+    name: 'Тестова страва', meal: 'lunch', grams: 200, kcal: 1800,
+    protein: 80, fat: 20, carbs: 200, date: iso(),
+  }));
+  await expect(page.locator('#confetti-canvas')).toHaveCount(1);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'celebration');
+
+  await page.evaluate(async () => addFood({
+    name: 'Ще одна тестова страва', meal: 'dinner', grams: 100, kcal: 300,
+    protein: 10, fat: 10, carbs: 30, date: iso(),
+  }));
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'oops');
+
+  await page.clock.fastForward(120000);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
+  await page.mouse.move(200, 200);
+  await expect.poll(() => page.evaluate(() => window.botGaze?.t)).toBeGreaterThan(0);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'surprise');
+});
+
+test('logging weight closer to the goal celebrates progress', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, currentWeight: 90, currentWeightDate: '2026-10-01', targetWeight: 80 },
+    foods: [],
+    weights: [],
+  });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '89');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#confetti-canvas')).toHaveCount(1);
+  await expect(page.locator('#bot-peeker')).toHaveAttribute('data-spine-mood', 'celebration');
+  expect(await page.evaluate(() => state.weights.map((item) => item.value))).toContain(89);
+});
