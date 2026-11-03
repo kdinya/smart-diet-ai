@@ -5079,7 +5079,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botSide: 'right' }, foods: [], weights: [] });
   const bot = page.locator('#bot-peeker');
-  await expect(bot).toBeVisible();
+  await expect(bot).toHaveClass(/is-arrived/);
   await expect(bot).not.toHaveClass(/bot-side-left/);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
@@ -5087,6 +5087,7 @@ test('swiping the assistant flings it past the opposite edge and keeps the new s
   await page.mouse.move(cx, cy);
   await page.mouse.down();
   for (let i = 1; i <= 8; i++) await page.mouse.move(cx - i * 40, cy);
+  await expect.poll(() => bot.evaluate((el) => el.style.transform)).not.toBe('');
   await page.mouse.up();
   await expect(bot).toHaveClass(/bot-side-left/, { timeout: 5000 });
   await expect.poll(async () => (await readStore(page)).prefs.botSide).toBe('left');
@@ -5100,13 +5101,14 @@ test('a small drag snaps the assistant back and keeps its side on a wide screen'
   await page.setViewportSize({ width: 1280, height: 800 });
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botSide: 'right' }, foods: [], weights: [] });
   const bot = page.locator('#bot-peeker');
-  await expect(bot).toBeVisible();
+  await expect(bot).toHaveClass(/is-arrived/);
   const box = await bot.boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   await page.mouse.move(cx, cy);
   await page.mouse.down();
   await page.mouse.move(cx - 20, cy);
+  await expect.poll(() => bot.evaluate((el) => el.style.transform)).not.toBe('');
   await page.mouse.up();
   await expect.poll(async () => page.evaluate(() => document.getElementById('bot-peeker').style.transform)).toBe('');
   await expect(bot).not.toHaveClass(/bot-side-left/);
