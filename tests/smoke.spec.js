@@ -3384,6 +3384,14 @@ test('second Spine assistant is opt-in, uses the archived rig, persists, and ope
   expect(spineRender.width).toBeGreaterThan(0);
   expect(spineRender.height).toBeGreaterThan(0);
   expect(spineRender.visiblePixels).toBeGreaterThan(100);
+  await page.evaluate(() => window.nutritionBot.celebration());
+  await expect(mirror).toHaveAttribute('data-spine-action', 'celebrate');
+  await expect(mirror).toHaveAttribute('data-spine-sequence', 'celebrate,wave');
+  await page.evaluate(() => window.nutritionBot.idle());
+  await expect(mirror).toHaveAttribute('data-spine-action', 'idle');
+  const blinkCount = Number(await mirror.getAttribute('data-spine-blink-count') || 0);
+  await page.clock.runFor(6500);
+  await expect.poll(async () => Number(await mirror.getAttribute('data-spine-blink-count') || 0)).toBeGreaterThan(blinkCount);
   await page.evaluate(() => window.nutritionBot.wave());
   await expect(mirror).toHaveAttribute('data-spine-action', 'wave');
   await page.evaluate(() => window.nutritionBot.idle());

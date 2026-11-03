@@ -1,4 +1,4 @@
-const CACHE='smart-diet-shell-v163';
+const CACHE='smart-diet-shell-v164';
 const SHELL=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js','./eco-bot/base.png','./eco-bot/hand.png','./eco-bot/eyeL.png','./eco-bot/eyeR.png','./eco-bot/mouth.png','./eco-bot/sprout.png','./vendor/spine-canvas-4.2.114.min.js','./assets/ecobot-spine/ecobot.json','./assets/ecobot-spine/ecobot.atlas','./assets/ecobot-spine/ecobot.png'];
 
 self.addEventListener('install',event=>event.waitUntil(
