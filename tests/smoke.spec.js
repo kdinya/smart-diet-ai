@@ -3293,14 +3293,15 @@ test.describe('Smoke: dietitian launcher', () => {
     const mascot = getZ(document.querySelector('#bot-peeker'));
     const overlays = [
       document.querySelector('.mobilebar'),
-      document.querySelector('#chat-panel'),
       ...document.querySelectorAll('.modal-back'),
     ].map(getZ).filter(Number.isFinite);
-    return { actions, poppedChat, mascot, overlays };
+    const dialogs = ['#chat-panel', '#ask-panel'].map(selector => getZ(document.querySelector(selector)));
+    return { actions, poppedChat, mascot, overlays, dialogs };
   });
   expect(assistantLayers.actions).toEqual([249, 249]);
   expect(assistantLayers.actions.every(layer => layer < assistantLayers.mascot)).toBeTruthy();
   expect(assistantLayers.poppedChat).toBe(39);
+  for (const dialogLayer of assistantLayers.dialogs) expect(dialogLayer).toBeGreaterThan(assistantLayers.mascot);
   for (const overlayLayer of assistantLayers.overlays) {
     for (const actionLayer of assistantLayers.actions) expect(actionLayer).toBeGreaterThan(overlayLayer);
     expect(assistantLayers.poppedChat).toBeLessThan(overlayLayer);
@@ -3308,7 +3309,7 @@ test.describe('Smoke: dietitian launcher', () => {
   for (const [action, iconSize] of [[fab, '39px'], [page.locator('#bot-settings-fab'), '43.5px']]) {
     const icon = action.locator('svg');
     await expect(icon).toHaveCSS('animation-name', 'bot-action-icon-spin');
-    await expect(icon).toHaveCSS('animation-duration', '0.9s');
+    await expect(icon).toHaveCSS('animation-duration', '0.45s');
     await expect(icon).toHaveCSS('animation-timing-function', 'linear');
     await expect(icon).toHaveCSS('animation-iteration-count', '1');
     await expect(icon).toHaveCSS('width', iconSize);
@@ -3338,7 +3339,7 @@ test.describe('Smoke: dietitian launcher', () => {
     expect(['running', 'finished']).toContain(spin.playState);
     expect(spin.currentTime).toBeGreaterThan(0);
   }
-  await page.clock.runFor(3949);
+  await page.clock.runFor(1949);
   await expect(fab).toBeVisible();
   await page.clock.runFor(1);
   await expect(fab).toHaveCSS('opacity', '1');
@@ -3350,7 +3351,7 @@ test.describe('Smoke: dietitian launcher', () => {
   });
   expect(closingLayers.actions).toEqual([249, 249]);
   expect(closingLayers.actions.every(layer => layer < closingLayers.mascot)).toBeTruthy();
-  await page.clock.runFor(1460);
+  await page.clock.runFor(3200);
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toBeVisible();
@@ -5002,5 +5003,33 @@ test.describe('Smoke: app user count', () => {
     await expect(page.locator('#app-users-list')).not.toContainText('AAAA2222');
     await page.locator('#app-users-toggle').click();
     await expect(page.locator('#app-users-list')).toBeHidden();
+  });
+
+  test('Friends opens a popup with the nicknames when there are more than five app users', async ({ page }) => {
+    const backend = createBackend();
+    for (const name of ['Carol', 'Dave', 'Erin', 'Frank']) backend.tables.profiles.push({ user_id: `u-${name}`, display_name: name, friend_code: `C${name.toUpperCase()}1` });
+    await startAlice(page, backend);
+    await openView(page, 'settings');
+    await expect(page.locator('#app-users-count')).toHaveText('6');
+    await page.locator('#app-users-toggle').click();
+    await expect(page.locator('#app-users-modal')).toHaveClass(/open/);
+    await expect(page.locator('#app-users-modal-list')).toContainText('Dave');
+    await expect(page.locator('#app-users-list')).toBeHidden();
+    await page.locator('#app-users-modal-close').click();
+    await expect(page.locator('#app-users-modal')).not.toHaveClass(/open/);
+  });
+
+  test('the dietitian dialog sits above the assistant and closes other windows when it opens', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    const mascot = page.locator('#bot-peeker');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await mascot.click();
+    await expect(page.locator('body')).toHaveClass(/bot-actions-open/);
+    await page.evaluate(() => document.getElementById('confirm-modal').classList.add('open'));
+    await page.evaluate(() => openAsk());
+    await expect(page.locator('#ask-panel')).toHaveClass(/open/);
+    await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await expect(page.locator('#ask-panel')).toHaveCSS('z-index', '300');
   });
 });
