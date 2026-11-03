@@ -4511,7 +4511,7 @@ test('progress shows recent weekly and average daily change, while keeping the f
   await expect(page.locator('#progress-stats .metric').nth(0)).toContainText('згладжене середнє за останні 7 днів');
   await expect(page.locator('#progress-stats .metric').nth(1).locator('strong')).toHaveText('0.188');
   await expect(page.locator('#progress-stats .metric').nth(1)).toContainText('Середня втрата ваги за день');
-  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.00');
+  await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('-1.31');
   await expect(page.locator('#progress-stats .metric').nth(3)).toContainText('Середнє за тиждень');
   await expect(page.locator('#progress-stats')).not.toContainText('Довгостроковий тренд для прогнозу');
   await expect.poll(() => page.evaluate(() => progressInfo().rate)).toBeCloseTo(-1.2630434783, 6);
@@ -4926,7 +4926,7 @@ test('progress statistics cards follow the two-column mobile order: trend/goal/f
 
   // Column 2 (Right column in row-based 2-col grid: indices 1, 3, 5)
   await expect(metrics.nth(1)).toContainText('Середня втрата ваги за день');
-  await expect(metrics.nth(3)).toContainText('За останні 7 днів');
+  await expect(metrics.nth(3)).toContainText('Середнє за тиждень');
   await expect(metrics.nth(5)).toContainText('Загальна втрата від ваги в профілі');
 });
 
