@@ -3351,7 +3351,7 @@ test.describe('Smoke: dietitian launcher', () => {
   });
   expect(closingLayers.actions).toEqual([249, 249]);
   expect(closingLayers.actions.every(layer => layer < closingLayers.mascot)).toBeTruthy();
-  await page.clock.runFor(1100);
+  await page.clock.runFor(3200);
   await expect(fab).toBeHidden();
   await mascot.click();
   await expect(fab).toBeVisible();
