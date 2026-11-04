@@ -2909,9 +2909,15 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   for (let i = 0; i < 5; i++) await title.click();
   const modal = page.locator('#bot-service-modal');
   await expect(modal).toHaveClass(/open/);
+  await page.setViewportSize({ width: 390, height: 844 });
   await modal.locator('#bot-comic-preview-toggle').click();
   const preview = page.locator('#bot-comic');
   await expect(preview).toHaveClass(/bot-comic-preview/);
+  expect(await preview.evaluate(el => el.parentElement.id)).toBe('bot-comic-preview-stage');
+  const previewAvoidsControls = await page.evaluate(() => { const a=document.querySelector('#bot-comic').getBoundingClientRect(), b=document.querySelector('#bot-comic-controls').getBoundingClientRect(); return a.bottom<=b.top||a.top>=b.bottom||a.right<=b.left||a.left>=b.right; });
+  expect(previewAvoidsControls).toBe(true);
+  const previewWithinMobileStage = await page.evaluate(() => { const a=document.querySelector('#bot-comic').getBoundingClientRect(), b=document.querySelector('#bot-comic-preview-stage').getBoundingClientRect(); return a.left>=b.left&&a.right<=b.right&&a.top>=b.top&&a.bottom<=b.bottom; });
+  expect(previewWithinMobileStage).toBe(true);
   await page.locator('body').dispatchEvent('pointerdown');
   await expect(preview).toHaveClass(/is-visible/);
   await modal.locator('#bot-comic-text').fill('A tiny preview ✨');
