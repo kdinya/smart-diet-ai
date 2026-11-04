@@ -2787,6 +2787,15 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await page.locator('#bot-peeker').evaluate(el => { el.classList.add('bot-side-left'); el.style.left='8px'; el.style.right='auto'; positionBotComic(); });
   const leftTail = Number(await bubble.getAttribute('data-tail-anchor'));
   expect(leftTail).toBeLessThan(.5);
+  await expect(bubble).toHaveAttribute('data-tail-side', 'left');
+  expect(await bubble.locator('.bot-comic-shape').evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)).toBe(-1);
+  const leftBounds = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; });
+  expect(leftBounds.left).toBeGreaterThanOrEqual(0);
+  expect(leftBounds.right).toBeLessThanOrEqual(390);
+  expect(leftBounds.top).toBeGreaterThanOrEqual(0);
+  expect(leftBounds.bottom).toBeLessThanOrEqual(844);
+  await page.evaluate(() => window.nutritionBot.say('This is a much longer assistant message to verify that the entire comic cloud remains within the visible screen area. '.repeat(8)));
+  await expect.poll(() => bubble.evaluate(el => { const r=el.getBoundingClientRect(); return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight; })).toBe(true);
   await page.locator('#bot-peeker').evaluate(el => { el.classList.remove('bot-side-left'); el.style.left=''; el.style.right=''; });
   await page.clock.fastForward(30_000);
   await expect(bubble).toHaveClass(/is-visible/);
