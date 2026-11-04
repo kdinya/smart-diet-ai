@@ -1,6 +1,6 @@
 # AI Agent Guidelines & Technical Instructions for Smart Diet AI
 
-> **Note for AI Agents:** The repository owner will frequently refer to this document as **"інструкція"** (Ukrainian for "instruction" / "manual"). Whenever the user mentions **"інструкція"**, **"згідно інструкції"**, or **"дивись в інструкцію"**, they are strictly referring to this file (`AGENTS.md`). Always consult and follow this file. See point 0 for the rules on updating it.
+> **Note for AI Agents:** The repository owner may refer to this document as the instruction or manual. Whenever the user calls it the instruction or manual, they mean this file (`AGENTS.md`). Always consult and follow this file. See point 0 for the rules on updating it.
 
 ---
 
@@ -30,6 +30,7 @@
    - Check `git config user.name` and `git config user.email` before any local commit to ensure it matches the repository owner.
 
 4. **Source of Truth: Always Read the Actual Latest Repository State:**
+   - Before performing any repository task, check the repository for open pull requests. Review their titles, base and head branches, draft status, and changed files to identify work that is related to or could conflict with the task. Continue relevant work on its existing branch or coordinate around the conflict; do not duplicate, overwrite, or discard in-progress changes.
    - Before performing any task, read current files / latest commit on `main` directly. Never rely on chat history, memory, or a previously discussed code state.
    - Check `git fetch` and ensure `origin/main` has not moved unexpectedly before pushing.
    - Maintain minimal diffs: modify only the lines and files directly pertinent to the task. Avoid unprompted mass reformatting.
@@ -49,6 +50,8 @@
    - All repository documentation must be provided in two languages: English (`README.md`) and Ukrainian (`README.uk.md`). Both versions must describe the same features and be kept in sync.
 9. **Direct Repository Work:** For all application changes, work directly in the GitHub repository `kdinya/smart-diet-ai`; do not ask the user to create or open a Lovable project.
 10. **Application Versioning:** Use `YYYY.MM.N` for every application release. Use the release year and month, with a sequence number starting at `1` for the first release in that month; increment the sequence for each additional release in the same month, and reset it to `1` when the year or month changes. Display the current app version in Settings and keep it synchronized with the release tag. When preparing release notes, always list changes in this order: **Added**, **Fixed**, then **Improved**; omit a category when there are no changes in it. When a change is small or non-critical (a label, wording, icon, or minor layout tweak), describe it generally in one short line, such as "Improved minor interface details", instead of listing the specific fields, labels, or wording that changed. Name a specific item only when it is a new feature or matters to users. Create a new application version, tag, or GitHub Release only when the user explicitly asks for a new version/release. For ordinary feature, fix, or improvement work without that explicit request, keep the current version and tags unchanged and update the latest version entry in the in-app version history by adding a concise description of the new functionality or improvements, preserving the required release-note category order.
+
+11. **Safely Save In-Progress GitHub Work:** For significant, multi-step, or unfinished changes, work in a dedicated branch created from the latest `main`. Save meaningful intermediate checkpoints as commits and push them to that branch so the work can be resumed later. Open a draft pull request when review or automated checks are useful; a draft PR is for review, while the branch commits are the saved work. Do not merge into `main` until the change is complete, the relevant checks pass, and the repository owner explicitly approves the merge. After merging, delete the feature branch when it is no longer needed. Do not create a branch or PR for a small, isolated change unless the repository owner requests it.
 
 ---
 
