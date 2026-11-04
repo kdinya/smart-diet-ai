@@ -2636,6 +2636,36 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect(zzz).toHaveClass(/is-sleeping/);
 });
 
+test('assistant waits fully off-screen until its entrance on load', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botSide: 'right' }, foods: [], weights: [] });
+  const canvas = page.locator('#bot-peeker .bot-spine-canvas');
+  await page.evaluate(() => document.getElementById('bot-peeker').classList.remove('is-arrived'));
+  const right = await canvas.boundingBox();
+  expect(right.x).toBeGreaterThanOrEqual(390);
+  await page.evaluate(() => document.getElementById('bot-peeker').classList.add('bot-side-left'));
+  const left = await canvas.boundingBox();
+  expect(left.x + left.width).toBeLessThanOrEqual(0);
+});
+
+test('assistant stays sleepy instead of cheerful while wearing pajamas', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T21:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  const mascot = page.locator('#bot-peeker');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await expect(mascot).toHaveAttribute('data-time-period', 'evening');
+  await page.evaluate(() => nutritionBot.celebration());
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await page.evaluate(() => nutritionBot.wave());
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await page.clock.setSystemTime(new Date('2026-11-03T12:00:00'));
+  await page.evaluate(() => syncBotTimePeriod());
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await page.evaluate(() => nutritionBot.celebration());
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'celebration');
+});
+
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, {
