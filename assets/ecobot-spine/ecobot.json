@@ -170,6 +170,41 @@
  ],
  "slots": [
   {
+   "name": "torso",
+   "bone": "torso",
+   "attachment": "torso"
+  },
+  {
+   "name": "pj_shirt",
+   "bone": "torso",
+   "attachment": "pj_shirt"
+  },
+  {
+   "name": "hand_r",
+   "bone": "hand_r",
+   "attachment": "hand_r"
+  },
+  {
+   "name": "upper_arm_l",
+   "bone": "upper_arm_l",
+   "attachment": "upper_arm_l"
+  },
+  {
+   "name": "pj_upper_arm_l",
+   "bone": "upper_arm_l",
+   "attachment": "pj_upper_arm_l"
+  },
+  {
+   "name": "head",
+   "bone": "head",
+   "attachment": "head"
+  },
+  {
+   "name": "pj_cap",
+   "bone": "head",
+   "attachment": "pj_cap"
+  },
+  {
    "name": "leaf_r",
    "bone": "leaf_r",
    "attachment": "leaf_r"
@@ -183,26 +218,6 @@
    "name": "stem",
    "bone": "sprout",
    "attachment": "stem"
-  },
-  {
-   "name": "torso",
-   "bone": "torso",
-   "attachment": "torso"
-  },
-  {
-   "name": "hand_r",
-   "bone": "hand_r",
-   "attachment": "hand_r"
-  },
-  {
-   "name": "upper_arm_l",
-   "bone": "upper_arm_l",
-   "attachment": "upper_arm_l"
-  },
-  {
-   "name": "head",
-   "bone": "head",
-   "attachment": "head"
   },
   {
    "name": "eye_l",
@@ -233,6 +248,11 @@
    "name": "forearm_l",
    "bone": "forearm_l",
    "attachment": "forearm_l"
+  },
+  {
+   "name": "pj_forearm_l",
+   "bone": "forearm_l",
+   "attachment": "pj_forearm_l"
   }
  ],
  "skins": [
@@ -341,6 +361,38 @@
       "y": 12.0,
       "width": 347,
       "height": 286
+     }
+    },
+    "pj_cap": {
+     "pj_cap": {
+      "x": -267.1,
+      "y": 404.54,
+      "width": 973.0,
+      "height": 456.0
+     }
+    },
+    "pj_shirt": {
+     "pj_shirt": {
+      "x": -171.1,
+      "y": 71.54,
+      "width": 771.0,
+      "height": 412.0
+     }
+    },
+    "pj_upper_arm_l": {
+     "pj_upper_arm_l": {
+      "x": -37.6,
+      "y": -6.96,
+      "width": 198.0,
+      "height": 255.0
+     }
+    },
+    "pj_forearm_l": {
+     "pj_forearm_l": {
+      "x": -120.1,
+      "y": 23.54,
+      "width": 341.0,
+      "height": 262.0
      }
     }
    }
