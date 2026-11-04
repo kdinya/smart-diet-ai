@@ -2570,6 +2570,29 @@ test('assistant celebrates nutrition goals and shows its target-overage and slee
   await expect.poll(() => page.evaluate(() => window.botGaze?.t)).toBeGreaterThan(0);
 });
 
+
+test('assistant welcome pools are localized by tone and stay silent while asleep', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  const pools = await page.evaluate(() => ({
+    ukPolite: I.uk.botWelcomePolite,
+    ukPlayful: I.uk.botWelcomePlayful,
+    enPolite: I.en.botWelcomePolite,
+    enPlayful: I.en.botWelcomePlayful,
+  }));
+  expect(pools.ukPolite).toHaveLength(15);
+  expect(pools.ukPlayful).toHaveLength(15);
+  expect(pools.enPolite).toHaveLength(8);
+  expect(pools.enPlayful).toHaveLength(7);
+  expect(pools.ukPolite.join(' ')+pools.ukPlayful.join(' ')).not.toContain('Дніпро');
+  expect(pools.enPolite.join(' ')+pools.enPlayful.join(' ')).not.toMatch(/ЗСУ|Україн|Ukraine|Russia|Putin/i);
+  const mascot = page.locator('#bot-peeker');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await page.clock.fastForward(4500);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+});
+
 test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
@@ -2757,13 +2780,15 @@ test('comic assistant left tail mirrors the right tail', async ({ page }) => {
 
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
-  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en', aiTone: 'playful' }, foods: [], weights: [] });
   await page.clock.fastForward(2999);
   const bubble = page.locator('#bot-comic');
   await expect(bubble).not.toHaveClass(/is-visible/);
   await page.clock.fastForward(1001);
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
-  await expect(bubble).toContainText('Hi!');
+  const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePlayful }));
+  expect(welcome.allowed).toHaveLength(7);
+  expect(welcome.allowed).toContain(welcome.text);
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
     const path = el.querySelector('.bot-comic-shape path');
