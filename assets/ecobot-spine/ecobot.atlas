@@ -29,3 +29,11 @@ torso
 bounds:822,2,539,590
 upper_arm_l
 bounds:1429,730,199,263
+pj_cap
+bounds:988,1086,973,456
+pj_shirt
+bounds:0,1388,771,412
+pj_upper_arm_l
+bounds:1706,0,198,255
+pj_forearm_l
+bounds:1362,0,341,262

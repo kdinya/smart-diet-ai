@@ -2579,15 +2579,18 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect(mascot).toHaveAttribute('data-time-period', 'night');
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
-  await expect(page.locator('.bot-sleepwear-art')).toBeVisible();
-  const shirtFabric = page.locator('.pajama-shirt .fabric');
-  await expect(shirtFabric).toHaveCount(2);
-  await expect(shirtFabric.first()).toBeVisible();
-  await expect(shirtFabric.nth(1)).toBeVisible();
-  const capFabric = page.locator('.sleep-cap .fabric');
-  await expect(capFabric).toHaveCount(2);
-  await expect(capFabric.first()).toBeVisible();
-  await expect(capFabric.nth(1)).toBeVisible();
+  const pajamaSlots = () => page.evaluate(() => {
+    botSpineRig.skeleton.setToSetupPose();
+    applyBotSleepwearSlots(botSpineRig);
+    return Object.fromEntries(['pj_cap', 'pj_shirt', 'pj_upper_arm_l', 'pj_forearm_l'].map(name => [name, botSpineRig.skeleton.findSlot(name).attachment?.name ?? null]));
+  });
+  await expect.poll(pajamaSlots).toEqual({ pj_cap: 'pj_cap', pj_shirt: 'pj_shirt', pj_upper_arm_l: 'pj_upper_arm_l', pj_forearm_l: 'pj_forearm_l' });
+  expect(await page.evaluate(() => ({
+    pj_cap: botSpineRig.skeleton.findSlot('pj_cap').bone.data.name,
+    pj_shirt: botSpineRig.skeleton.findSlot('pj_shirt').bone.data.name,
+    pj_upper_arm_l: botSpineRig.skeleton.findSlot('pj_upper_arm_l').bone.data.name,
+    pj_forearm_l: botSpineRig.skeleton.findSlot('pj_forearm_l').bone.data.name,
+  }))).toEqual({ pj_cap: 'head', pj_shirt: 'torso', pj_upper_arm_l: 'upper_arm_l', pj_forearm_l: 'forearm_l' });
   await expect(zzz).toHaveClass(/is-sleeping/);
 
   await mascot.click();
@@ -2617,6 +2620,7 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
   await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await expect.poll(pajamaSlots).toEqual({ pj_cap: null, pj_shirt: null, pj_upper_arm_l: null, pj_forearm_l: null });
   await setTime('2026-11-03T19:59:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
   await setTime('2026-11-03T20:00:00');
