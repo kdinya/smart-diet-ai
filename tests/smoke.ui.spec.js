@@ -2593,6 +2593,31 @@ test('assistant welcome pools are localized by tone and stay silent while asleep
   await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
 });
 
+test('assistant welcomes use profile names and match Ukrainian gender', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', sex: 'female', aiTone: 'playful' }, foods: [], weights: [] });
+  const result = await page.evaluate(() => {
+    const source = '💙 Привіт! Україна прекрасна, а ти вже зробив/-ла крок до турботи про себе.';
+    const female = personalizeBotWelcome(source, true);
+    state.prefs.sex = 'male';
+    const male = personalizeBotWelcome(source, true);
+    state.prefs.sex = 'other';
+    const neutral = personalizeBotWelcome(source, true);
+    state.prefs.lang = 'en';
+    const english = personalizeBotWelcome('🌿 Hi! Ready for a fresh start?', true);
+    return { female, male, neutral, english };
+  });
+  expect(result.female).toContain('Олена');
+  expect(result.female).toContain('зробила крок');
+  expect(result.female).toContain('моя бусічко');
+  expect(result.male).toContain('зробив крок');
+  expect(result.male).toContain('мій котику');
+  expect(result.neutral).toContain('зробив/-ла крок');
+  expect(result.english).toContain('👋 Hi, Олена!');
+  const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
+  expect(parity).toBe(true);
+  expect(await page.evaluate(() => I.uk.botWelcomeUniversalPlayful)).toHaveLength(4);
+});
+
 test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
