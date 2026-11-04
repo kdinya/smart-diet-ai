@@ -2813,7 +2813,13 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePlayful }));
   expect(welcome.allowed).toHaveLength(7);
-  expect(welcome.allowed).toContain(welcome.text);
+  expect(welcome.allowed.some(message => welcome.text.startsWith(message))).toBe(true);
+  const uaWelcome = await page.evaluate(() => ({ playful: I.uk.botWelcomePlayful, polite: I.uk.botWelcomePolite }));
+  expect(uaWelcome.playful).toHaveLength(15);
+  expect(uaWelcome.polite).toHaveLength(15);
+  const topical = /ЗСУ|Україн|росі|РФ|Путін/iu;
+  expect(uaWelcome.playful.filter(text => topical.test(text))).toHaveLength(5);
+  expect(uaWelcome.polite.filter(text => topical.test(text))).toHaveLength(5);
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
     const path = el.querySelector('.bot-comic-shape path');
@@ -2836,7 +2842,8 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(fit.withinViewport).toBe(true);
   expect(fit.withinHeight).toBe(true);
   expect(fit.textFits).toBe(true);
-  expect(fit.textAngle).toBeCloseTo((fit.tailSide === 'left' ? -1 : 1) * (fit.placement === 'bottom' ? -1 : 1) * 10, 0);
+  expect(fit.textAngle).toBeCloseTo((fit.tailSide === 'left' ? 1 : -1) * (fit.placement === 'bottom' ? -1 : 1) * 5, 0);
+  expect(await bubble.evaluate(el => getComputedStyle(el).maxWidth)).toBe('340px');
   expect(fit.fontSize).toBe('17px');
   expect(fit.alpha).toMatch(/rgba/);
   expect(fit.cloud).toBe(true);
@@ -2849,9 +2856,15 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(fit.tailAnchor).toBeGreaterThan(.5);
   expect(fit.bubbleBackground).toBe('rgba(0, 0, 0, 0)');
   expect(fit.shapeShadow).toBe('none');
+  await page.evaluate(() => window.nutritionBot.say('Hi!'));
+  const shortMessageWidth = await bubble.evaluate(el => el.getBoundingClientRect().width);
+  await page.evaluate(() => window.nutritionBot.say('A longer assistant note should use more horizontal space and avoid looking like a narrow column.'));
+  const longMessageWidth = await bubble.evaluate(el => el.getBoundingClientRect().width);
+  expect(longMessageWidth).toBeGreaterThan(shortMessageWidth + 10);
+  expect(longMessageWidth).toBeLessThanOrEqual(364);
   await page.setViewportSize({ width: 390, height: 844 });
   await bubble.evaluate(() => positionBotComic());
-  const mobile = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return { centered: Math.abs(r.left+r.width/2-innerWidth/2)<1, tail: Number(el.dataset.tailAnchor) }; });
+  const mobile = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return { centered: Math.abs(r.left+r.width/2-innerWidth/2)<2, tail: Number(el.dataset.tailAnchor), left:r.left,width:r.width,screen:innerWidth }; });
   expect(mobile.centered).toBe(true);
   await page.locator('#bot-peeker').evaluate(el => { el.classList.add('bot-side-left'); el.style.left='8px'; el.style.right='auto'; positionBotComic(); });
   const leftTail = Number(await bubble.getAttribute('data-tail-anchor'));
@@ -2860,7 +2873,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(leftOutlineArcCount).toBeGreaterThanOrEqual(7);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
   await expect(bubble).toHaveAttribute('data-tail-side', 'left');
-  await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '-10deg');
+  await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '5deg');
   expect(await bubble.locator('.bot-comic-shape').evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)).toBe(1);
   const leftBounds = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; });
   expect(leftBounds.left).toBeGreaterThanOrEqual(0);
@@ -2878,7 +2891,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(rightBounds.top).toBeGreaterThanOrEqual(0);
   expect(rightBounds.bottom).toBeLessThanOrEqual(844);
   await expect(bubble).toHaveAttribute('data-tail-side', 'right');
-  await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '10deg');
+  await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '-5deg');
   expect(Number(await bubble.getAttribute('data-tail-anchor'))).toBeGreaterThan(.5);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
   await page.clock.fastForward(30_000);
@@ -2913,7 +2926,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(preview).toHaveCSS('--comic-outline', '#28754f');
   await modal.locator('#bot-comic-placement').selectOption('bottom');
   await expect(preview).toHaveAttribute('data-placement', 'bottom');
-  await expect(preview.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '-10deg');
+  await expect(preview.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '5deg');
   await modal.locator('#bot-comic-tail').click();
   await expect(preview).toHaveAttribute('data-tail', 'false');
   await modal.locator('#bot-service-close').click();
