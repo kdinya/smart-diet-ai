@@ -2594,7 +2594,7 @@ test('assistant follows local night, morning, day, and evening routines', async 
   const isArmMirroredBehindBack = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
     let bone = botSpineRig.bones.upper_arm_l;
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - (-90)) < 5;
+    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - (-40)) < 5;
   });
   await expect.poll(isArmMirroredBehindBack).toBe(true);
 
@@ -2709,6 +2709,20 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
   await modal.getByRole('button', { name: 'Put on pajamas' }).click();
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  const isArmBehind = () => page.evaluate(() => {
+    let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
+    let bone = botSpineRig.bones.upper_arm_l;
+    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - (-40)) < 5;
+  });
+  await expect.poll(isArmBehind).toBe(true);
+  await modal.getByRole('button', { name: 'Take off pajamas' }).click();
+  await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+  const isArmNormal = () => page.evaluate(() => {
+    let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
+    let bone = botSpineRig.bones.upper_arm_l;
+    return order.indexOf('upper_arm_l') > order.indexOf('torso') && bone.scaleY === 1 && Math.abs(bone.rotation) < 5;
+  });
+  await expect.poll(isArmNormal).toBe(true);
   await modal.locator('#bot-service-close').click();
   await expect(modal).not.toHaveClass(/open/);
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
