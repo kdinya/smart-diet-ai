@@ -2673,6 +2673,10 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   const modal = page.locator('#bot-service-modal');
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  const mouthScale = () => page.evaluate(() => botSpineRig.skeleton.findBone('mouth').scaleY);
+  const eyeScale = () => page.evaluate(() => botSpineRig.skeleton.findBone('eye_l').scaleY);
+  const dayMouth = await mouthScale();
+  const dayEye = await eyeScale();
   await openView(page, 'settings');
   const title = page.locator('#bot-appearance-title');
   for (let i = 0; i < 4; i++) await title.click();
@@ -2684,8 +2688,10 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
   await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
-  await modal.getByRole('button', { name: 'Dozing' }).click();
+  await expect.poll(mouthScale).toBeLessThan(dayMouth * 0.9);
+  await modal.getByRole('button', { name: 'Sleepy' }).click();
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await expect.poll(eyeScale).toBeLessThan(dayEye * 0.8);
   await expect(page.locator('#bot-zzz')).not.toHaveClass(/is-sleeping/);
   await modal.getByRole('button', { name: 'Awake' }).click();
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
