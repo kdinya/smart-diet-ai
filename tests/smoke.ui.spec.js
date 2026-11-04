@@ -2594,7 +2594,7 @@ test('assistant follows local night, morning, day, and evening routines', async 
   const isArmMirroredBehindBack = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
     let bone = botSpineRig.bones.upper_arm_l;
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - (-40)) < 5;
+    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - 120) < 5;
   });
   await expect.poll(isArmMirroredBehindBack).toBe(true);
 
@@ -2712,7 +2712,7 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   const isArmBehind = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
     let bone = botSpineRig.bones.upper_arm_l;
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - (-40)) < 5;
+    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - 120) < 5;
   });
   await expect.poll(isArmBehind).toBe(true);
   await modal.getByRole('button', { name: 'Take off pajamas' }).click();
