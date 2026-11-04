@@ -2750,13 +2750,31 @@ test('comic assistant message is compact, dismisses on touch, and service previe
   await expect(bubble).toContainText('Hi!');
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
-    const style = getComputedStyle(el);
-    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: el.scrollWidth <= el.clientWidth + 1, alpha: style.backgroundColor };
+    const path = el.querySelector('.bot-comic-shape path');
+    const text = el.querySelector('.bot-comic-text');
+    const angle = -3.5 * Math.PI / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let textInside = true;
+    for (let a = -1; a <= 1; a += .5) {
+      for (let b = -1; b <= 1; b += .5) {
+        if (Math.abs(a) < 1 && Math.abs(b) < 1) continue;
+        const x = a * text.offsetWidth / 2;
+        const y = b * text.offsetHeight / 2;
+        if (!path.isPointInFill(new DOMPoint(text.offsetLeft + text.offsetWidth / 2 + x * cos - y * sin, text.offsetTop + text.offsetHeight / 2 + x * sin + y * cos))) textInside = false;
+      }
+    }
+    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke };
   });
   expect(fit.withinViewport).toBe(true);
   expect(fit.withinHeight).toBe(true);
   expect(fit.textFits).toBe(true);
   expect(fit.alpha).toMatch(/rgba/);
+  expect(fit.cloud).toBe(true);
+  expect(fit.textInside).toBe(true);
+  expect(fit.hasClose).toBe(true);
+  expect(fit.sparkCount).toBe(4);
+  expect(fit.outline).toBe('rgb(27, 56, 53)');
   await page.locator('#bot-comic').dispatchEvent('pointerdown');
   await expect(bubble).not.toHaveClass(/is-visible/);
 
