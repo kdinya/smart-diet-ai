@@ -2705,6 +2705,36 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
 });
 
+test('putting on and taking off pajamas plays a sparkle transition', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  const mascot = page.locator('#bot-peeker');
+  const modal = page.locator('#bot-service-modal');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await page.clock.fastForward(3500);
+  await openView(page, 'settings');
+  const title = page.locator('#bot-appearance-title');
+  for (let i = 0; i < 5; i++) await title.click();
+  await expect(modal).toHaveClass(/open/);
+  await modal.getByRole('button', { name: 'Put on pajamas' }).click();
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await page.clock.fastForward(200);
+  expect(await page.evaluate(() => botSpineRig.pajamaFx?.dir)).toBe('on');
+  expect(await page.evaluate(() => botSpineRig.pajamaFx.particles.length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').color.a)).toBeLessThan(1);
+  await page.clock.fastForward(3000);
+  expect(await page.evaluate(() => botSpineRig.pajamaFx)).toBeNull();
+  expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').color.a)).toBe(1);
+  await modal.getByRole('button', { name: 'Take off pajamas' }).click();
+  await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+  await page.clock.fastForward(200);
+  expect(await page.evaluate(() => botSpineRig.pajamaFx?.dir)).toBe('off');
+  expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').attachment?.name ?? null)).toBe('pj_cap');
+  await page.clock.fastForward(3000);
+  expect(await page.evaluate(() => botSpineRig.pajamaFx)).toBeNull();
+  expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').attachment?.name ?? null)).toBeNull();
+});
+
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, {
