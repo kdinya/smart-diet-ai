@@ -2741,6 +2741,20 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
 });
 
+test('comic assistant left tail mirrors the right tail', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  const result = await page.evaluate(() => {
+    const bubble = document.querySelector('#bot-comic');
+    fitBotComicCloud(bubble, 18, .75, 12);
+    const path = bubble.querySelector('.bot-comic-shape path');
+    const rightPath = path.getAttribute('d');
+    fitBotComicCloud(bubble, 18, .25, 12);
+    return { rightPath, leftPath: path.getAttribute('d'), transform: path.getAttribute('transform'), viewBox: bubble.querySelector('.bot-comic-shape').getAttribute('viewBox') };
+  });
+  expect(result.leftPath).toBe(result.rightPath);
+  expect(result.transform).toBe('translate(' + result.viewBox.split(' ')[2] + ' 0) scale(-1 1)');
+});
+
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
