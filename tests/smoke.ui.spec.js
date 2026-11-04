@@ -2741,6 +2741,54 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
 });
 
+test('comic assistant message is compact, dismisses on touch, and service preview settings are temporary', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  await page.clock.fastForward(1500);
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
+  await expect(bubble).toContainText('Hi!');
+  const fit = await bubble.evaluate(el => {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: el.scrollWidth <= el.clientWidth + 1, alpha: style.backgroundColor };
+  });
+  expect(fit.withinViewport).toBe(true);
+  expect(fit.withinHeight).toBe(true);
+  expect(fit.textFits).toBe(true);
+  expect(fit.alpha).toMatch(/rgba/);
+  await page.locator('#bot-comic').dispatchEvent('pointerdown');
+  await expect(bubble).not.toHaveClass(/is-visible/);
+
+  await openView(page, 'settings');
+  const title = page.locator('#bot-appearance-title');
+  for (let i = 0; i < 5; i++) await title.click();
+  const modal = page.locator('#bot-service-modal');
+  await expect(modal).toHaveClass(/open/);
+  await modal.locator('#bot-comic-preview-toggle').click();
+  const preview = page.locator('#bot-comic');
+  await expect(preview).toHaveClass(/bot-comic-preview/);
+  await modal.locator('#bot-comic-text').fill('A tiny preview ✨');
+  await expect(preview).toHaveText('A tiny preview ✨');
+  await modal.locator('#bot-comic-font').evaluate(el => { el.value = '22'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview).toHaveCSS('font-size', '22px');
+  await modal.locator('#bot-comic-alpha').evaluate(el => { el.value = '50'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.5)');
+  await modal.locator('#bot-comic-width').evaluate(el => { el.value = '200'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview).toHaveCSS('max-width', '200px');
+  await modal.locator('#bot-service-close').click();
+  await expect(modal).not.toHaveClass(/open/);
+  await expect(preview).not.toHaveClass(/is-visible/);
+  expect(await page.evaluate(() => localStorage.getItem('smartdiet-v1'))).not.toContain('A tiny preview');
+  for (let i = 0; i < 5; i++) await title.click();
+  await modal.locator('#bot-comic-preview-toggle').click();
+  await expect(preview).toHaveText('Hi! 🌿 I’m ready to help you today ✨');
+  await expect(preview).toHaveCSS('font-size', '15px');
+  await modal.locator('#bot-service-close').click();
+  await page.evaluate(() => window.nutritionBot.say('Saved! 🎉', { duration: 2 }));
+  await expect(bubble).toHaveText('Saved! 🎉');
+});
+
 test('putting on and taking off pajamas plays a sparkle transition', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
