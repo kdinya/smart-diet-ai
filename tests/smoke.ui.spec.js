@@ -2591,11 +2591,12 @@ test('assistant follows local night, morning, day, and evening routines', async 
     pj_upper_arm_l: botSpineRig.skeleton.findSlot('pj_upper_arm_l').bone.data.name,
     pj_forearm_l: botSpineRig.skeleton.findSlot('pj_forearm_l').bone.data.name,
   }))).toEqual({ pj_cap: 'head', pj_shirt: 'torso', pj_upper_arm_l: 'upper_arm_l', pj_forearm_l: 'forearm_l' });
-  const isArmBehindBack = () => page.evaluate(() => {
+  const isArmMirroredBehindBack = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && botSpineRig.bones.upper_arm_l.rotation > 50;
+    let bone = botSpineRig.bones.upper_arm_l;
+    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation) < 5;
   });
-  await expect.poll(isArmBehindBack).toBe(true);
+  await expect.poll(isArmMirroredBehindBack).toBe(true);
 
   await mascot.click();
   await expect(mascot).toHaveAttribute('data-spine-mood', 'surprise');
@@ -2627,7 +2628,8 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect.poll(pajamaSlots).toEqual({ pj_cap: null, pj_shirt: null, pj_upper_arm_l: null, pj_forearm_l: null });
   const isArmInFront = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
-    return order.indexOf('upper_arm_l') > order.indexOf('torso') && botSpineRig.bones.upper_arm_l.rotation < 20;
+    let bone = botSpineRig.bones.upper_arm_l;
+    return order.indexOf('upper_arm_l') > order.indexOf('torso') && bone.scaleY === 1 && Math.abs(bone.rotation) < 5;
   });
   await expect.poll(isArmInFront).toBe(true);
   await setTime('2026-11-03T19:59:00');
