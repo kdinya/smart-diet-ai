@@ -2744,8 +2744,10 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
 test('comic assistant message is compact, dismisses on touch, and service preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-  await page.clock.fastForward(1500);
+  await page.clock.fastForward(2999);
   const bubble = page.locator('#bot-comic');
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await page.clock.fastForward(1001);
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   await expect(bubble).toContainText('Hi!');
   const fit = await bubble.evaluate(el => {
@@ -2764,7 +2766,7 @@ test('comic assistant message is compact, dismisses on touch, and service previe
         if (!path.isPointInFill(new DOMPoint(text.offsetLeft + text.offsetWidth / 2 + x * cos - y * sin, text.offsetTop + text.offsetHeight / 2 + x * sin + y * cos))) textInside = false;
       }
     }
-    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke };
+    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke, tailAnchor: Number(el.dataset.tailAnchor), bubbleBackground: getComputedStyle(el).backgroundColor, shapeShadow: getComputedStyle(el.querySelector('.bot-comic-shape')).filter };
   });
   expect(fit.withinViewport).toBe(true);
   expect(fit.withinHeight).toBe(true);
@@ -2775,6 +2777,17 @@ test('comic assistant message is compact, dismisses on touch, and service previe
   expect(fit.hasClose).toBe(true);
   expect(fit.sparkCount).toBe(4);
   expect(fit.outline).toBe('rgb(27, 56, 53)');
+  expect(fit.tailAnchor).toBeGreaterThan(.5);
+  expect(fit.bubbleBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(fit.shapeShadow).toBe('none');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await bubble.evaluate(() => positionBotComic());
+  const mobile = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return { centered: Math.abs(r.left+r.width/2-innerWidth/2)<1, tail: Number(el.dataset.tailAnchor) }; });
+  expect(mobile.centered).toBe(true);
+  await page.locator('#bot-peeker').evaluate(el => { el.classList.add('bot-side-left'); el.style.left='8px'; el.style.right='auto'; positionBotComic(); });
+  const leftTail = Number(await bubble.getAttribute('data-tail-anchor'));
+  expect(leftTail).toBeLessThan(.5);
+  await page.locator('#bot-peeker').evaluate(el => { el.classList.remove('bot-side-left'); el.style.left=''; el.style.right=''; });
   await page.locator('#bot-comic').dispatchEvent('pointerdown');
   await expect(bubble).not.toHaveClass(/is-visible/);
 
