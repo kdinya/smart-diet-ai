@@ -2789,18 +2789,29 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
 });
 
-test('comic assistant left tail mirrors the right tail', async ({ page }) => {
+test('comic assistant cloud artwork mirrors without mirroring text', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
   const result = await page.evaluate(() => {
     const bubble = document.querySelector('#bot-comic');
+    const text = bubble.querySelector('.bot-comic-text');
+    text.textContent = 'Readable on both sides';
+    bubble.dataset.placement = 'top';
+    bubble.dataset.side = 'right';
     fitBotComicCloud(bubble, 18, .75, 12);
     const path = bubble.querySelector('.bot-comic-shape path');
     const rightPath = path.getAttribute('d');
+    const rightText = { value: text.textContent, transform: getComputedStyle(text).transform, parent: text.parentElement.className };
+    bubble.dataset.side = 'left';
     fitBotComicCloud(bubble, 18, .25, 12);
-    return { rightPath, leftPath: path.getAttribute('d'), transform: path.getAttribute('transform'), viewBox: bubble.querySelector('.bot-comic-shape').getAttribute('viewBox') };
+    return { rightPath, leftPath: path.getAttribute('d'), pathTransform: path.getAttribute('transform'), artworkTransform: bubble.querySelector('.bot-comic-art').style.transform, text: { value: text.textContent, transform: getComputedStyle(text).transform, parent: text.parentElement.className }, dots: bubble.querySelectorAll('.bot-comic-thought-dot').length };
   });
   expect(result.leftPath).toBe(result.rightPath);
-  expect(result.transform).toBe('translate(' + result.viewBox.split(' ')[2] + ' 0) scale(-1 1)');
+  expect(result.pathTransform).toBeNull();
+  expect(result.artworkTransform).toBe('scaleX(-1)');
+  expect(result.text.value).toBe('Readable on both sides');
+  expect(result.text.parent).toBe('bot-comic');
+  expect(result.text.transform).not.toMatch(/matrix\(-1/);
+  expect(result.dots).toBe(2);
 });
 
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
@@ -2837,12 +2848,12 @@ test('comic assistant message fits, stays until touch, and preview settings are 
         if (!path.isPointInFill(new DOMPoint(text.offsetLeft + text.offsetWidth / 2 + x * cos - y * sin, text.offsetTop + text.offsetHeight / 2 + x * sin + y * cos))) textInside = false;
       }
     }
-    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, textAngle: angle * 180 / Math.PI, fontSize: getComputedStyle(el).fontSize, tailSide: el.dataset.tailSide, placement: el.dataset.placement, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke, tailAnchor: Number(el.dataset.tailAnchor), bubbleBackground: getComputedStyle(el).backgroundColor, shapeShadow: getComputedStyle(el.querySelector('.bot-comic-shape')).filter };
+    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, textAngle: angle * 180 / Math.PI, fontSize: getComputedStyle(el).fontSize, side: el.dataset.side, placement: el.dataset.placement, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke, thoughtDots: el.querySelectorAll('.bot-comic-thought-dot').length, artworkTransform: el.querySelector('.bot-comic-art').style.transform, bubbleBackground: getComputedStyle(el).backgroundColor, shapeShadow: getComputedStyle(el.querySelector('.bot-comic-shape')).filter };
   });
   expect(fit.withinViewport).toBe(true);
   expect(fit.withinHeight).toBe(true);
   expect(fit.textFits).toBe(true);
-  expect(fit.textAngle).toBeCloseTo((fit.tailSide === 'left' ? 1 : -1) * (fit.placement === 'bottom' ? -1 : 1) * 10, 0);
+  expect(fit.textAngle).toBeCloseTo((fit.side === 'left' ? 1 : -1) * (fit.placement === 'bottom' ? -1 : 1) * 10, 0);
   expect(await bubble.evaluate(el => getComputedStyle(el).maxWidth)).toBe('340px');
   expect(fit.fontSize).toBe('17px');
   expect(fit.alpha).toMatch(/rgba/);
@@ -2853,7 +2864,9 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(fit.hasClose).toBe(true);
   expect(fit.sparkCount).toBe(4);
   expect(fit.outline).toBe('rgb(40, 117, 79)');
-  expect(fit.tailAnchor).toBeGreaterThan(.5);
+  expect(fit.side).toBe('right');
+  expect(fit.thoughtDots).toBe(2);
+  expect(fit.artworkTransform).toBe('');
   expect(fit.bubbleBackground).toBe('rgba(0, 0, 0, 0)');
   expect(fit.shapeShadow).toBe('none');
   await page.evaluate(() => window.nutritionBot.say('Hi!'));
@@ -2864,17 +2877,18 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(longMessageWidth).toBeLessThanOrEqual(364);
   await page.setViewportSize({ width: 390, height: 844 });
   await bubble.evaluate(() => positionBotComic());
-  const mobile = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return { centered: Math.abs(r.left+r.width/2-innerWidth/2)<2, tail: Number(el.dataset.tailAnchor), left:r.left,width:r.width,screen:innerWidth }; });
+  const mobile = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return { centered: Math.abs(r.left+r.width/2-innerWidth/2)<2, left:r.left,width:r.width,screen:innerWidth }; });
   expect(mobile.centered).toBe(true);
   await page.evaluate(() => { document.querySelector('#bot-comic .bot-comic-text').textContent = 'A short note ✨'; positionBotComic(); });
   await page.locator('#bot-peeker').evaluate(el => { el.classList.add('bot-side-left'); el.style.left='8px'; el.style.right='auto'; positionBotComic(); });
-  const leftTail = Number(await bubble.getAttribute('data-tail-anchor'));
+  const leftSide = await bubble.getAttribute('data-side');
   await expect(bubble).toHaveAttribute('data-fit', 'ok');
-  expect(leftTail).toBeLessThan(.5);
+  expect(leftSide).toBe('left');
+  expect(await bubble.locator('.bot-comic-art').evaluate(el => el.style.transform)).toBe('scaleX(-1)');
   const leftOutlineArcCount = await bubble.locator('.bot-comic-shape path').getAttribute('d').then(d => (d.match(/A/g) || []).length);
   expect(leftOutlineArcCount).toBeGreaterThanOrEqual(7);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
-  await expect(bubble).toHaveAttribute('data-tail-side', 'left');
+  await expect(bubble).toHaveAttribute('data-side', 'left');
   await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '10deg');
   expect(await bubble.locator('.bot-comic-shape').evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)).toBe(1);
   const leftBounds = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; });
@@ -2886,18 +2900,19 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect.poll(() => bubble.evaluate(el => { const r=el.getBoundingClientRect(); return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight; })).toBe(true);
   await page.evaluate(() => { document.querySelector('#bot-comic .bot-comic-text').textContent = 'A short note ✨'; positionBotComic(); });
   await page.locator('#bot-peeker').evaluate(el => { el.classList.remove('bot-side-left'); el.style.left=''; el.style.right=''; positionBotComic(); });
-  const rightTail = Number(await bubble.getAttribute('data-tail-anchor'));
+  const rightSide = await bubble.getAttribute('data-side');
   
   await expect(bubble).toHaveAttribute('data-fit', 'ok');
-  expect(rightTail).toBeGreaterThan(.5);
+  expect(rightSide).toBe('right');
+  expect(await bubble.locator('.bot-comic-art').evaluate(el => el.style.transform)).toBe('');
   const rightBounds = await bubble.evaluate(el => { const r=el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; });
   expect(rightBounds.left).toBeGreaterThanOrEqual(0);
   expect(rightBounds.right).toBeLessThanOrEqual(390);
   expect(rightBounds.top).toBeGreaterThanOrEqual(0);
   expect(rightBounds.bottom).toBeLessThanOrEqual(844);
-  await expect(bubble).toHaveAttribute('data-tail-side', 'right');
+  await expect(bubble).toHaveAttribute('data-side', 'right');
   await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '-10deg');
-  expect(Number(await bubble.getAttribute('data-tail-anchor'))).toBeGreaterThan(.5);
+  expect(await bubble.locator('.bot-comic-thought-dot').count()).toBe(2);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
   await page.clock.fastForward(30_000);
   await expect(bubble).toHaveClass(/is-visible/);
@@ -2938,8 +2953,8 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await modal.locator('#bot-comic-placement').selectOption('bottom');
   await expect(preview).toHaveAttribute('data-placement', 'bottom');
   await expect(preview.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '10deg');
-  await modal.locator('#bot-comic-tail').click();
-  await expect(preview).toHaveAttribute('data-tail', 'false');
+  await expect(modal.locator('#bot-comic-tail')).toHaveCount(0);
+  await expect(preview.locator('.bot-comic-thought-dot')).toHaveCount(2);
   await modal.locator('#bot-service-close').click();
   await expect(modal).not.toHaveClass(/open/);
   await expect(preview).not.toHaveClass(/is-visible/);
