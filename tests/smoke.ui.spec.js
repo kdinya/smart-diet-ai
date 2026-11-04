@@ -2596,7 +2596,9 @@ test('assistant follows local night, morning, day, and evening routines', async 
     let torsoIndex = order.indexOf('torso');
     let armSlots = ['upper_arm_l', 'pj_upper_arm_l', 'forearm_l', 'pj_forearm_l', 'hand_l'];
     let bone = botSpineRig.bones.upper_arm_l;
-    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 150) < 5;
+    let elbow = botSpineRig.bones.forearm_l;
+    let wrist = botSpineRig.bones.hand_l;
+    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 70) < 5 && elbow.worldX < bone.worldX && wrist.worldX <= elbow.worldX + 20;
   });
   await expect.poll(isArmMirroredBehindBack).toBe(true);
 
@@ -2694,7 +2696,9 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
     let torsoIndex = order.indexOf('torso');
     let armSlots = ['upper_arm_l', 'pj_upper_arm_l', 'forearm_l', 'pj_forearm_l', 'hand_l'];
     let bone = botSpineRig.bones.upper_arm_l;
-    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 150) < 5;
+    let elbow = botSpineRig.bones.forearm_l;
+    let wrist = botSpineRig.bones.hand_l;
+    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 70) < 5 && elbow.worldX < bone.worldX && wrist.worldX <= elbow.worldX + 20;
   });
   const dayMouth = await mouthScale();
   const dayEye = await eyeScale();
