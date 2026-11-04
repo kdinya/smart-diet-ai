@@ -2593,8 +2593,10 @@ test('assistant follows local night, morning, day, and evening routines', async 
   }))).toEqual({ pj_cap: 'head', pj_shirt: 'torso', pj_upper_arm_l: 'upper_arm_l', pj_forearm_l: 'forearm_l' });
   const isArmMirroredBehindBack = () => page.evaluate(() => {
     let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
+    let torsoIndex = order.indexOf('torso');
+    let armSlots = ['upper_arm_l', 'pj_upper_arm_l', 'forearm_l', 'pj_forearm_l', 'hand_l'];
     let bone = botSpineRig.bones.upper_arm_l;
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - 120) < 5;
+    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 150) < 5;
   });
   await expect.poll(isArmMirroredBehindBack).toBe(true);
 
@@ -2617,6 +2619,7 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect(mascot).toHaveAttribute('data-time-period', 'morning');
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await expect.poll(isArmMirroredBehindBack).toBe(true);
   await expect(zzz).not.toHaveClass(/is-sleeping/);
   await setTime('2026-11-03T08:59:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'morning');
@@ -2686,6 +2689,13 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
   const mouthScale = () => page.evaluate(() => botSpineRig.skeleton.findBone('mouth').scaleY);
   const eyeScale = () => page.evaluate(() => botSpineRig.skeleton.findBone('eye_l').scaleY);
+  const isArmBehind = () => page.evaluate(() => {
+    let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
+    let torsoIndex = order.indexOf('torso');
+    let armSlots = ['upper_arm_l', 'pj_upper_arm_l', 'forearm_l', 'pj_forearm_l', 'hand_l'];
+    let bone = botSpineRig.bones.upper_arm_l;
+    return torsoIndex >= 0 && armSlots.every(name => order.indexOf(name) >= 0 && order.indexOf(name) < torsoIndex) && bone.scaleY === -1 && Math.abs(bone.rotation - 150) < 5;
+  });
   const dayMouth = await mouthScale();
   const dayEye = await eyeScale();
   await openView(page, 'settings');
@@ -2696,6 +2706,7 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(modal).toHaveClass(/open/);
   await modal.getByRole('button', { name: 'Asleep' }).click();
   await expect(mascot).toHaveAttribute('data-time-period', 'night');
+  await expect.poll(isArmBehind).toBe(true);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
   await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
@@ -2703,17 +2714,13 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await modal.getByRole('button', { name: 'Sleepy' }).click();
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
   await expect.poll(eyeScale).toBeLessThan(dayEye * 0.8);
+  await expect.poll(isArmBehind).toBe(true);
   await expect(page.locator('#bot-zzz')).not.toHaveClass(/is-sleeping/);
   await modal.getByRole('button', { name: 'Awake' }).click();
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
   await modal.getByRole('button', { name: 'Put on pajamas' }).click();
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
-  const isArmBehind = () => page.evaluate(() => {
-    let order = botSpineRig.skeleton.drawOrder.map(s => s.data.name);
-    let bone = botSpineRig.bones.upper_arm_l;
-    return order.indexOf('upper_arm_l') < order.indexOf('torso') && bone.scaleY === -1 && Math.abs(bone.rotation - 120) < 5;
-  });
   await expect.poll(isArmBehind).toBe(true);
   await modal.getByRole('button', { name: 'Take off pajamas' }).click();
   await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
