@@ -2666,6 +2666,39 @@ test('assistant stays sleepy instead of cheerful while wearing pajamas', async (
   await expect(mascot).toHaveAttribute('data-spine-mood', 'celebration');
 });
 
+test('hidden service menu forces assistant states until it is closed', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  const mascot = page.locator('#bot-peeker');
+  const modal = page.locator('#bot-service-modal');
+  await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await openView(page, 'settings');
+  const title = page.locator('#bot-appearance-title');
+  for (let i = 0; i < 4; i++) await title.click();
+  await expect(modal).not.toHaveClass(/open/);
+  await title.click();
+  await expect(modal).toHaveClass(/open/);
+  await modal.getByRole('button', { name: 'Asleep' }).click();
+  await expect(mascot).toHaveAttribute('data-time-period', 'night');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
+  await modal.getByRole('button', { name: 'Dozing' }).click();
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await expect(page.locator('#bot-zzz')).not.toHaveClass(/is-sleeping/);
+  await modal.getByRole('button', { name: 'Awake' }).click();
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+  await modal.getByRole('button', { name: 'Put on pajamas' }).click();
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
+  await modal.locator('#bot-service-close').click();
+  await expect(modal).not.toHaveClass(/open/);
+  await expect(mascot).toHaveAttribute('data-time-period', 'day');
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
+  await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+});
+
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, {
