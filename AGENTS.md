@@ -1,6 +1,6 @@
 # AI Agent Guidelines & Technical Instructions for Smart Diet AI
 
-> **Note for AI Agents:** The repository owner will frequently refer to this document as **"інструкція"** (Ukrainian for "instruction" / "manual"). Whenever the user mentions **"інструкція"**, **"згідно інструкції"**, or **"дивись в інструкцію"**, they are strictly referring to this file (`AGENTS.md`). Always consult and follow this file. See point 0 for the rules on updating it.
+> **Note for AI Agents:** The repository owner may refer to this document as the instruction or manual. Whenever the user calls it the instruction or manual, they mean this file (`AGENTS.md`). Always consult and follow this file. See point 0 for the rules on updating it.
 
 ---
 
