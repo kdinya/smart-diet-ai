@@ -2992,7 +2992,8 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '0deg');
   expect(await bubble.locator('.bot-comic-thought-dot').count()).toBe(3);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
-  await page.clock.fastForward(30_000);
+  await page.evaluate(() => window.nutritionBot.say('Timer test', { duration: 1 }));
+  await page.clock.fastForward(1400);
   await expect(bubble).not.toHaveClass(/is-visible/);
   await page.locator('body').dispatchEvent('pointerdown');
   await expect(bubble).not.toHaveClass(/is-visible/);
@@ -3127,10 +3128,11 @@ test('putting on and taking off pajamas plays a sparkle transition', async ({ pa
 
 test('a qualifying weigh-in offers a plan update and acceptance preserves the profile baseline', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
-  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2300, protein: 160, carbs: 200, fat: 70 };
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
-  const candidateKcal = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 90 }).kcal);
-  expect(2300 - candidateKcal).toBeGreaterThanOrEqual(50);
+  await page.clock.fastForward(2200);
+  const candidateKcal = 1781;
+  expect(2236 - candidateKcal).toBeGreaterThanOrEqual(50);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
@@ -3148,23 +3150,28 @@ test('a qualifying weigh-in offers a plan update and acceptance preserves the pr
 
 test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal does not prompt', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
-  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2300, protein: 160, carbs: 200, fat: 70 };
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
   await expect(bubble).toContainText('Update your weight-loss plan?');
   await bubble.locator('.bot-comic-actions button').nth(1).click();
-  expect((await readStore(page)).prefs.kcal).toBe(2300);
+  expect((await readStore(page)).prefs.kcal).toBe(2236);
 
   await page.reload();
-  await page.evaluate(() => { const p={...state.prefs,currentWeight:100}; p.kcal=formulaRecommendation(p).kcal+49; state.prefs=p; save(); });
+  await page.clock.fastForward(2200);
+  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925 }; save(); });
+  expect(1925 - 1876).toBe(49);
   await page.locator('[data-action="add-weight"]').first().click();
-  await page.fill('#weight-value', '100');
+  await page.fill('#weight-value', '99.9');
   await page.locator('#weight-save').click();
   await expect(bubble).not.toHaveClass(/is-visible/);
-  expect((await readStore(page)).prefs.currentWeight).toBe(100);
+  const afterSmallDrop = await readStore(page);
+  expect(afterSmallDrop.prefs.currentWeight).toBe(100);
+  expect(afterSmallDrop.weights.map(item => item.value)).toContain(99.9);
 });
 
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
