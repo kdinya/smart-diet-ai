@@ -1681,6 +1681,72 @@ test.describe('Smoke: legacy snack ordering', () => {
   });
 });
 
+test.describe('Smoke: sleeping assistant wake prompt', () => {
+  const sleepyStore = () => ({ prefs: { ...BASE_PREFS, botMode: 'mascot', lang: 'uk' }, products: [], foods: [], weights: [] });
+
+  test('tapping a sleeping assistant asks first and the no choice returns it to sleep', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+    await openApp(page, sleepyStore());
+    const mascot = page.locator('#bot-peeker');
+    const bubble = page.locator('#bot-comic');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+
+    await mascot.click();
+    await page.clock.fastForward(20);
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Я сплю 😴 Точно розбудити мене?');
+    await expect(bubble.locator('.bot-comic-actions button')).toHaveText(['Так, розбудити', 'Ні, спи далі']);
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await page.evaluate(() => toggleBotPoppedFab());
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
+
+    await bubble.locator('.bot-comic-actions button', { hasText: 'Ні, спи далі' }).click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.clock.fastForward(1000);
+    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 3000 }).toBe('sleeping');
+  });
+
+  test('yes reveals the quick actions and the assistant sleeps again after opening settings', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+    await openApp(page, sleepyStore());
+    const mascot = page.locator('#bot-peeker');
+    const bubble = page.locator('#bot-comic');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await mascot.click();
+    await page.clock.fastForward(20);
+    await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
+    await bubble.locator('.bot-comic-actions button', { hasText: 'Так, розбудити' }).click();
+    await page.clock.fastForward(360);
+    await page.clock.fastForward(20);
+    await expect(page.locator('body')).toHaveClass(/bot-actions-open/, { timeout: 3000 });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await expect(page.locator('#bot-chat-action-fab')).toBeVisible();
+    await expect(page.locator('#bot-settings-fab')).toBeVisible();
+
+    await page.locator('#bot-settings-fab').click();
+    await expect(page.locator('#bot-appearance-card')).toBeVisible();
+    await expect(page.locator('body')).not.toHaveClass(/bot-actions-open/);
+    await page.clock.fastForward(1000);
+    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 3000 }).toBe('sleeping');
+  });
+
+  test('unrelated actions cannot animate the assistant awake at night', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+    await openApp(page, sleepyStore());
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    await page.evaluate(() => {
+      window.nutritionBot.wave();
+      window.nutritionBot.thinking();
+      window.nutritionBot.success();
+      window.nutritionBot.celebration();
+    });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+  });
+});
+
 test.describe('Smoke: sleepy assistant food reminder', () => {
   const store = () => ({ prefs: { ...BASE_PREFS, botMode: 'mascot', lang: 'uk' }, products: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }], foods: [], weights: [] });
 
