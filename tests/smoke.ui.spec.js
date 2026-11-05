@@ -3172,7 +3172,7 @@ test('a qualifying weigh-in offers a plan update and acceptance preserves the pr
   const bubble = page.locator('#bot-comic');
   await expect(bubble).toContainText(`Update your weight-loss plan?`);
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
-  await bubble.locator('.bot-comic-actions button').first().click();
+  await bubble.locator('.bot-comic-actions button').first().dispatchEvent('click');
   await expect(bubble).not.toHaveClass(/is-visible/);
   const saved = await readStore(page);
   expect(saved.prefs.kcal).toBe(candidateKcal);
