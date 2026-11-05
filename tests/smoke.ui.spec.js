@@ -2671,16 +2671,24 @@ test('assistant welcomes use profile names and match Ukrainian gender', async ({
 });
 
 
-test('Ukrainian assistant startup welcome uses one of the 30 approved messages', async ({ page }) => {
+test('Ukrainian assistant startup welcome uses one of the 30 approved messages and stays until touched', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', aiTone: 'playful' }, foods: [], weights: [] });
-  await page.clock.fastForward(4000);
+  await page.clock.fastForward(2999);
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await page.clock.fastForward(1001);
+  await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   const welcome = await page.evaluate(() => ({
     text: document.querySelector('#bot-comic .bot-comic-text').textContent,
     allowed: I.uk.botWelcomeMessages,
   }));
   expect(welcome.allowed).toHaveLength(30);
   expect(welcome.allowed).toContain(welcome.text);
+  await page.clock.fastForward(15000);
+  await expect(bubble).toHaveClass(/is-visible/);
+  await page.locator('body').dispatchEvent('pointerdown');
+  await expect(bubble).not.toHaveClass(/is-visible/);
 });
 
 test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
