@@ -3088,6 +3088,33 @@ test('comic assistant cloud keeps a usable text area for very long messages on n
   }
 });
 
+test('comic assistant cloud cleanly encloses multi-line messages with actions without overflowing', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  const bubble = page.locator('#bot-comic');
+  const result = await page.evaluate(async () => {
+    const bubble = document.querySelector('#bot-comic');
+    const msg = I.uk.weightCycleSupport;
+    window.nutritionBot.ask(msg, [{ label: I.uk.weightCycleContinue, value: 'continue' }]);
+    positionBotComic();
+    const bBox = bubble.getBoundingClientRect();
+    const tBox = bubble.querySelector('.bot-comic-text').getBoundingClientRect();
+    const aBox = bubble.querySelector('.bot-comic-actions').getBoundingClientRect();
+    return {
+      fit: bubble.dataset.fit,
+      requiresAction: bubble.dataset.requiresAction,
+      bubbleWidth: bBox.width,
+      textWidth: tBox.width,
+      actionsWidth: aBox.width
+    };
+  });
+  expect(result.fit).toBe('ok');
+  expect(result.requiresAction).toBe('true');
+  expect(result.bubbleWidth).toBeGreaterThan(160);
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveText('Зрозуміло — продовжити');
+  await bubble.locator('.bot-comic-actions button').click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
+});
+
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en', aiTone: 'playful' }, foods: [], weights: [] });
