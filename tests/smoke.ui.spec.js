@@ -1691,7 +1691,11 @@ test.describe('Smoke: sleeping assistant wake prompt', () => {
     const bubble = page.locator('#bot-comic');
     await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
-    await page.clock.fastForward(2000);
+    await expect(mascot).not.toHaveClass(/is-arrived/);
+    await page.clock.fastForward(1500);
+    await expect(mascot).toHaveClass(/is-arrived/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    await page.clock.fastForward(700);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.clock.fastForward(500);
     await expect(bubble).toHaveClass(/is-visible/);
