@@ -2395,20 +2395,33 @@ test('assistant drops to the bottom while a window is open and returns when it c
   await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(restY) + 1);
 });
 
-test('assistant stays in place while a window is open when the lower position setting is off', async ({ page }) => {
+test('lower position slider sets how far the assistant drops while a window is open', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
   await openView(page, 'settings');
-  await page.locator('#pref-bot-lower').click();
+  await page.locator('#pref-bot-lower-offset').fill('50');
   await page.locator('#save-bot-settings').click();
   await openView(page, 'home');
   const peeker = page.locator('#bot-peeker');
   await expect(peeker).toHaveClass(/is-arrived/);
-  const restY = (await peeker.boundingBox()).y;
+  const viewport = page.viewportSize();
 
   await page.locator('[data-action="add-weight"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
-  await page.waitForTimeout(500);
-  expect(Math.round((await peeker.boundingBox()).y)).toBeLessThanOrEqual(Math.round(restY) + 1);
+  const height = await peeker.evaluate(el => el.offsetHeight);
+  const expectedY = (viewport.height - height) / 2;
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
+  expect(Math.round((await peeker.boundingBox()).y)).toBeLessThanOrEqual(Math.round(expectedY) + 3);
+});
+
+test('robot settings button closes an open window before opening settings', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
+  await openView(page, 'home');
+  await expect(page.locator('#bot-peeker')).toHaveClass(/is-arrived/);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await page.locator('#bot-settings-fab').dispatchEvent('click');
+  await expect(page.locator('#modal')).not.toHaveClass(/open/);
+  await expect(page.locator('#bot-appearance-card')).toBeVisible();
 });
 
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
