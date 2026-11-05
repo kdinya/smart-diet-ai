@@ -2627,16 +2627,16 @@ test('assistant welcome pools are localized by tone and stay silent while asleep
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   const pools = await page.evaluate(() => ({
-    ukPolite: I.uk.botWelcomePolite,
-    ukPlayful: I.uk.botWelcomePlayful,
+    ukMessages: I.uk.botWelcomeMessages,
     enPolite: I.en.botWelcomePolite,
     enPlayful: I.en.botWelcomePlayful,
   }));
-  expect(pools.ukPolite).toHaveLength(15);
-  expect(pools.ukPlayful).toHaveLength(15);
+  expect(pools.ukMessages).toHaveLength(30);
   expect(pools.enPolite).toHaveLength(8);
   expect(pools.enPlayful).toHaveLength(7);
-  expect(pools.ukPolite.join(' ')+pools.ukPlayful.join(' ')).not.toContain('Дніпро');
+  const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
+  expect(pools.ukMessages.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
+  expect(pools.ukMessages.slice(10).filter(text => topical.test(text))).toHaveLength(0);
   expect(pools.enPolite.join(' ')+pools.enPlayful.join(' ')).not.toMatch(/ЗСУ|Україн|Ukraine|Russia|Putin/i);
   const mascot = page.locator('#bot-peeker');
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
@@ -2668,6 +2668,19 @@ test('assistant welcomes use profile names and match Ukrainian gender', async ({
   const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
   expect(parity).toBe(true);
   expect(await page.evaluate(() => I.uk.botWelcomeUniversalPlayful)).toHaveLength(4);
+});
+
+
+test('Ukrainian assistant startup welcome uses one of the 30 approved messages', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', aiTone: 'playful' }, foods: [], weights: [] });
+  await page.clock.fastForward(4000);
+  const welcome = await page.evaluate(() => ({
+    text: document.querySelector('#bot-comic .bot-comic-text').textContent,
+    allowed: I.uk.botWelcomeMessages,
+  }));
+  expect(welcome.allowed).toHaveLength(30);
+  expect(welcome.allowed).toContain(welcome.text);
 });
 
 test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
@@ -2903,12 +2916,11 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePlayful }));
   expect(welcome.allowed).toHaveLength(7);
   expect(welcome.allowed.some(message => welcome.text.startsWith(message))).toBe(true);
-  const uaWelcome = await page.evaluate(() => ({ playful: I.uk.botWelcomePlayful, polite: I.uk.botWelcomePolite }));
-  expect(uaWelcome.playful).toHaveLength(15);
-  expect(uaWelcome.polite).toHaveLength(15);
-  const topical = /ЗСУ|Україн|росі|РФ|Путін/iu;
-  expect(uaWelcome.playful.filter(text => topical.test(text))).toHaveLength(5);
-  expect(uaWelcome.polite.filter(text => topical.test(text))).toHaveLength(5);
+  const uaWelcome = await page.evaluate(() => I.uk.botWelcomeMessages);
+  expect(uaWelcome).toHaveLength(30);
+  const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
+  expect(uaWelcome.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
+  expect(uaWelcome.slice(10).filter(text => topical.test(text))).toHaveLength(0);
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
     const path = el.querySelector('.bot-comic-shape path');
