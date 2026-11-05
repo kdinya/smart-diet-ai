@@ -1684,6 +1684,26 @@ test.describe('Smoke: legacy snack ordering', () => {
 test.describe('Smoke: sleeping assistant wake prompt', () => {
   const sleepyStore = () => ({ prefs: { ...BASE_PREFS, botMode: 'mascot', lang: 'uk' }, products: [], foods: [], weights: [] });
 
+  test('startup welcome changes sleeping assistant to dozing and sleeps one second after dismissal', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
+    await openApp(page, sleepyStore());
+    const mascot = page.locator('#bot-peeker');
+    const bubble = page.locator('#bot-comic');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    await page.clock.fastForward(2000);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await page.clock.fastForward(500);
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-actions')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+
+    await page.locator('main h1').first().click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.clock.fastForward(1000);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+  });
+
   test('tapping a sleeping assistant asks first and the no choice returns it to sleep', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
     await openApp(page, sleepyStore());
