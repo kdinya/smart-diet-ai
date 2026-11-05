@@ -118,7 +118,8 @@
 
 ### Test Requirements
 - Before changing code, inspect `package.json` and the relevant CI workflow to identify the available test commands and checks.
-- For every code change, run the most relevant targeted test(s). For UI behavior, use the matching Playwright smoke tests; run the full smoke suite when practical and whenever the change may affect shared flows.
+- Start with the narrowest relevant test(s) for fast feedback. After a fix, rerun the failed test and directly related checks before repeating unrelated suites. For UI behavior, use the matching Playwright smoke tests; run the full smoke suite as a final gate when changes affect shared flows or when practical.
+- Targeted tests are an early feedback loop, not a replacement for required CI checks. Before merging, confirm that all required PR checks pass.
 - Run the applicable syntax/static checks from CI for the files changed. Do not claim a test passed unless it was actually run and its result was observed.
 - Do not weaken, remove, or broadly skip a test just to make a run green. Fix stale assertions only when they conflict with the intended behavior, and add regression coverage for the behavior being changed.
 - In the completion report, name the commands run and summarize pass/fail counts. Clearly state any suite that could not be completed and why.

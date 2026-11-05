@@ -3126,6 +3126,19 @@ test('putting on and taking off pajamas plays a sparkle transition', async ({ pa
   expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').attachment?.name ?? null)).toBeNull();
 });
 
+test('legacy profile initialization migrates the birth date without blocking app startup', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('smartdiet-v1', JSON.stringify({
+    prefs: { name: 'Legacy profile', age: 35, currentWeight: 100, height: 180, targetWeight: 80, pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70, lang: 'en' },
+    foods: [],
+    weights: [],
+    products: [],
+  })));
+  await page.reload();
+  await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+  expect((await readStore(page)).prefs.birthDate).toBeTruthy();
+});
+
 test('a qualifying weigh-in offers a plan update and acceptance preserves the profile baseline', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
