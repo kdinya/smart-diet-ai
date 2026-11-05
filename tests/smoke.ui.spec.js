@@ -1667,7 +1667,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await meal.locator('.meal-head').click();
     await meal.locator('[data-action="add-food"]').click();
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await expect(page.locator('#bot-comic .bot-comic-text')).toContainText('спати');
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Може, давай спатки, а не їсти?');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
@@ -1686,6 +1686,13 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await page.locator('#products-list [data-add-product]').first().click();
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
+    await page.locator('#bot-comic .bot-comic-actions button').click();
+    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleepy');
   });
 
   test('sleepy reminder respects its cooldown and then allows meal entry', async ({ page }) => {
@@ -2967,7 +2974,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(leftBounds.right).toBeLessThanOrEqual(390);
   expect(leftBounds.top).toBeGreaterThanOrEqual(0);
   expect(leftBounds.bottom).toBeLessThanOrEqual(844);
-  await page.evaluate(() => window.nutritionBot.say('This is a much longer assistant message to verify that the entire comic cloud remains within the visible screen area. '.repeat(8)));
+  await page.evaluate(() => window.nutritionBot.say('This is a much longer assistant message to verify that the entire comic cloud remains within the visible screen area. '.repeat(8), { duration: 60 }));
   await expect.poll(() => bubble.evaluate(el => { const r=el.getBoundingClientRect(); return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight; })).toBe(true);
   await page.evaluate(() => { document.querySelector('#bot-comic .bot-comic-text').textContent = 'A short note ✨'; positionBotComic(); });
   await page.locator('#bot-peeker').evaluate(el => { el.classList.remove('bot-side-left'); el.style.left=''; el.style.right=''; positionBotComic(); });
@@ -2985,8 +2992,9 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(bubble.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '0deg');
   expect(await bubble.locator('.bot-comic-thought-dot').count()).toBe(3);
   await expect(bubble.locator('.bot-comic-shape path')).toHaveAttribute('d', /A/);
-  await page.clock.fastForward(30_000);
-  await expect(bubble).toHaveClass(/is-visible/);
+  await page.evaluate(() => window.nutritionBot.say('Timer test', { duration: 1 }));
+  await page.clock.fastForward(1400);
+  await expect(bubble).not.toHaveClass(/is-visible/);
   await page.locator('body').dispatchEvent('pointerdown');
   await expect(bubble).not.toHaveClass(/is-visible/);
 
@@ -2999,17 +3007,25 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await modal.locator('#bot-comic-preview-toggle').click();
   const preview = page.locator('#bot-comic');
   await expect(preview).toHaveClass(/bot-comic-preview/);
-  expect(await preview.evaluate(el => el.parentElement.id)).toBe('bot-comic-preview-stage');
-  const previewAvoidsControls = await page.evaluate(() => { const a=document.querySelector('#bot-comic').getBoundingClientRect(), b=document.querySelector('#bot-comic-controls').getBoundingClientRect(); return a.bottom<=b.top||a.top>=b.bottom||a.right<=b.left||a.left>=b.right; });
-  expect(previewAvoidsControls).toBe(true);
-  const previewWithinMobileStage = await page.evaluate(() => { const a=document.querySelector('#bot-comic').getBoundingClientRect(), b=document.querySelector('#bot-comic-preview-stage').getBoundingClientRect(); return a.left>=b.left&&a.right<=b.right&&a.top>=b.top&&a.bottom<=b.bottom; });
-  expect(previewWithinMobileStage).toBe(true);
+  expect(await preview.evaluate(el => el.parentElement === document.body)).toBe(true);
+  const previewGeometry = await page.evaluate(() => { const a=document.querySelector('#bot-comic').getBoundingClientRect(), b=document.querySelector('#bot-peeker').getBoundingClientRect(); return {fixed:getComputedStyle(document.querySelector('#bot-comic')).position,zIndex:+getComputedStyle(document.querySelector('#bot-comic')).zIndex,left:a.left,right:a.right,top:a.top,bottom:a.bottom,nearRobot:Math.abs((a.left+a.right)/2-(b.left+b.right)/2)<200}; });
+  expect(previewGeometry.fixed).toBe('fixed');
+  expect(previewGeometry.zIndex).toBeGreaterThan(100);
+  expect(previewGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(previewGeometry.right).toBeLessThanOrEqual(390);
+  expect(previewGeometry.top).toBeGreaterThanOrEqual(0);
+  expect(previewGeometry.bottom).toBeLessThanOrEqual(844);
+  expect(previewGeometry.nearRobot).toBe(true);
   await page.locator('body').dispatchEvent('pointerdown');
   await expect(preview).toHaveClass(/is-visible/);
   await modal.locator('#bot-comic-text').fill('A tiny preview ✨');
   await expect(preview).toHaveText('A tiny preview ✨');
   await modal.locator('#bot-comic-font').evaluate(el => { el.value = '22'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await expect(preview).toHaveCSS('font-size', '22px');
+  await modal.locator('#bot-comic-padding').evaluate(el => { el.value = '20'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview).toHaveCSS('padding', '22px 26px 40px');
+  await modal.locator('#bot-comic-duration').evaluate(el => { el.value = '8'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(modal.locator('#bot-comic-duration-value')).toHaveText('8 s');
   await modal.locator('#bot-comic-alpha').evaluate(el => { el.value = '50'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(preview.locator('.bot-comic-shape path')).toHaveCSS('fill', 'rgba(255, 255, 255, 0.5)');
@@ -3021,10 +3037,28 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(preview).toHaveCSS('--comic-border', '4px');
   await modal.locator('#bot-comic-outline').evaluate(el => { el.value = '#28754f'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await expect(preview).toHaveCSS('--comic-outline', '#28754f');
+  await modal.locator('#bot-comic-bg').evaluate(el => { el.value = '#ffeecc'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview.locator('.bot-comic-shape path')).toHaveCSS('fill', 'rgba(255, 238, 204, 0.5)');
+  await modal.locator('#bot-comic-color').evaluate(el => { el.value = '#123456'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(preview).toHaveCSS('--comic-color', '#123456');
+  await modal.locator('#bot-comic-weight').selectOption('600');
+  await expect(preview).toHaveCSS('font-weight', '600');
   await modal.locator('#bot-comic-placement').selectOption('bottom');
   await expect(preview).toHaveAttribute('data-placement', 'bottom');
+  await modal.locator('#bot-comic-gap').evaluate(el => { el.value = '20'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await modal.locator('#bot-comic-offset-x').evaluate(el => { el.value = '12'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await modal.locator('#bot-comic-offset-y').evaluate(el => { el.value = '12'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  const adjustedBubble = await preview.evaluate(el => { const r=el.getBoundingClientRect(); return {left:r.left,top:r.top}; });
+  expect(adjustedBubble.left).toBeGreaterThan(0);
+  expect(adjustedBubble.top).toBeGreaterThan(0);
+  await modal.locator('#bot-comic-motion').selectOption('float');
+  await expect(preview).toHaveAttribute('data-motion', 'float');
+  await modal.locator('#bot-comic-dismiss').selectOption('shrink');
+  await expect(preview).toHaveAttribute('data-dismiss', 'shrink');
+  await modal.locator('#bot-comic-dismiss-test').click();
+  await expect(preview).not.toHaveClass(/is-visible/);
+  await expect(preview).toHaveClass(/is-visible/, { timeout: 2000 });
   await expect(preview.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '0deg');
-  await expect(modal.locator('#bot-comic-tail')).toHaveCount(0);
   await expect(preview.locator('.bot-comic-thought-dot')).toHaveCount(3);
   await modal.locator('#bot-service-close').click();
   await expect(modal).not.toHaveClass(/open/);
@@ -3041,8 +3075,8 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await modal.locator('#bot-service-close').click();
   await page.evaluate(() => window.nutritionBot.say('Saved! 🎉', { duration: 2 }));
   await expect(bubble).toHaveText('Saved! 🎉');
-  await page.clock.fastForward(30_000);
-  await expect(bubble).toHaveClass(/is-visible/);
+  await page.clock.fastForward(2100);
+  await expect(bubble).not.toHaveClass(/is-visible/);
 });
 
 test('assistant action message stays until a choice is pressed', async ({ page }) => {
@@ -3090,6 +3124,67 @@ test('putting on and taking off pajamas plays a sparkle transition', async ({ pa
   await page.clock.fastForward(3000);
   expect(await page.evaluate(() => botSpineRig.pajamaFx)).toBeNull();
   expect(await page.evaluate(() => botSpineRig.skeleton.findSlot('pj_cap').attachment?.name ?? null)).toBeNull();
+});
+
+test('legacy profile initialization migrates the birth date without blocking app startup', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('smartdiet-v1', JSON.stringify({
+    prefs: { name: 'Legacy profile', age: 35, currentWeight: 100, height: 180, targetWeight: 80, pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70, lang: 'en' },
+    foods: [],
+    weights: [],
+    products: [],
+  })));
+  await page.reload();
+  await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+  expect((await readStore(page)).prefs.birthDate).toBeTruthy();
+});
+
+test('a qualifying weigh-in offers a plan update and acceptance preserves the profile baseline', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  const candidateKcal = 1781;
+  expect(2236 - candidateKcal).toBeGreaterThanOrEqual(50);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '90');
+  await page.locator('#weight-save').click();
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toContainText(`Update your weight-loss plan?`);
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
+  await bubble.locator('.bot-comic-actions button').first().click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  const saved = await readStore(page);
+  expect(saved.prefs.kcal).toBe(candidateKcal);
+  expect(saved.prefs.currentWeight).toBe(100);
+  expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
+  expect(saved.weights.map(item => item.value)).toContain(90);
+});
+
+test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal does not prompt', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '90');
+  await page.locator('#weight-save').click();
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toContainText('Update your weight-loss plan?');
+  await bubble.locator('.bot-comic-actions button').nth(1).click();
+  expect((await readStore(page)).prefs.kcal).toBe(2236);
+
+  await page.reload();
+  await page.clock.fastForward(2200);
+  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925 }; save(); });
+  expect(1925 - 1876).toBe(49);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '99.9');
+  await page.locator('#weight-save').click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  const afterSmallDrop = await readStore(page);
+  expect(afterSmallDrop.prefs.currentWeight).toBe(100);
+  expect(afterSmallDrop.weights.map(item => item.value)).toContain(99.9);
 });
 
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
