@@ -2301,6 +2301,29 @@ test('calendar highlights meals in diary and only weigh-ins in weight entry', as
   await expect(page.locator('#cal-modal')).not.toHaveClass(/open/);
 });
 
+test('diary next-day arrow stays disabled on today when tomorrow has no entries', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-29T12:00:00') });
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await openView(page, 'diary');
+  await expect(page.locator('#diary-date')).toHaveValue('2026-10-29');
+  await expect(page.locator('#diary-next')).toBeDisabled();
+});
+
+test('diary next-day arrow is enabled when tomorrow has entries and disabled again after moving there', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-29T12:00:00') });
+  await openApp(page, {
+    prefs: BASE_PREFS,
+    foods: [{ id: 'f-next-1', name: 'Apple', meal: 'breakfast', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, date: '2026-10-30', createdAt: 1 }],
+    weights: [],
+  });
+  await openView(page, 'diary');
+  await expect(page.locator('#diary-date')).toHaveValue('2026-10-29');
+  await expect(page.locator('#diary-next')).toBeEnabled();
+  await page.locator('#diary-next').click();
+  await expect(page.locator('#diary-date')).toHaveValue('2026-10-30');
+  await expect(page.locator('#diary-next')).toBeDisabled();
+});
+
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
@@ -3191,7 +3214,7 @@ test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal 
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
   await expect(bubble).toContainText('Update your weight-loss plan?');
-  await bubble.locator('.bot-comic-actions button').nth(1).click();
+  await bubble.locator('.bot-comic-actions button').nth(1).evaluate(button => button.click());
   expect((await readStore(page)).prefs.kcal).toBe(2236);
 
   await page.reload();
