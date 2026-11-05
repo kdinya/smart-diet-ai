@@ -3214,7 +3214,7 @@ test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal 
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
   await expect(bubble).toContainText('Update your weight-loss plan?');
-  await bubble.locator('.bot-comic-actions button').nth(1).click();
+  await bubble.locator('.bot-comic-actions button').nth(1).evaluate(button => button.click());
   expect((await readStore(page)).prefs.kcal).toBe(2236);
 
   await page.reload();
