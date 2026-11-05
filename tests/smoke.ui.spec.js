@@ -2400,7 +2400,8 @@ test('lower position slider sets how far the assistant drops while a window is o
   await openView(page, 'settings');
   const lowerSlider = page.locator('#pref-bot-lower-offset');
   await expect(lowerSlider).toHaveAttribute('min', '-10');
-  await lowerSlider.fill('50');
+  await expect(lowerSlider).toHaveAttribute('max', '0');
+  await lowerSlider.fill('0');
   await page.locator('#save-bot-settings').click();
   await openView(page, 'home');
   const peeker = page.locator('#bot-peeker');
@@ -2410,7 +2411,7 @@ test('lower position slider sets how far the assistant drops while a window is o
   await page.locator('[data-action="add-weight"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   const height = await peeker.evaluate(el => el.offsetHeight);
-  const expectedY = (viewport.height - height) / 2;
+  const expectedY = viewport.height - height;
   await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(expectedY) + 3);
   expect(Math.round((await peeker.boundingBox()).y)).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
 
@@ -2424,6 +2425,44 @@ test('lower position slider sets how far the assistant drops while a window is o
   await expect(page.locator('#modal')).toHaveClass(/open/);
   const expectedNegativeY = Math.round((viewport.height - height) * 1.1);
   await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeGreaterThanOrEqual(expectedNegativeY - 3);
+});
+
+
+test('lower-position slider previews while dragged and returns to the saved position on release', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botOffsetV: '40%' }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  const peeker = page.locator('#bot-peeker');
+  const slider = page.locator('#pref-bot-lower-offset');
+  const originalY = (await peeker.boundingBox()).y;
+  const originalSaved = (await readStore(page)).prefs.botLowerOffset || 0;
+  await slider.evaluate(el => { el.value = '-10'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect.poll(async () => (await peeker.boundingBox()).y).toBeGreaterThan(originalY + 20);
+  expect((await readStore(page)).prefs.botLowerOffset || 0).toBe(originalSaved);
+  await slider.evaluate(el => el.dispatchEvent(new Event('change', { bubbles: true })));
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y)).toBe(Math.round(originalY));
+});
+
+test('menstrual-cycle support is female-only and its bubble waits for an explicit acknowledgement', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-05T12:00:00') });
+  await openApp(page, { prefs: { ...BASE_PREFS, sex: 'female', botMode: 'mascot' }, foods: [], weights: [] });
+  await page.locator('[data-action="add-weight"]').first().click();
+  const cycle = page.locator('#weight-cycle-field');
+  await expect(cycle).toBeVisible();
+  await page.locator('#weight-cycle').check();
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toContainText('fluid retention and bloating');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveText('Got it — continue');
+  await page.clock.fastForward(60000);
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-actions button').click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+
+  await page.locator('#modal-close').click();
+  await page.evaluate(() => { state.prefs = { ...state.prefs, sex: 'male' }; save(); });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await expect(page.locator('#weight-cycle-field')).toBeHidden();
+  await expect(page.locator('#weight-cycle')).not.toBeChecked();
 });
 
 test('robot settings button closes an open window before opening settings', async ({ page }) => {
