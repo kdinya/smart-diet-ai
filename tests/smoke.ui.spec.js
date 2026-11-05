@@ -2349,6 +2349,68 @@ test('diary next-day arrow is enabled when tomorrow has entries and disabled aga
   await expect(page.locator('#diary-next')).toBeDisabled();
 });
 
+test('snack title stays on one line before the expand arrow and analyze button', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.clock.install({ time: new Date('2026-11-05T12:00:00') });
+  const today = '2026-11-05';
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk' },
+    weights: [],
+    foods: [
+      { id: 'snack-title-1', name: 'Яблуко', meal: 'snack', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, date: today, createdAt: 1, snackId: 'snack-a' },
+      { id: 'snack-title-2', name: 'Банан', meal: 'snack', grams: 100, kcal: 89, protein: 1, fat: 0, carbs: 23, date: today, createdAt: 2, snackId: 'snack-b' },
+    ],
+  });
+  await openView(page, 'diary');
+  const title = page.locator('#view-diary .meal-top .meal-head .meal-title', { hasText: 'Перекус 2' }).first();
+  await expect(title).toBeVisible();
+  expect(await title.evaluate(el => getComputedStyle(el).whiteSpace)).toBe('nowrap');
+  const lines = await title.evaluate(el => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
+  });
+  expect(lines).toBe(1);
+});
+
+test('assistant drops to the bottom while a window is open and returns when it closes', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
+  await openView(page, 'home');
+  const peeker = page.locator('#bot-peeker');
+  await expect(peeker).toHaveClass(/is-arrived/);
+  const restY = (await peeker.boundingBox()).y;
+  const viewport = page.viewportSize();
+
+  await page.locator('[data-action="add-weight"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await expect.poll(async () => {
+    const box = await peeker.boundingBox();
+    return box ? Math.round(box.y + box.height) : 0;
+  }, { timeout: 3000 }).toBeGreaterThanOrEqual(viewport.height - 4);
+
+  await page.evaluate(() => {
+    document.querySelectorAll('.modal-back.open').forEach(modal => modal.classList.remove('open'));
+    updateScrollLock();
+  });
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(restY) + 1);
+});
+
+test('assistant stays in place while a window is open when the lower position setting is off', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  await page.locator('#pref-bot-lower').click();
+  await page.locator('#save-bot-settings').click();
+  await openView(page, 'home');
+  const peeker = page.locator('#bot-peeker');
+  await expect(peeker).toHaveClass(/is-arrived/);
+  const restY = (await peeker.boundingBox()).y;
+
+  await page.locator('[data-action="add-weight"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  await page.waitForTimeout(500);
+  expect(Math.round((await peeker.boundingBox()).y)).toBeLessThanOrEqual(Math.round(restY) + 1);
+});
+
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
