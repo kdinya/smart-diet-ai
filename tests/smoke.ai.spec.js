@@ -951,13 +951,12 @@ test.describe('Smoke: dialog close, AI models and storage cleanup', () => {
   await expect(page.locator('#notif-list .notif-item')).toHaveCount(0);
 });
 
-test('all close buttons share one style', async ({ page }) => {
+test('popup close controls use text labels and contain no close crosses', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    const info = await page.$$eval('button', bs => bs.filter(b => /✕|×/.test(b.textContent) && !b.closest('.install-banner')).map(b => ({ cls: b.className, id: b.id })));
-    expect(info.length).toBeGreaterThanOrEqual(9);
-    for (const b of info) expect(b.cls).toContain('modal-x');
-    const sizes = await page.$$eval('button.modal-x', bs => bs.map(b => { const s = getComputedStyle(b); return [s.width, s.height, s.backgroundColor, s.borderRadius, s.fontSize].join('|'); }));
-    expect(new Set(sizes).size).toBe(1);
+    await expect(page.locator('button[class*=\"modal-x\"], button[class*=\"toast-x\"], button.bot-comic-close')).toHaveCount(0);
+    const buttons = await page.locator('button.modal-close').allTextContents();
+    expect(buttons.length).toBeGreaterThanOrEqual(9);
+    expect(buttons.every(text => text.trim() === 'Close')).toBe(true);
   });
 
   test('model dropdown, custom id validation, warning and test button', async ({ page }) => {
