@@ -1720,6 +1720,18 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleepy');
   });
 
+  test('disabled assistant never intercepts food entry even while asleep', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'uk' }, products: [], foods: [], weights: [] });
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    const meal = page.locator('#home-meals .meal-card').first();
+    await meal.locator('.meal-head').click();
+    await meal.locator('[data-action="add-food"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+    expect(await page.evaluate(() => botComicActionResolve)).toBeNull();
+  });
+
   test('sleepy reminder respects its cooldown and then allows meal entry', async ({ page }) => {
     await openApp(page, store());
     await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
@@ -2656,7 +2668,8 @@ test('assistant comic clouds stay hidden whenever the assistant is disabled', as
     renderBotComic();
   });
   await expect(bubble).not.toHaveClass(/is-visible/);
-  await page.evaluate(() => { botComicPreview = false; });
+  await page.evaluate(() => { botComicPreview = false; inboxRows = [{ id: 'disabled-share', name: 'Apple' }]; announceNewShares(); });
+  expect(await page.evaluate(() => shareNoticeBatch)).toBeNull();
 
   await openView(page, 'settings');
   const toggle = page.locator('#pref-bot-enabled');
@@ -2881,10 +2894,10 @@ test('assistant welcomes use profile names and match Ukrainian gender', async ({
 test('Ukrainian assistant startup welcome uses one of the 30 approved messages and stays until touched', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', aiTone: 'playful' }, foods: [], weights: [] });
-  await page.clock.fastForward(2999);
+  await page.clock.fastForward(1499);
   const bubble = page.locator('#bot-comic');
   await expect(bubble).not.toHaveClass(/is-visible/);
-  await page.clock.fastForward(1001);
+  await page.clock.fastForward(501);
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   const welcome = await page.evaluate(() => ({
     text: document.querySelector('#bot-comic .bot-comic-text').textContent,
@@ -3150,10 +3163,10 @@ test('comic assistant cloud cleanly encloses multi-line messages with actions wi
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en', aiTone: 'playful' }, foods: [], weights: [] });
-  await page.clock.fastForward(2999);
+  await page.clock.fastForward(1499);
   const bubble = page.locator('#bot-comic');
   await expect(bubble).not.toHaveClass(/is-visible/);
-  await page.clock.fastForward(1001);
+  await page.clock.fastForward(501);
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePlayful }));
   expect(welcome.allowed).toHaveLength(7);
@@ -3477,12 +3490,14 @@ test.describe('Smoke: first-visit greeting and shared product notice', () => {
       inboxRows = [{ id: 'share-1', from_user: 'friend-share-1', name: 'Яблуко', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, verified: false, created_at: '2026-11-05T10:00:00.000Z' }];
       announceNewShares();
     });
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.locator('#greeting').click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.waitForTimeout(1100);
     await expect(bubble).toHaveClass(/is-visible/);
     await expect(bubble.locator('.bot-comic-text')).toHaveText('Олена надсилає тобі продукт «Яблуко».');
     await expect(bubble.locator('.bot-comic-actions button')).toHaveText(['Переглянути', 'Закрити']);
-    await page.waitForTimeout(1500);
-    await page.locator('#greeting').click();
-    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic-dim')).toHaveClass(/is-visible/);
     await bubble.locator('.bot-comic-actions button', { hasText: 'Закрити' }).click();
     await expect(bubble).not.toHaveClass(/is-visible/);
 
@@ -3491,6 +3506,7 @@ test.describe('Smoke: first-visit greeting and shared product notice', () => {
       announceNewShares();
     });
     await expect(bubble).not.toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic-dim')).not.toHaveClass(/is-visible/);
 
     await page.evaluate(() => {
       inboxRows = [];
@@ -3506,7 +3522,10 @@ test.describe('Smoke: first-visit greeting and shared product notice', () => {
     await page.evaluate(() => document.querySelector('#inbox-modal').classList.remove('open'));
     await expect(bubble).toHaveClass(/is-visible/);
     await expect(bubble.locator('.bot-comic-text')).toHaveText('Тобі прийшли нові продукти від друзів: 2.');
-    await bubble.locator('.bot-comic-actions button', { hasText: 'Закрити' }).click();
+    await bubble.locator('.bot-comic-actions button', { hasText: 'Переглянути' }).click();
+    await expect(page.locator('#inbox-modal')).toHaveClass(/open/);
+    await expect(page.locator('#inbox-body')).toContainText('Груша');
+    await page.locator('#inbox-modal [data-close-inbox]').click();
     await expect(bubble).not.toHaveClass(/is-visible/);
   });
 });
