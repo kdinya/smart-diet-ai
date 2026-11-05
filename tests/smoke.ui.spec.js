@@ -2643,6 +2643,38 @@ test.describe('Smoke: calorie deficit fills goals and keeps pace', () => {
   });
 });
 
+test('assistant comic clouds stay hidden whenever the assistant is disabled', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'en' }, foods: [], weights: [] });
+  const bubble = page.locator('#bot-comic');
+  await page.clock.install({ time: new Date('2026-11-05T12:00:00') });
+  await page.clock.fastForward(5000);
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await page.evaluate(() => {
+    window.nutritionBot.say('Regular message');
+    window.nutritionBot.say('Forced reminder', { force: true, actions: [{ label: 'Close', value: 'close' }] });
+    botComicPreview = true;
+    renderBotComic();
+  });
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await page.evaluate(() => { botComicPreview = false; });
+
+  await openView(page, 'settings');
+  const toggle = page.locator('#pref-bot-enabled');
+  await page.evaluate(() => { state.prefs.botMode = 'mascot'; document.querySelector('#pref-bot-enabled').setAttribute('aria-checked', 'true'); applyBotPreferences(); });
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await page.evaluate(() => { botWelcomeShown = false; scheduleBotWelcome(3000); window.nutritionBot.say('Visible while enabled'); });
+  await expect(bubble).toHaveClass(/is-visible/);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  expect(await page.evaluate(() => botWelcomeTimer)).toBeNull();
+  await page.clock.fastForward(3000);
+  await expect(bubble).not.toHaveClass(/is-visible/);
+  await page.evaluate(() => window.nutritionBot.say('Must stay hidden', { force: true }));
+  await expect(bubble).not.toHaveClass(/is-visible/);
+});
+
 test.describe('Smoke: assistant buttons hide on interaction', () => {
   test('the assistant action buttons close on a tap, a drag or a scroll', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
