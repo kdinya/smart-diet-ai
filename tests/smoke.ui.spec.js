@@ -968,6 +968,8 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Oats');
     await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.evaluate(() => { setBotServiceState({ period: 'night', pajamas: true }); setBotMotion('sleeping', undefined, true); });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     await page.locator('#products-list [data-add-product]').first().click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#pick-dates [data-pick-date="tomorrow"]')).toBeVisible();
@@ -1656,6 +1658,50 @@ test.describe('Smoke: legacy snack ordering', () => {
   });
 });
 
+test.describe('Smoke: sleepy assistant food reminder', () => {
+  const store = () => ({ prefs: { ...BASE_PREFS, botMode: 'mascot', lang: 'uk' }, products: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }], foods: [], weights: [] });
+
+  test('meal add shows a reminder while asleep and returns the assistant to sleep when closed', async ({ page }) => {
+    await openApp(page, store());
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    const meal = page.locator('#home-meals .meal-card').first();
+    await meal.locator('.meal-head').click();
+    await meal.locator('[data-action="add-food"]').click();
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic .bot-comic-text')).toContainText('спати');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await page.locator('#bot-comic .bot-comic-actions button').click();
+    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
+  });
+
+  test('product plus shows a reminder while asleep and does not open the meal picker', async ({ page }) => {
+    await openApp(page, store());
+    await openView(page, 'products');
+    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
+    await page.locator('#products-list [data-add-product]').first().click();
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await page.locator('#bot-comic .bot-comic-actions button').click();
+    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
+  });
+
+  test('sleepy reminder respects its cooldown and then allows meal entry', async ({ page }) => {
+    await openApp(page, store());
+    await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
+    const meal = page.locator('#home-meals .meal-card').first();
+    await meal.locator('.meal-head').click();
+    await page.evaluate(() => localStorage.setItem('smartdiet-sleep-food-reminder', String(Date.now())));
+    await meal.locator('[data-action="add-food"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+    await page.locator('#modal-close').click();
+  });
+});
+
 test.describe('Smoke: notifications', () => {
   test('unread messages can be read individually or together and all messages can be cleared with confirmation', async ({ page }) => {
     await page.clock.install();
@@ -1678,7 +1724,7 @@ test.describe('Smoke: notifications', () => {
     await expect(page.locator('#notif-badge')).toHaveText('2');
 
     await page.evaluate(() => toast('Third note'));
-    await page.locator('#notif-stack .toast').last().locator('.toast-x').click();
+    await page.locator('#notif-stack .toast').last().locator('.toast-close').click();
     await expect(page.locator('#notif-badge')).toHaveText('2');
 
     await page.click('#notif-bell');
@@ -2874,7 +2920,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
         if (!path.isPointInFill(new DOMPoint(text.offsetLeft + text.offsetWidth / 2 + x * cos - y * sin, text.offsetTop + text.offsetHeight / 2 + x * sin + y * cos))) textInside = false;
       }
     }
-    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, textAngle: angle * 180 / Math.PI, fontSize: getComputedStyle(el).fontSize, side: el.dataset.side, placement: el.dataset.placement, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasClose: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke, thoughtDots: el.querySelectorAll('.bot-comic-thought-dot').length, artworkTransform: el.querySelector('.bot-comic-art').style.transform, bubbleBackground: getComputedStyle(el).backgroundColor, shapeShadow: getComputedStyle(el.querySelector('.bot-comic-shape')).filter };
+    return { withinViewport: box.left >= 0 && box.right <= innerWidth, withinHeight: box.top >= 0 && box.bottom <= innerHeight, textFits: text.scrollWidth <= text.clientWidth + 1, textAngle: angle * 180 / Math.PI, fontSize: getComputedStyle(el).fontSize, side: el.dataset.side, placement: el.dataset.placement, alpha: getComputedStyle(path).fill, cloud: Boolean(path.getAttribute('d')), textInside, hasCloseCross: Boolean(el.querySelector('.bot-comic-close')), sparkCount: el.querySelectorAll('.bot-comic-spark').length, outline: getComputedStyle(path).stroke, thoughtDots: el.querySelectorAll('.bot-comic-thought-dot').length, artworkTransform: el.querySelector('.bot-comic-art').style.transform, bubbleBackground: getComputedStyle(el).backgroundColor, shapeShadow: getComputedStyle(el.querySelector('.bot-comic-shape')).filter };
   });
   expect(fit.withinViewport).toBe(true);
   expect(fit.withinHeight).toBe(true);
@@ -2887,7 +2933,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   const outlineArcCount = await bubble.locator('.bot-comic-shape path').getAttribute('d').then(d => (d.match(/A/g) || []).length);
   expect(outlineArcCount).toBeGreaterThanOrEqual(7);
   expect(fit.textInside).toBe(true);
-  expect(fit.hasClose).toBe(true);
+  expect(fit.hasCloseCross).toBe(false);
   expect(fit.sparkCount).toBe(4);
   expect(fit.outline).toBe('rgb(40, 117, 79)');
   expect(fit.side).toBe('right');
