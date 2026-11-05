@@ -1698,7 +1698,7 @@ test.describe('Smoke: sleeping assistant wake prompt', () => {
     await expect(bubble.locator('.bot-comic-actions')).toBeHidden();
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
 
-    await page.locator('main h1').first().click();
+    await page.locator('#bot-comic-dim').click();
     await expect(bubble).not.toHaveClass(/is-visible/);
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
