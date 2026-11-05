@@ -2409,8 +2409,8 @@ test('lower position slider sets how far the assistant drops while a window is o
   await expect(page.locator('#modal')).toHaveClass(/open/);
   const height = await peeker.evaluate(el => el.offsetHeight);
   const expectedY = (viewport.height - height) / 2;
-  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
-  expect(Math.round((await peeker.boundingBox()).y)).toBeLessThanOrEqual(Math.round(expectedY) + 3);
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(expectedY) + 3);
+  expect(Math.round((await peeker.boundingBox()).y)).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
 });
 
 test('robot settings button closes an open window before opening settings', async ({ page }) => {
