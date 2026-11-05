@@ -2412,8 +2412,8 @@ test('lower position slider sets how far the assistant drops while a window is o
   await expect(page.locator('#modal')).toHaveClass(/open/);
   const height = await peeker.evaluate(el => el.offsetHeight);
   const expectedY = viewport.height - height;
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
   await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(expectedY) + 3);
-  expect(Math.round((await peeker.boundingBox()).y)).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
 
   await page.locator('#modal .modal-close').click();
   await expect(page.locator('#modal')).not.toHaveClass(/open/);
