@@ -60,6 +60,31 @@ test.describe('Smoke: app version', () => {
 });
 
 test.describe('Smoke: product clipboard nutrition import', () => {
+  test('parses Russian labels, plural names and same-line values without mixing them', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Parser product');
+    await page.evaluate(async () => navigator.clipboard.writeText('Энергетическая ценность\t263 ккал\nБелки\t6.93 г\nЖиры\t1.2 г\nУглеводы\t45 г'));
+    await page.click('#product-import-clipboard');
+    await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
+    await expect(page.locator('#import-kcal')).toHaveValue('263');
+    await expect(page.locator('#import-protein')).toHaveValue('6.93');
+    await expect(page.locator('#import-fat')).toHaveValue('1.2');
+    await expect(page.locator('#import-carbs')).toHaveValue('45');
+    await page.click('#product-import-close');
+    await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
+
+    await page.evaluate(async () => navigator.clipboard.writeText('263kcal Proteins 6.9g Fat 1.2g Carbs 45g'));
+    await page.click('#product-import-clipboard');
+    await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
+    await expect(page.locator('#import-kcal')).toHaveValue('263');
+    await expect(page.locator('#import-protein')).toHaveValue('6.9');
+    await expect(page.locator('#import-fat')).toHaveValue('1.2');
+    await expect(page.locator('#import-carbs')).toHaveValue('45');
+  });
+
   test('shows copied nutrition text and editable parsed values before filling product form', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
