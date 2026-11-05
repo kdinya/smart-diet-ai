@@ -2398,7 +2398,9 @@ test('assistant drops to the bottom while a window is open and returns when it c
 test('lower position slider sets how far the assistant drops while a window is open', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
   await openView(page, 'settings');
-  await page.locator('#pref-bot-lower-offset').fill('50');
+  const lowerSlider = page.locator('#pref-bot-lower-offset');
+  await expect(lowerSlider).toHaveAttribute('min', '-10');
+  await lowerSlider.fill('50');
   await page.locator('#save-bot-settings').click();
   await openView(page, 'home');
   const peeker = page.locator('#bot-peeker');
@@ -2411,6 +2413,17 @@ test('lower position slider sets how far the assistant drops while a window is o
   const expectedY = (viewport.height - height) / 2;
   await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeLessThanOrEqual(Math.round(expectedY) + 3);
   expect(Math.round((await peeker.boundingBox()).y)).toBeGreaterThanOrEqual(Math.round(expectedY) - 3);
+
+  await page.locator('#modal .modal-close').click();
+  await expect(page.locator('#modal')).not.toHaveClass(/open/);
+  await openView(page, 'settings');
+  await lowerSlider.fill('-10');
+  await page.locator('#save-bot-settings').click();
+  await openView(page, 'home');
+  await page.locator('[data-action="add-weight"]').first().click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
+  const expectedNegativeY = Math.round((viewport.height - height) * 1.1);
+  await expect.poll(async () => Math.round((await peeker.boundingBox()).y), { timeout: 3000 }).toBeGreaterThanOrEqual(expectedNegativeY - 3);
 });
 
 test('robot settings button closes an open window before opening settings', async ({ page }) => {
@@ -3030,7 +3043,7 @@ test('comic assistant cloud keeps a usable text area for very long messages on n
     expect(layout.width).toBeLessThanOrEqual(width - 47);
     expect(layout.height).toBeLessThanOrEqual(732);
     expect(layout.textWidth).toBeGreaterThan(120);
-    expect(layout.padding).toMatch(/^14px 18px 32px$/);
+    expect(layout.padding).toMatch(/^22px 26px 40px$/);
     expect(layout.fit).toBe('ok');
     await expect(bubble.locator('.bot-comic-text')).toHaveText(longMessage);
   }
@@ -3213,6 +3226,8 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await expect(preview).toHaveCSS('font-size', '17px');
   await expect(preview).toHaveCSS('--comic-alpha', '0.95');
   await expect(preview).toHaveCSS('--comic-radius', '30px');
+  await expect(modal.locator('#bot-comic-padding')).toHaveValue('20');
+  await expect(preview).toHaveCSS('padding', '22px 26px 40px');
   await expect(modal.locator('#bot-comic-offset-y')).toHaveValue('35');
   await expect(modal.locator('#bot-comic-placement')).toHaveValue('auto');
   await modal.locator('#bot-service-close').click();
