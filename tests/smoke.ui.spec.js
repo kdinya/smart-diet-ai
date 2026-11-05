@@ -427,7 +427,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('multiple snack events are numbered, grouped, and survive reload', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
@@ -657,7 +657,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('snacks added less than an hour apart share the same snack event', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
@@ -680,7 +680,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('a main meal interrupts the snack hour but an existing snack can still receive food', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
