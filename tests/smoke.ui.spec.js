@@ -3221,3 +3221,68 @@ test('logging weight closer to the goal celebrates progress', async ({ page }) =
   await expect(page.locator('#bot-peeker')).toHaveAttribute('data-spine-mood', 'celebration');
   expect(await page.evaluate(() => state.weights.map((item) => item.value))).toContain(89);
 });
+
+test.describe('Smoke: first-visit greeting and shared product notice', () => {
+  test('greets a first-time visitor in Ukrainian and English on the setup screen', async ({ page }) => {
+    await openApp(page, { prefs: { lang: 'uk' }, foods: [], weights: [] });
+    await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
+    await expect(page.locator('#onboarding-choice')).toBeVisible();
+    await expect(page.locator('#onboard-intro-hello')).toHaveText('Привіт! · Hello!');
+    await expect(page.locator('#onboard-intro-uk')).toContainText('Smart Diet AI допомагає');
+    await expect(page.locator('#onboard-intro-en')).toContainText('Smart Diet AI helps you');
+  });
+
+  test('announces only the first shared product, keeps it open until a button is pressed, and waits for open dialogs', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    const bubble = page.locator('#bot-comic');
+    await page.evaluate(() => {
+      localStorage.setItem('smartdiet-share-count-v1', '0');
+      friendNames.set('friend-share-1', 'Олена');
+      inboxRows = [{ id: 'share-1', from_user: 'friend-share-1', name: 'Яблуко', grams: 100, kcal: 52, protein: 0, fat: 0, carbs: 14, verified: false, created_at: '2026-11-05T10:00:00.000Z' }];
+      announceNewShares();
+    });
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Олена надсилає тобі продукт «Яблуко».');
+    await expect(bubble.locator('.bot-comic-actions button')).toHaveText(['Переглянути', 'Закрити']);
+    await page.waitForTimeout(1500);
+    await page.locator('#greeting').click();
+    await expect(bubble).toHaveClass(/is-visible/);
+    await bubble.locator('.bot-comic-actions button', { hasText: 'Закрити' }).click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+
+    await page.evaluate(() => {
+      inboxRows = [...inboxRows, { ...inboxRows[0], id: 'share-2', name: 'Банан' }];
+      announceNewShares();
+    });
+    await expect(bubble).not.toHaveClass(/is-visible/);
+
+    await page.evaluate(() => {
+      inboxRows = [];
+      announceNewShares();
+      inboxRows = [
+        { id: 'share-3', from_user: 'friend-share-1', name: 'Груша', grams: 100, kcal: 57, protein: 0, fat: 0, carbs: 15, verified: false, created_at: '2026-11-05T11:00:00.000Z' },
+        { id: 'share-4', from_user: 'friend-share-1', name: 'Слива', grams: 100, kcal: 46, protein: 0, fat: 0, carbs: 11, verified: false, created_at: '2026-11-05T11:01:00.000Z' },
+      ];
+      document.querySelector('#inbox-modal').classList.add('open');
+      announceNewShares();
+    });
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.evaluate(() => document.querySelector('#inbox-modal').classList.remove('open'));
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Тобі прийшли нові продукти від друзів: 2.');
+    await bubble.locator('.bot-comic-actions button', { hasText: 'Закрити' }).click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+  });
+});
+
+test.describe('Smoke: food added notice', () => {
+  test('the notice names the product, the meal and the date, and the bell keeps the same text', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await addFood(page, 'Огірок', 'lunch');
+    const card = page.locator('#notif-stack').getByText('Огірок');
+    await expect(card).toContainText('Обід');
+    await expect(card).toContainText('Сьогодні');
+    await expect.poll(() => page.evaluate(() => notifications[0]?.text || '')).toContain('Огірок');
+  });
+});
