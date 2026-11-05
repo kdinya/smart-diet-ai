@@ -334,6 +334,7 @@ async function openApp(page, store = {}) {
   await page.evaluate((data) => localStorage.setItem('smartdiet-v1', JSON.stringify(data)), store);
   await page.reload();
   await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+  await page.evaluate(() => localStorage.setItem('smartdiet-sleep-food-reminder', String(Date.now())));
 }
 
 async function readStore(page) {

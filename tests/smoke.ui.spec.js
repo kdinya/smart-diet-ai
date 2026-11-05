@@ -968,8 +968,6 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Oats');
     await page.locator('#products-list [data-toggle-product]').first().click();
-    await page.evaluate(() => { setBotServiceState({ period: 'night', pajamas: true }); setBotMotion('sleeping', undefined, true); });
-    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     await page.locator('#products-list [data-add-product]').first().click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#pick-dates [data-pick-date="tomorrow"]')).toBeVisible();
@@ -1663,7 +1661,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('meal add shows a reminder while asleep and returns the assistant to sleep when closed', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
@@ -1678,6 +1676,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('product plus shows a reminder while asleep and does not open the meal picker', async ({ page }) => {
     await openApp(page, store());
+    await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
     await openView(page, 'products');
     await page.locator('#products-list [data-toggle-product]').first().click();
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
