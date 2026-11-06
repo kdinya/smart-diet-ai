@@ -814,7 +814,9 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.clock.runFor(760);
   await expect(fab).toBeHidden();
   await mascot.click();
+  await expect(fab).toBeVisible();
   await fab.click();
+  await page.clock.runFor(100);
   const calculatorChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
   await expect(calculatorChoice).toBeVisible();
   await calculatorChoice.click();
