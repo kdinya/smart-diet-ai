@@ -3751,3 +3751,11 @@ test.describe('Smoke: friend invite failures', () => {
     await expect(page.locator('#friends-signed')).not.toHaveClass(/hidden/);
   });
 });
+
+test.describe('Smoke: previous weight on home', () => {
+  test('the home weight shows the previous weight in brackets', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 80 }, { date: '2026-01-20', value: 78.5 }] });
+    await expect(page.locator('#home-weight')).toHaveText('78.5');
+    await expect(page.locator('#home-weight-prev')).toHaveText('(was 80.0 kg)');
+  });
+});
