@@ -3730,6 +3730,41 @@ test.describe('Smoke: weight badge and achievements', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 80 }, { date: '2026-01-20', value: 78.5 }] });
     await expect(page.locator('#weight-badge-value')).toHaveText('78.5');
     await expect(page.locator('#weight-badge .weight-badge-label')).toHaveText('My weight');
+
+    const geometry = await page.evaluate(() => {
+      const date = document.querySelector('#today-label').getBoundingClientRect();
+      const badge = document.querySelector('#weight-badge').getBoundingClientRect();
+      const badgeStyle = getComputedStyle(document.querySelector('#weight-badge'));
+      return {
+        dateWidth: date.width,
+        badgeWidth: badge.width,
+        dateRight: date.right,
+        badgeRight: badge.right,
+        badgeTop: badge.top,
+        dateBottom: date.bottom,
+        badgeBorderRadius: badgeStyle.borderRadius,
+        badgeBorderStyle: badgeStyle.borderTopStyle,
+      };
+    });
+    expect(Math.abs(geometry.dateWidth - geometry.badgeWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.dateRight - geometry.badgeRight)).toBeLessThanOrEqual(1);
+    expect(geometry.badgeTop).toBeGreaterThanOrEqual(geometry.dateBottom);
+    expect(geometry.badgeBorderStyle).toBe('solid');
+    expect(geometry.badgeBorderRadius).toBe('14px');
+
+    // When weight label is wider, both cards expand to equal width
+    await page.evaluate(() => {
+      document.querySelector('.weight-badge-label').textContent = 'Very long custom weight label';
+    });
+    const widerGeometry = await page.evaluate(() => {
+      const date = document.querySelector('#today-label').getBoundingClientRect();
+      const badge = document.querySelector('#weight-badge').getBoundingClientRect();
+      return { dateWidth: date.width, badgeWidth: badge.width, dateRight: date.right, badgeRight: badge.right };
+    });
+    expect(Math.abs(widerGeometry.dateWidth - widerGeometry.badgeWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(widerGeometry.dateRight - widerGeometry.badgeRight)).toBeLessThanOrEqual(1);
+    expect(widerGeometry.dateWidth).toBeGreaterThan(geometry.dateWidth);
+
     await page.locator('#weight-badge').click();
     await expect(page.locator('#achievements-modal')).toHaveClass(/open/);
     await expect(page.locator('#achievements-list .achievement-item.is-unlocked')).toHaveCount(2);
