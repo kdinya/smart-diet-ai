@@ -4020,3 +4020,31 @@ test.describe('Smoke: assistant chat launcher choices', () => {
     await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
   });
 });
+
+test('weight chart range controls filter dates and points reveal accessible details', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'en' },
+    foods: [],
+    weights: [
+      { id: 'w-old', value: 81, date: '2026-08-01' },
+      { id: 'w-recent-old', value: 79.5, date: '2026-10-20' },
+      { id: 'w-current', value: 78, date: '2026-11-03' },
+    ],
+  });
+  await openView(page, 'stats');
+  await expect(page.locator('#weight-chart [data-weight-point]')).toHaveCount(2);
+  await expect(page.locator('#weight-chart-summary')).toContainText('-1.5 kg');
+  await page.locator('[data-weight-range="all"]').click();
+  await expect(page.locator('[data-weight-range="all"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#weight-chart [data-weight-point]')).toHaveCount(3);
+  const oldest = page.locator('#weight-chart [data-weight-point]').first();
+  await expect(oldest).toHaveAttribute('aria-label', /Aug 1, 2026: 81/);
+  await oldest.click();
+  await expect(page.locator('#weight-chart-tooltip')).toBeVisible();
+  await expect(page.locator('#weight-chart-tooltip')).toContainText('81.0 kg');
+  await page.locator('[data-weight-range="1m"]').click();
+  await page.mouse.move(0, 0);
+  await expect(page.locator('#weight-chart-tooltip')).toBeHidden();
+  await expect(page.locator('#weight-chart [data-weight-point]')).toHaveCount(2);
+});
