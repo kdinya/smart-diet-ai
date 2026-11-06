@@ -2600,6 +2600,54 @@ test('assistant message dimming defaults to 30 and follows the saved setting', a
   await expect.poll(dimColor).toBe('rgba(21, 82, 56, 0.6)');
 });
 
+test('all assistant appearance sliders ignore touch and vertical scroll but respond to intentional horizontal drags', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  const ids = ['pref-bot-size', 'pref-bot-offset-v', 'pref-bot-lower-offset', 'pref-bot-dim', 'pref-bot-offset-h'];
+  for (const id of ids) {
+    const slider = page.locator(`#${id}`);
+    const start = await slider.inputValue();
+    await slider.evaluate(el => {
+      const rect = el.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+      const emit = (type, clientX, clientY) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 91, pointerType: 'touch', clientX, clientY }));
+      emit('pointerdown', x, y); emit('pointermove', x + 2, y + 30); emit('pointerup', x + 2, y + 30);
+    });
+    await expect(slider).toHaveValue(start);
+    await slider.evaluate(el => {
+      const rect = el.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+      const emit = (type, clientX, clientY) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 92, pointerType: 'touch', clientX, clientY }));
+      emit('pointerdown', x, y); emit('pointermove', x - 70, y + 1); emit('pointerup', x - 70, y + 1);
+    });
+    await expect.poll(() => slider.inputValue()).not.toBe(start);
+  }
+});
+
+test('text-only assistant bubbles dismiss on any touch while action bubbles stay open', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
+  await page.evaluate(() => { botWelcomeShown = true; botComicTouched = true; });
+  const bubble = page.locator('#bot-comic');
+  await page.evaluate(() => window.nutritionBot.say('Dismiss me'));
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-text').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await expect(bubble).not.toHaveClass(/is-visible/);
+
+  await page.evaluate(() => { window.nutritionBot.ask('Needs a choice', [{ label: 'Continue', value: 'continue' }]); });
+  await expect(bubble).toHaveAttribute('data-requires-action', 'true');
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-text').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-actions button').click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
+
+  await page.evaluate(() => { window.__assistantChoice = null; window.nutritionBot.say('Dismissible choice', { dismissible: true, actions: [{ label: 'Continue', value: 'continue', onSelect: value => { window.__assistantChoice = value; } }] }); });
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-actions button').dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await expect(bubble).toHaveClass(/is-visible/);
+  await bubble.locator('.bot-comic-actions button').click();
+  await expect.poll(() => page.evaluate(() => window.__assistantChoice)).toBe('continue');
+  await expect(bubble).not.toHaveClass(/is-visible/);
+});
+
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, {
@@ -3729,6 +3777,7 @@ test.describe('Smoke: weight badge and achievements', () => {
   test('the current weight shows under the date and opens the achievements window', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 80 }, { date: '2026-01-20', value: 78.5 }] });
     await expect(page.locator('#weight-badge-value')).toHaveText('78.5');
+    await expect(page.locator('#weight-badge .weight-badge-unit')).toHaveText('kg');
     await expect(page.locator('#weight-badge .weight-badge-label')).toHaveText('My weight');
 
     const geometry = await page.evaluate(() => {
