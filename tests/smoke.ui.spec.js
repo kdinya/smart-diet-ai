@@ -2679,13 +2679,31 @@ test('text-only assistant bubbles dismiss on any touch while action bubbles stay
   await bubble.locator('.bot-comic-text').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await expect(bubble).not.toHaveClass(/is-visible/);
 
-  await page.evaluate(() => { window.nutritionBot.ask('Needs a choice', [{ label: 'Continue', value: 'continue' }]); });
+  await page.evaluate(() => {
+    const underlay = document.createElement('button');
+    underlay.id = 'bot-comic-underlay-test';
+    underlay.textContent = 'Background action';
+    underlay.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:1';
+    underlay.dataset.clicks = '0';
+    underlay.addEventListener('click', () => underlay.dataset.clicks = String(Number(underlay.dataset.clicks) + 1));
+    document.body.appendChild(underlay);
+    window.nutritionBot.ask('Needs a choice', [{ label: 'Continue', value: 'continue' }]);
+  });
   await expect(bubble).toHaveAttribute('data-requires-action', 'true');
   await expect(bubble).toHaveClass(/is-visible/);
+  const dim = page.locator('#bot-comic-dim');
+  await expect(dim).toHaveClass(/is-action-blocking/);
+  await expect(dim).toHaveCSS('pointer-events', 'auto');
+  await expect(page.locator('#bot-peeker')).toHaveCSS('pointer-events', 'none');
+  const underlayBox = await page.locator('#bot-comic-underlay-test').boundingBox();
+  await page.mouse.click(underlayBox.x + underlayBox.width / 2, underlayBox.y + underlayBox.height / 2);
+  await expect(page.locator('#bot-comic-underlay-test')).toHaveAttribute('data-clicks', '0');
   await bubble.locator('.bot-comic-text').dispatchEvent('pointerdown', { pointerType: 'touch' });
   await expect(bubble).toHaveClass(/is-visible/);
   await bubble.locator('.bot-comic-actions button').click();
   await expect(bubble).not.toHaveClass(/is-visible/);
+  await expect(dim).not.toHaveClass(/is-action-blocking/);
+  await expect(page.locator('#bot-peeker')).toHaveCSS('pointer-events', 'auto');
 
   await page.evaluate(() => { window.__assistantChoice = null; window.nutritionBot.say('Dismissible choice', { dismissible: true, actions: [{ label: 'Continue', value: 'continue', onSelect: value => { window.__assistantChoice = value; } }] }); });
   await expect(bubble).toHaveClass(/is-visible/);
@@ -3266,6 +3284,8 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await title.click();
   await expect(modal).toHaveClass(/open/);
   await modal.getByRole('button', { name: 'Asleep' }).click();
+  await modal.getByRole('button', { name: 'Take off pajamas' }).click();
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
   await expect(mascot).toHaveAttribute('data-time-period', 'night');
   await expect.poll(isArmBehind).toBe(true);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
@@ -3273,6 +3293,8 @@ test('hidden service menu forces assistant states until it is closed', async ({ 
   await expect(page.locator('#bot-zzz')).toHaveClass(/is-sleeping/);
   await expect.poll(mouthScale).toBeLessThan(dayMouth * 0.9);
   await modal.getByRole('button', { name: 'Sleepy' }).click();
+  await modal.getByRole('button', { name: 'Take off pajamas' }).click();
+  await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
   await expect.poll(eyeScale).toBeLessThan(dayEye * 0.8);
   await expect.poll(isArmBehind).toBe(true);

@@ -466,8 +466,9 @@ test.describe('Smoke: friends', () => {
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'settings');
-    await expect(page.locator('#friend-requests')).toContainText('Bob');
-    await page.click('[data-friend-accept]');
+    const notice = page.locator('#bot-comic');
+    await expect(notice).toContainText('Bob wants to add you as a friend.');
+    await notice.locator('.bot-comic-actions button').filter({ hasText: 'Accept' }).click();
     await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Request accepted.');
     await expect(page.locator('#friends-list')).toContainText('Bob');
     expect(backend.tables.friendships[0].status).toBe('accepted');
@@ -508,10 +509,14 @@ test.describe('Smoke: friends', () => {
 
   test('a pending request can be declined, and a friend can be removed', async ({ page, browser }) => {
     const backend = createBackend();
-    backend.tables.friendships.push({ id: 'pending-1', requester: 'user-bob', addressee: 'user-alice', status: 'pending', created_at: new Date().toISOString() });
     await startAlice(page, backend);
-    await expect(page.locator('#friend-requests')).toContainText('Bob');
-    await page.click('[data-friend-reject]');
+    backend.tables.friendships.push({ id: 'pending-1', requester: 'user-bob', addressee: 'user-alice', status: 'pending', created_at: new Date().toISOString() });
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'settings');
+    const notice = page.locator('#bot-comic');
+    await expect(notice).toContainText('Bob wants to add you as a friend.');
+    await notice.locator('.bot-comic-actions button').filter({ hasText: 'Decline' }).click();
     await expect(page.locator('#friend-requests')).toContainText('No incoming requests.');
     expect(backend.tables.friendships).toHaveLength(0);
 
