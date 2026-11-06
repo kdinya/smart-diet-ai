@@ -3662,3 +3662,65 @@ test.describe('Smoke: food added notice', () => {
     await expect.poll(() => page.evaluate(() => notifications[0]?.text || '')).toContain('Огірок');
   });
 });
+
+test.describe('Smoke: friend invite links', () => {
+  const inviteToken = '0123456789abcdef012345';
+
+  test('an invite link is stored once and removed from the address bar', async ({ page }) => {
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+    await page.goto(`/?friend-invite=${inviteToken}`);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('smartdiet-friend-invite'))).toBe(inviteToken);
+    expect(await page.evaluate(() => location.search)).toBe('');
+  });
+
+  test('an incoming friend request appears in the assistant bubble with accept and decline', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => {
+      clearTimeout(botWelcomeTimer);
+      botWelcomeTimer = null;
+      botWelcomeScheduled = false;
+      botWelcomeShown = true;
+      botComicTouched = true;
+      user = { id: 'me-friend' };
+      appHasInteracted = true;
+      friendNames.set('friend-req-1', 'Olena');
+      friendRows = [{ id: 'req-1', requester: 'friend-req-1', addressee: 'me-friend', status: 'pending', created_at: '2026-11-06T10:00:00.000Z' }];
+      window.__friendDecisions = [];
+      respondFriend = async (id, accept) => { window.__friendDecisions.push([id, accept]); };
+      announceFriendRequests();
+    });
+    const bubble = page.locator('#bot-comic');
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Olena wants to add you as a friend.');
+    await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
+    await bubble.locator('.bot-comic-actions button').first().click();
+    expect(await page.evaluate(() => window.__friendDecisions)).toEqual([['req-1', true]]);
+  });
+
+  test('inviting a friend copies a link to the invite when sharing is unavailable', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    const base = await page.evaluate(() => location.origin + location.pathname);
+    await page.evaluate((token) => {
+      user = { id: 'me-invite' };
+      window.__copied = '';
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text) => { window.__copied = text; } }, configurable: true });
+      sb = { rpc: async (name) => ({ data: name === 'create_friend_invite' ? token : null, error: null }) };
+    }, inviteToken);
+    await page.evaluate(() => inviteFriend());
+    await expect.poll(() => page.evaluate(() => window.__copied)).toBe(`${base}?friend-invite=${inviteToken}`);
+  });
+
+  test('a stored invite is accepted once after sign-in and then forgotten', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate((token) => {
+      localStorage.setItem('smartdiet-friend-invite', token);
+      user = { id: 'me-link' };
+      window.__inviteCalls = [];
+      sb = { rpc: async (name, args) => { window.__inviteCalls.push([name, args]); return { data: 'ok', error: null }; } };
+    }, inviteToken);
+    await page.evaluate(() => acceptPendingFriendInvite());
+    expect(await page.evaluate(() => window.__inviteCalls)).toEqual([['accept_friend_invite', { invite_token: inviteToken }]]);
+    expect(await page.evaluate(() => localStorage.getItem('smartdiet-friend-invite'))).toBeNull();
+  });
+});

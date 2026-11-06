@@ -303,6 +303,30 @@ async function run() {
   check('Signed-in user can read app user names', Array.isArray(r.json) && r.json.length >= 2, describe(r));
   check('App user names expose only display_name', Array.isArray(r.json) && r.json.every(row => Object.keys(row).join() === 'display_name'), describe(r));
 
+  // Friend invite links: one-time, expiring, and never self-accepted
+  r = await rpc('create_friend_invite', { as: 'a', body: {} });
+  const inviteToken = r.json;
+  check('Inviter gets a 22-character invite token', typeof inviteToken === 'string' && /^[0-9a-f]{22}$/.test(inviteToken), describe(r));
+  r = await rpc('create_friend_invite', { as: 'a', body: {} });
+  check('Repeated invite request reuses the active token', r.json === inviteToken, describe(r));
+  r = await rpc('accept_friend_invite', { as: 'a', body: { invite_token: inviteToken } });
+  check('Inviter cannot accept their own invite', r.json === 'self', describe(r));
+  r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: 'not-a-token' } });
+  check('Malformed invite token is rejected', r.json === 'invalid', describe(r));
+  r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: inviteToken } });
+  check('Invite creates a pending request for the recipient', r.json === 'ok', JSON.stringify(r.json));
+  r = await rest('friendships', { as: 'c', query: `requester=${eq(A)}&addressee=${eq(C)}&select=status` });
+  check('Recipient sees the invite as a pending request from the inviter', Array.isArray(r.json) && r.json.length === 1 && r.json[0].status === 'pending', describe(r));
+  r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: inviteToken } });
+  check('Used invite cannot be reused', r.json === 'used', JSON.stringify(r.json));
+  r = await rest('friendships', { as: 'c', method: 'PATCH', query: `requester=${eq(A)}&addressee=${eq(C)}`, body: { status: 'accepted' } });
+  check('Recipient confirms the invited request', r.status < 300, describe(r));
+  r = await rpc('create_friend_invite', { as: 'b', body: {} });
+  const expiredToken = r.json;
+  r = await rest('friend_invites', { as: 'service', method: 'PATCH', query: `token=${eq(expiredToken)}`, body: { expires_at: '2000-01-01T00:00:00Z' } });
+  r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: expiredToken } });
+  check('Expired invite is rejected', r.json === 'expired', JSON.stringify(r.json));
+
   // Deleting an account removes its data
   r = await admin('DELETE', `/users/${A}`);
   check('Test account can be deleted', r.status < 300, describe(r));

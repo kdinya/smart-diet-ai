@@ -47,6 +47,7 @@
 - **Goal changes:** new calorie and macro targets apply from the day you save them. Earlier days keep the targets that applied then.
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
+- Invite a friend with a one-time link from the Friends section; they confirm the request in the assistant's bubble.
 
 **Other**
 - English and Ukrainian interface.
