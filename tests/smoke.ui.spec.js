@@ -2590,6 +2590,29 @@ test('lower position slider sets how far the assistant drops while a window is o
 });
 
 
+test('an accidental touch on the lower-position slider does not move the assistant', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botOffsetV: '40%' }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  const peeker = page.locator('#bot-peeker');
+  const slider = page.locator('#pref-bot-lower-offset');
+  const originalY = (await peeker.boundingBox()).y;
+  const originalValue = await slider.inputValue();
+
+  for (const endEvent of ['pointerup', 'pointercancel']) {
+    await slider.evaluate((el, finishEvent) => {
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, pointerType: 'touch', clientX: 0, clientY: 0 }));
+      el.value = '-10';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (finishEvent === 'pointercancel') {
+        el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, pointerType: 'touch', clientX: 0, clientY: 24 }));
+      }
+      el.dispatchEvent(new PointerEvent(finishEvent, { bubbles: true, pointerId: 1, pointerType: 'touch', clientX: 0, clientY: 24 }));
+    }, endEvent);
+    await expect(slider).toHaveValue(originalValue);
+    await expect.poll(async () => Math.round((await peeker.boundingBox()).y)).toBe(Math.round(originalY));
+  }
+});
+
 test('lower-position slider previews while dragged and returns to the saved position on release', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot', botOffsetV: '40%' }, foods: [], weights: [] });
   await openView(page, 'settings');
