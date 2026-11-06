@@ -2593,11 +2593,11 @@ test('robot settings button closes an open window before opening settings', asyn
 test('assistant message dimming defaults to 30 and follows the saved setting', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'mascot' }, foods: [], weights: [] });
   const dimColor = () => page.evaluate(() => getComputedStyle(document.getElementById('bot-comic-dim')).backgroundColor);
-  await expect.poll(dimColor).toBe('rgba(40, 117, 79, 0.3)');
+  await expect.poll(dimColor).toBe('rgba(21, 82, 56, 0.3)');
   await openView(page, 'settings');
   await page.locator('#pref-bot-dim').fill('60');
   await page.locator('#save-bot-settings').click();
-  await expect.poll(dimColor).toBe('rgba(40, 117, 79, 0.6)');
+  await expect.poll(dimColor).toBe('rgba(21, 82, 56, 0.6)');
 });
 
 test('adding food defaults to today even when a past diary date was viewed, and announces meal and date', async ({ page }) => {
