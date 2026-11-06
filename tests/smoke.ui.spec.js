@@ -3794,3 +3794,44 @@ test.describe('Smoke: previous weight on home', () => {
     await expect(page.locator('#home-weight-prev')).toHaveText('(was 80.0 kg)');
   });
 });
+
+test.describe('Smoke: assistant chat launcher choices', () => {
+  test('home hero does not contain Ask Dietitian CTA and assistant chat button opens speech cloud with general and calorie options', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await expect(page.locator('#view-home .card.hero [data-action="open-ask"]')).toHaveCount(0);
+
+    const mascot = page.locator('#bot-peeker');
+    await expect(mascot).toBeVisible();
+    await mascot.click();
+
+    const chatAction = page.locator('#bot-chat-action-fab');
+    await expect(chatAction).toBeVisible();
+    await chatAction.click();
+
+    const bubble = page.locator('#bot-comic');
+    await expect(bubble).toBeVisible();
+    await expect(bubble).toHaveClass(/is-visible/);
+
+    const askBtn = page.locator('.bot-comic-actions [data-action="open-ask"]');
+    const calcBtn = page.locator('.bot-comic-actions [data-action="open-calc"]');
+    await expect(askBtn).toHaveText('Поспілкуватися');
+    await expect(calcBtn).toHaveText('Розрахувати калорії');
+
+    await askBtn.click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await expect(page.locator('#ask-panel')).toHaveClass(/open/);
+    await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
+    await page.locator('#ask-close').click();
+    await expect(page.locator('#ask-panel')).not.toHaveClass(/open/);
+
+    await mascot.click();
+    await expect(chatAction).toBeVisible();
+    await chatAction.click();
+    await expect(calcBtn).toBeVisible();
+    await calcBtn.click();
+    await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+    await expect(page.locator('#ask-panel')).not.toHaveClass(/open/);
+    await page.locator('#chat-close').click();
+    await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
+  });
+});

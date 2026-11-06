@@ -1,4 +1,4 @@
-const { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate } = require('./smoke.helpers');
+const { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate } = require('./smoke.helpers');
 
 test.describe('Smoke: meal plan', () => {
   test("tomorrow plan ignores today's fully used calorie budget and saves for tomorrow", async ({ page }) => {
@@ -549,7 +549,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
       return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: 'Aim for protein at every meal.' } }] }) });
     });
 
-    await page.click('[data-action="open-ask"]');
+    await openAskChat(page);
     await expect(page.locator('#ask-panel')).toHaveClass(/open/);
     await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
     await page.fill('#ask-input', 'How much protein do I need?');
@@ -562,7 +562,7 @@ test.describe('Smoke: meal analysis, dietitian questions, calendar and intro', (
 
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-    await page.click('[data-action="open-ask"]');
+    await openAskChat(page);
     await expect(page.locator('#ask-box')).toContainText('How much protein do I need?');
     await expect(page.locator('#ask-box')).toContainText('Aim for protein at every meal.');
 
@@ -814,7 +814,12 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.clock.runFor(760);
   await expect(fab).toBeHidden();
   await mascot.click();
+  await expect(fab).toBeVisible();
   await fab.click();
+  await page.clock.runFor(100);
+  const calculatorChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
+  await expect(calculatorChoice).toBeVisible();
+  await calculatorChoice.click();
   await expect(page.locator('#chat-panel')).toHaveClass(/open/);
   await expect(mascot).toHaveClass(/bot-overlay-hidden/);
   await page.locator('#chat-close').click();
@@ -888,6 +893,9 @@ test('single Spine assistant uses the new rig and keeps legacy appearance settin
   await mascot.click();
   await expect(page.locator('#bot-chat-action-fab')).toBeVisible();
   await page.locator('#bot-chat-action-fab').click();
+  const calcChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
+  await expect(calcChoice).toBeVisible();
+  await calcChoice.click();
   await expect(page.locator('#chat-panel')).toHaveClass(/open/);
   await expect(mascot).toHaveClass(/bot-overlay-hidden/);
   await page.locator('#chat-close').click();
@@ -1056,7 +1064,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
     await page.evaluate((value) => localStorage.setItem('smartdiet-ask-v1', JSON.stringify([{ role: 'ai', text: value }])), json);
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-    await page.click('[data-action="open-ask"]');
+    await openAskChat(page);
     const bubble = page.locator('#ask-box .bubble.ai').last();
     await expect(bubble).toContainText('Coffee with honey');
     await expect(bubble).toContainText('21 kcal');
@@ -1071,7 +1079,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
       { name: 'Йогурт', grams: 120, kcal: 90, protein: 8, fat: 2, carbs: 10 },
     ], summary: 'Орієнтовні порції для перекусу.' });
     await page.route('https://api.groq.com/**', (route) => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: json } }] }) }));
-    await page.click('[data-action="open-ask"]');
+    await openAskChat(page);
     await page.fill('#ask-input', 'Що можна додати до перекусу?');
     await page.click('#ask-send');
 
