@@ -3724,3 +3724,30 @@ test.describe('Smoke: friend invite links', () => {
     expect(await page.evaluate(() => localStorage.getItem('smartdiet-friend-invite'))).toBeNull();
   });
 });
+
+test.describe('Smoke: weight badge and achievements', () => {
+  test('the current weight shows under the date and opens the achievements window', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 80 }, { date: '2026-01-20', value: 78.5 }] });
+    await expect(page.locator('#weight-badge-value')).toHaveText('78.5');
+    await expect(page.locator('#weight-badge .weight-badge-label')).toHaveText('My weight');
+    await page.locator('#weight-badge').click();
+    await expect(page.locator('#achievements-modal')).toHaveClass(/open/);
+    await expect(page.locator('#achievements-list .achievement-item.is-unlocked')).toHaveCount(2);
+    await expect(page.locator('#achievements-list .achievement-item.is-unlocked').nth(1)).toContainText('First kilogram');
+    await page.locator('#achievements-close').click();
+    await expect(page.locator('#achievements-modal')).not.toHaveClass(/open/);
+  });
+});
+
+test.describe('Smoke: friend invite failures', () => {
+  test('a failed invite keeps the Friends block visible', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => {
+      user = { id: 'me-missing-fn' };
+      sb = { rpc: async () => ({ data: null, error: { message: 'Could not find the function public.create_friend_invite', code: 'PGRST202' } }) };
+      renderFriends();
+    });
+    await page.evaluate(() => inviteFriend());
+    await expect(page.locator('#friends-signed')).not.toHaveClass(/hidden/);
+  });
+});

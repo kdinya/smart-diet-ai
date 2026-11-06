@@ -48,6 +48,7 @@
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
 - Invite a friend with a one-time link from the Friends section; they confirm the request in the assistant's bubble.
+- See your current weight under the date; tap it to open your weight-loss achievements.
 
 **Other**
 - English and Ukrainian interface.
