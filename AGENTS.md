@@ -105,7 +105,6 @@
    - The application is designed mobile-first as an installable PWA.
    - Mobile navigation bar (`.mobilebar`), sticky headers, chat panels, modals, and input keyboards (`inputmode="numeric"`, `inputmode="decimal"`) must work flawlessly on narrow viewports (360px - 430px) and iOS Safari with notch/home indicator safe areas (`env(safe-area-inset-*)`).
    - Modals must be cleanly dismissible via close buttons (✕), backdrop clicks, or cancel actions.
-   - Range sliders must use the shared touch behavior established by the assistant settings sliders: a touch or vertical page scroll must preserve the current value, and only an intentional horizontal drag may move the thumb. Apply the same interaction contract to every new slider.
 7. **UI Layering & Stacking Hierarchy:**
    - Base pages and layout views: baseline layer (`z-index: 0` – `5`).
    - Sticky navigation, action buttons, and panels (`.mobilebar`, `.chat-fab`, `.chat-panel`): interface overlay layer (`z-index: 40` – `60`).

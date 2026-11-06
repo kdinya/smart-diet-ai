@@ -1793,7 +1793,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await meal.locator('[data-action="add-food"]').click();
     await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Може, давай спатки, а не їсти?');
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
@@ -1832,6 +1832,54 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
     expect(await page.evaluate(() => botComicActionResolve)).toBeNull();
+  });
+
+  test('sleeping and sleepy reminders share a 10-minute cooldown, then show again', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
+    await openApp(page, store());
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    const meal = page.locator('#home-meals .meal-card').first();
+    await meal.locator('.meal-head').click();
+    const add = meal.locator('[data-action="add-food"]');
+
+    await add.click();
+    const bubble = page.locator('#bot-comic');
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
+    await bubble.locator('.bot-comic-actions button').click();
+    await page.clock.fastForward(1000);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+
+    await add.click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.locator('#modal-close').click();
+
+    await page.clock.fastForward(10 * 60 * 1000 + 1);
+    await add.click();
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+  });
+
+  test('a dozing assistant warns about food, but an awake assistant does not', async ({ page }) => {
+    await openApp(page, store());
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    const meal = page.locator('#home-meals .meal-card').first();
+    await meal.locator('.meal-head').click();
+    const add = meal.locator('[data-action="add-food"]');
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await add.click();
+    const bubble = page.locator('#bot-comic');
+    await expect(bubble).toHaveClass(/is-visible/);
+    await bubble.locator('.bot-comic-actions button').click();
+    await expect(bubble).not.toHaveClass(/is-visible/);
+
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'day', pajamas: false }); });
+    await add.click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await expect.poll(() => page.evaluate(() => botMotion)).not.toBe('sleeping');
   });
 
   test('sleepy reminder respects its cooldown and then allows meal entry', async ({ page }) => {
@@ -3820,6 +3868,26 @@ test.describe('Smoke: weight badge and achievements', () => {
     await expect(page.locator('#achievements-list .achievement-item.is-unlocked').nth(1)).toContainText('First kilogram');
     await page.locator('#achievements-close').click();
     await expect(page.locator('#achievements-modal')).not.toHaveClass(/open/);
+  });
+});
+
+test.describe('Smoke: floating current weight', () => {
+  test('the weight badge floats after the date scrolls away and returns at the page top', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-11-05', value: 72.4 }] });
+    const badge = page.locator('#weight-badge');
+    await expect(badge).not.toHaveClass(/is-floating/);
+    await page.evaluate(() => window.scrollTo(0, 600));
+    await expect(badge).toHaveClass(/is-floating/);
+    await expect.poll(() => badge.evaluate(el => el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(0);
+    const floating = await badge.evaluate(el => ({ position: getComputedStyle(el).position, z: Number(getComputedStyle(el).zIndex), top: el.getBoundingClientRect().top }));
+    expect(floating.position).toBe('fixed');
+    expect(floating.z).toBeLessThan(40);
+    expect(floating.top).toBeLessThan(50);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(badge).not.toHaveClass(/is-floating/);
+    const restored = await badge.evaluate(el => getComputedStyle(el).position);
+    expect(restored).not.toBe('fixed');
   });
 });
 
