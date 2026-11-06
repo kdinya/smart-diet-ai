@@ -3642,10 +3642,11 @@ test.describe('Smoke: first-visit greeting and shared product notice', () => {
     await page.evaluate(() => document.querySelector('#inbox-modal').classList.remove('open'));
     await expect(bubble).toHaveClass(/is-visible/);
     await expect(bubble.locator('.bot-comic-text')).toHaveText('Тобі прийшли нові продукти від друзів: 2.');
+    await page.evaluate(() => { user = { id: 'me-share' }; renderInbox(); });
     await bubble.locator('.bot-comic-actions button', { hasText: 'Переглянути' }).click();
     await expect(page.locator('#inbox-modal')).toHaveClass(/open/);
     await expect(page.locator('#inbox-body')).toContainText('Груша');
-    await page.locator('#inbox-modal [data-close-inbox]').click();
+    await page.locator('#inbox-modal [data-close-inbox]').first().click();
     await expect(bubble).not.toHaveClass(/is-visible/);
   });
 });
