@@ -236,6 +236,105 @@ end;
 $$;
 revoke all on function public.request_friend(text) from public, anon;
 grant execute on function public.request_friend(text) to authenticated;
+-- Single-use friend invite links shared through messengers.
+create table if not exists public.friend_invites (
+  token text primary key check (token ~ '^[0-9a-f]{22}$'),
+  inviter uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days',
+  used_by uuid references auth.users(id) on delete set null,
+  used_at timestamptz
+);
+create index if not exists friend_invites_inviter_idx on public.friend_invites (inviter);
+alter table public.friend_invites enable row level security;
+revoke all on public.friend_invites from public, anon, authenticated;
+
+create or replace function public.create_friend_invite()
+returns text
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+as $$
+declare
+  caller uuid := auth.uid();
+  active_token text;
+begin
+  if caller is null then
+    raise exception 'Authentication required';
+  end if;
+  delete from public.friend_invites
+    where inviter = caller and used_at is null and expires_at <= now();
+  select token into active_token from public.friend_invites
+    where inviter = caller and used_at is null and expires_at > now()
+    order by created_at desc limit 1;
+  if active_token is not null then
+    return active_token;
+  end if;
+  active_token := left(replace(gen_random_uuid()::text, '-', ''), 22);
+  insert into public.friend_invites (token, inviter) values (active_token, caller);
+  return active_token;
+end;
+$$;
+
+create or replace function public.accept_friend_invite(invite_token text)
+returns text
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+as $$
+declare
+  caller uuid := auth.uid();
+  normalized_token text := lower(btrim(coalesce(invite_token, '')));
+  invite public.friend_invites%rowtype;
+  existing public.friendships%rowtype;
+  result text;
+begin
+  if caller is null then
+    raise exception 'Authentication required';
+  end if;
+  if normalized_token !~ '^[0-9a-f]{22}$' then
+    return 'invalid';
+  end if;
+  select * into invite from public.friend_invites where token = normalized_token for update;
+  if not found then
+    return 'invalid';
+  end if;
+  if invite.used_at is not null then
+    return 'used';
+  end if;
+  if invite.expires_at <= now() then
+    return 'expired';
+  end if;
+  if invite.inviter = caller then
+    return 'self';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(least(caller::text, invite.inviter::text) || ':' || greatest(caller::text, invite.inviter::text), 0));
+  select * into existing from public.friendships
+    where (requester = caller and addressee = invite.inviter)
+       or (requester = invite.inviter and addressee = caller)
+    for update;
+  if found then
+    if existing.status = 'pending' and existing.requester = caller then
+      update public.friendships set status = 'accepted' where id = existing.id;
+      result := 'accepted';
+    else
+      result := 'already';
+    end if;
+  else
+    insert into public.friendships (requester, addressee, status) values (invite.inviter, caller, 'pending');
+    result := 'ok';
+  end if;
+
+  update public.friend_invites set used_by = caller, used_at = now() where token = normalized_token;
+  return result;
+end;
+$$;
+revoke all on function public.create_friend_invite() from public, anon;
+grant execute on function public.create_friend_invite() to authenticated;
+revoke all on function public.accept_friend_invite(text) from public, anon;
+grant execute on function public.accept_friend_invite(text) to authenticated;
+
 revoke all on function public.generate_friend_code() from public, anon, authenticated;
 revoke all on function public.create_profile_for_new_user() from public, anon, authenticated;
 
