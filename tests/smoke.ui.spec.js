@@ -1822,6 +1822,29 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
   });
 
+  test('AI-recommended food shows the sleep reminder before opening the meal picker', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
+    await openApp(page, store());
+    await page.evaluate(() => {
+      localStorage.removeItem('smartdiet-sleep-food-reminder');
+      clearTimeout(botWelcomeTimer);
+      botWelcomeTimer = null;
+      botWelcomeScheduled = false;
+      botWelcomeShown = true;
+      hideBotComic(true);
+      applyBotTimeBaseline();
+    });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+    await page.evaluate(() => { openAsk(); askBubble(JSON.stringify({ items: [{ name: 'Oats', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 }] }), 'ai'); });
+    await page.locator('#ask-box .ask-product-plus').click();
+    await page.locator('#ask-product-action-diary').click();
+    await page.clock.fastForward(20);
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
+    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+  });
+
   test('disabled assistant never intercepts food entry even while asleep', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'uk' }, products: [], foods: [], weights: [] });
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
