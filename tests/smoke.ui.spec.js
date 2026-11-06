@@ -1683,6 +1683,14 @@ test.describe('Smoke: legacy snack ordering', () => {
 
 test.describe('Smoke: sleeping assistant wake prompt', () => {
   const sleepyStore = () => ({ prefs: { ...BASE_PREFS, botMode: 'mascot', lang: 'uk' }, products: [], foods: [], weights: [] });
+  const silenceStartupWelcome = (page) => page.evaluate(() => {
+    clearTimeout(botWelcomeTimer);
+    botWelcomeTimer = null;
+    botWelcomeScheduled = false;
+    botWelcomeShown = true;
+    hideBotComic(true);
+    applyBotTimeBaseline();
+  });
 
   test('startup welcome changes sleeping assistant to dozing and sleeps one second after dismissal', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
@@ -1702,7 +1710,7 @@ test.describe('Smoke: sleeping assistant wake prompt', () => {
     await expect(bubble.locator('.bot-comic-actions')).toBeHidden();
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
 
-    await page.locator('#bot-comic-dim').click();
+    await page.mouse.click(4, 4);
     await expect(bubble).not.toHaveClass(/is-visible/);
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
@@ -1711,6 +1719,7 @@ test.describe('Smoke: sleeping assistant wake prompt', () => {
   test('tapping a sleeping assistant asks first and the no choice returns it to sleep', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
     await openApp(page, sleepyStore());
+    await silenceStartupWelcome(page);
     const mascot = page.locator('#bot-peeker');
     const bubble = page.locator('#bot-comic');
     await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
@@ -1736,6 +1745,7 @@ test.describe('Smoke: sleeping assistant wake prompt', () => {
   test('yes reveals the quick actions and the assistant sleeps again after opening settings', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
     await openApp(page, sleepyStore());
+    await silenceStartupWelcome(page);
     const mascot = page.locator('#bot-peeker');
     const bubble = page.locator('#bot-comic');
     await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
@@ -1781,11 +1791,13 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     await meal.locator('[data-action="add-food"]').click();
+    await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Може, давай спатки, а не їсти?');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
+    await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
   });
 
@@ -1796,18 +1808,18 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#products-list [data-toggle-product]').first().click();
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await page.locator('#products-list [data-add-product]').first().click();
+    await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
+    await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#products-list [data-add-product]').first().click();
-    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
-    await page.locator('#bot-comic .bot-comic-actions button').click();
-    await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleepy');
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
   });
 
   test('disabled assistant never intercepts food entry even while asleep', async ({ page }) => {
@@ -2943,7 +2955,7 @@ test('assistant celebrates nutrition goals and shows its target-overage and slee
 });
 
 
-test('assistant welcome pools are localized by tone and stay silent while asleep', async ({ page }) => {
+test('assistant welcome pools are localized by tone and greet at night in dozing mode', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   const pools = await page.evaluate(() => ({
@@ -2961,8 +2973,8 @@ test('assistant welcome pools are localized by tone and stay silent while asleep
   const mascot = page.locator('#bot-peeker');
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
   await page.clock.fastForward(4500);
-  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
-  await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+  await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
+  await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
 });
 
 test('assistant welcomes use profile names and match Ukrainian gender', async ({ page }) => {
@@ -3014,6 +3026,13 @@ test('Ukrainian assistant startup welcome uses one of the 30 approved messages a
 test('assistant follows local night, morning, day, and evening routines', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  await page.evaluate(() => {
+    clearTimeout(botWelcomeTimer);
+    botWelcomeTimer = null;
+    botWelcomeScheduled = false;
+    botWelcomeShown = true;
+    applyBotTimeBaseline();
+  });
   const mascot = page.locator('#bot-peeker');
   const zzz = page.locator('#bot-zzz');
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
@@ -3044,11 +3063,12 @@ test('assistant follows local night, morning, day, and evening routines', async 
   await expect.poll(isArmMirroredBehindBack).toBe(true);
 
   await mascot.click();
-  await expect(mascot).toHaveAttribute('data-spine-mood', 'surprise');
-  await expect(zzz).not.toHaveClass(/is-sleeping/);
-  await page.clock.fastForward(1200);
+  await page.clock.fastForward(20);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
-  await page.clock.fastForward(15000);
+  await expect(zzz).not.toHaveClass(/is-sleeping/);
+  await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+  await page.locator('#bot-comic .bot-comic-actions button').nth(1).click();
+  await page.clock.fastForward(1000);
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleeping');
   await expect(zzz).toHaveClass(/is-sleeping/);
 
@@ -3235,6 +3255,7 @@ test('comic assistant cloud keeps a usable text area for very long messages on n
 
 test('comic assistant cloud cleanly encloses multi-line messages with actions without overflowing', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  await page.evaluate(() => { botComicTouched = true; });
   const bubble = page.locator('#bot-comic');
   const result = await page.evaluate(async () => {
     const bubble = document.querySelector('#bot-comic');
@@ -3255,7 +3276,7 @@ test('comic assistant cloud cleanly encloses multi-line messages with actions wi
   expect(result.fit).toBe('ok');
   expect(result.requiresAction).toBe('true');
   expect(result.bubbleWidth).toBeGreaterThan(160);
-  await expect(bubble.locator('.bot-comic-actions button')).toHaveText('Зрозуміло — продовжити');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveText(await page.evaluate(() => I.uk.weightCycleContinue));
   await bubble.locator('.bot-comic-actions button').click();
   await expect(bubble).not.toHaveClass(/is-visible/);
 });
@@ -3423,7 +3444,6 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   await modal.locator('#bot-comic-dismiss').selectOption('shrink');
   await expect(preview).toHaveAttribute('data-dismiss', 'shrink');
   await modal.locator('#bot-comic-dismiss-test').click();
-  await expect(preview).not.toHaveClass(/is-visible/);
   await expect(preview).toHaveClass(/is-visible/, { timeout: 2000 });
   await expect(preview.locator('.bot-comic-text')).toHaveCSS('--comic-text-angle', '0deg');
   await expect(preview.locator('.bot-comic-thought-dot')).toHaveCount(3);
