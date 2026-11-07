@@ -4021,6 +4021,33 @@ test.describe('Smoke: assistant chat launcher choices', () => {
   });
 });
 
+test('weight chart keeps labels and markers proportional on a phone-sized screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'en' },
+    foods: [],
+    weights: [
+      { id: 'w-a', value: 81.2, date: '2026-10-05' },
+      { id: 'w-b', value: 79.8, date: '2026-10-20' },
+      { id: 'w-c', value: 78.4, date: '2026-11-03' },
+    ],
+  });
+  await page.evaluate(() => document.querySelector('#intro')?.remove());
+  await openView(page, 'stats');
+  const chart = page.locator('#weight-chart');
+  await expect(chart.locator('[data-weight-point]')).toHaveCount(3);
+  await expect(chart).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const measurements = await chart.evaluate((svg) => {
+    const rect = svg.getBoundingClientRect();
+    const point = svg.querySelector('.weight-point-active circle:not(.weight-point-hitarea)').getBoundingClientRect();
+    return { ratio: svg.viewBox.baseVal.width / svg.viewBox.baseVal.height, renderedRatio: rect.width / rect.height, pointDifference: Math.abs(point.width - point.height), width: rect.width };
+  });
+  expect(Math.abs(measurements.ratio - measurements.renderedRatio)).toBeLessThan(0.03);
+  expect(measurements.pointDifference).toBeLessThan(1);
+  expect(measurements.width).toBeLessThan(400);
+});
+
 test('weight chart range controls filter dates and points reveal accessible details', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, {
@@ -4032,6 +4059,7 @@ test('weight chart range controls filter dates and points reveal accessible deta
       { id: 'w-current', value: 78, date: '2026-11-03' },
     ],
   });
+  await page.evaluate(() => document.querySelector('#intro')?.remove());
   await openView(page, 'stats');
   await expect(page.locator('#weight-chart [data-weight-point]')).toHaveCount(2);
   await expect(page.locator('#weight-chart-summary')).toContainText('-1.5 kg');
