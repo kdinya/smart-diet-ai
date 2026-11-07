@@ -4156,11 +4156,40 @@ test('settings sections offer localized help dialogs in both languages', async (
   await expect(headings).toHaveCount(10);
   const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
   expect(parity).toBe(true);
+  await expect(page.locator('#view-settings .settings-info-btn')).toHaveCount(10);
+  const iconStylesMatchStatistics = await page.evaluate(() => {
+    const settings = getComputedStyle(document.querySelector('#view-settings .settings-info-btn'));
+    const statisticsIcon = document.createElement('button');
+    statisticsIcon.className = 'metric-info-btn';
+    document.body.append(statisticsIcon);
+    const statistics = getComputedStyle(statisticsIcon);
+    const matches = ['width', 'height', 'borderRadius', 'borderTopWidth', 'borderTopStyle', 'borderTopColor', 'backgroundColor', 'color', 'fontFamily', 'fontSize', 'fontWeight'].every((property) => settings[property] === statistics[property]);
+    statisticsIcon.remove();
+    return matches;
+  });
+  expect(iconStylesMatchStatistics).toBe(true);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const multilineHeading = page.locator('#view-settings h2[data-settings-help="aiProvider"]');
+  const multilineTitleState = await multilineHeading.evaluate((heading) => {
+    const textNode = [...heading.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    const originalText = textNode.textContent;
+    textNode.textContent = 'AI provider configuration and model options across several lines';
+    const range = document.createRange();
+    range.selectNode(textNode);
+    const lines = [...range.getClientRects()];
+    const icon = heading.querySelector('.settings-info-btn').getBoundingClientRect();
+    const title = heading.getBoundingClientRect();
+    textNode.textContent = originalText;
+    return { lineCount: lines.length, iconOffset: icon.top - title.top };
+  });
+  expect(multilineTitleState.lineCount).toBeGreaterThan(1);
+  expect(Math.abs(multilineTitleState.iconOffset)).toBeLessThanOrEqual(1);
   const englishHelp = await page.evaluate(() => Object.fromEntries(Object.keys(I.en).filter((key) => key.startsWith('settingsHelp') && key.endsWith('Body')).map((key) => { const suffix = key.slice('settingsHelp'.length, -'Body'.length); return [suffix, [I.en[`settingsHelp${suffix}Title`], I.en[key]]]; })));
   for (const heading of await headings.all()) {
     const key = await heading.getAttribute('data-settings-help');
     const button = heading.locator('.settings-info-btn');
     await expect(button).toHaveAttribute('aria-label', 'About this section');
+    await expect(button).toHaveText('i');
     await button.click();
     const suffix = key[0].toUpperCase() + key.slice(1);
     await expect(page.locator('#info-title')).toHaveText(englishHelp[suffix][0]);
@@ -4175,6 +4204,7 @@ test('settings sections offer localized help dialogs in both languages', async (
     const key = await heading.getAttribute('data-settings-help');
     const button = heading.locator('.settings-info-btn');
     await expect(button).toHaveAttribute('aria-label', 'Про цей розділ');
+    await expect(button).toHaveText('i');
     await button.click();
     const suffix = key[0].toUpperCase() + key.slice(1);
     await expect(page.locator('#info-title')).toHaveText(ukrainianHelp[suffix][0]);
