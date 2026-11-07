@@ -1210,8 +1210,11 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const chart = page.locator('#calorie-chart');
     await expect(chart).toBeVisible();
     await expect(chart).toHaveAttribute('aria-label', 'Calorie chart');
-    await expect(chart.locator('polyline[stroke-dasharray="7 6"]')).toHaveCount(1);
-    await expect(page.locator('[data-i18n="calorieChartLegend"]')).toBeVisible();
+    await expect(chart.locator('line[stroke-dasharray="7 6"]')).toHaveCount(1);
+    await expect(chart.locator('[data-calorie-point]')).toHaveCount(0);
+    await expect(page.locator('#calorie-chart-summary')).toContainText('No logged calories');
+    await expect(page.locator('[data-i18n="calorieLegendTarget"]')).toBeVisible();
+    await expect(page.locator('[data-i18n="calorieLegendIntake"]')).toBeVisible();
   });
 
   test('food entry modal puts product picker first and hides date for a chosen meal', async ({ page }) => {
@@ -4019,6 +4022,75 @@ test.describe('Smoke: assistant chat launcher choices', () => {
     await page.locator('#chat-close').click();
     await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
   });
+});
+
+test('calorie chart shows daily intake, goal details and filters by period', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-07T12:00:00') });
+  const today = '2026-11-07';
+  const day = (offset) => {
+    const date = new Date(`${today}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - offset);
+    return date.toISOString().slice(0, 10);
+  };
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'en', kcal: 1800 },
+    foods: [
+      { id: 'c-today', name: 'Lunch', meal: 'lunch', kcal: 650, protein: 30, fat: 20, carbs: 70, date: today, createdAt: 3 },
+      { id: 'c-4d', name: 'Dinner', meal: 'dinner', kcal: 1200, protein: 45, fat: 35, carbs: 140, date: day(4), createdAt: 2 },
+      { id: 'c-12d', name: 'Breakfast', meal: 'breakfast', kcal: 400, protein: 20, fat: 10, carbs: 50, date: day(12), createdAt: 1 },
+      { id: 'c-40d', name: 'Older meal', meal: 'lunch', kcal: 2000, protein: 50, fat: 60, carbs: 220, date: day(40), createdAt: 0 },
+    ],
+    weights: [],
+  });
+  await page.evaluate(() => document.querySelector('#intro')?.remove());
+  await openView(page, 'stats');
+  await expect(page.locator('[data-i18n="calorieChartTitle"]')).toHaveText('Calorie trend');
+  const localeParity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
+  expect(localeParity).toBe(true);
+  const chart = page.locator('#calorie-chart');
+  await expect(chart).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
+  await expect(chart.locator('[data-calorie-point]')).toHaveCount(3);
+  await expect(page.locator('#calorie-chart-summary')).toContainText('3 days logged');
+  await expect(page.locator('#calorie-chart-summary')).toContainText('2,250 kcal total');
+  await expect(chart.locator('line[stroke-dasharray="7 6"]')).toHaveCount(1);
+  const todayPoint = chart.locator('[data-calorie-point]').last();
+  await todayPoint.focus();
+  await expect(page.locator('#calorie-chart-tooltip')).toBeVisible();
+  await expect(page.locator('#calorie-chart-tooltip')).toContainText('650 kcal');
+  await expect(page.locator('#calorie-chart-tooltip')).toContainText('1,800 kcal');
+  await page.locator('[data-calorie-range="7d"]').click();
+  await expect(page.locator('[data-calorie-range="7d"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(page.locator('#calorie-chart-summary')).toContainText('2 days logged');
+  await page.locator('[data-calorie-range="all"]').click();
+  await expect(chart.locator('[data-calorie-point]')).toHaveCount(4);
+});
+
+test('calorie chart keeps labels and points proportional on a phone-sized screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.install({ time: new Date('2026-11-07T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk' },
+    foods: [
+      { id: 'c-mobile-a', name: 'Обід', meal: 'lunch', kcal: 700, protein: 30, fat: 20, carbs: 90, date: '2026-11-05', createdAt: 2 },
+      { id: 'c-mobile-b', name: 'Вечеря', meal: 'dinner', kcal: 1100, protein: 40, fat: 35, carbs: 130, date: '2026-11-07', createdAt: 3 },
+    ],
+    weights: [],
+  });
+  await page.evaluate(() => document.querySelector('#intro')?.remove());
+  await openView(page, 'stats');
+  await expect(page.locator('[data-i18n="calorieChartTitle"]')).toHaveText('Динаміка калорій');
+  const chart = page.locator('#calorie-chart');
+  await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(page.locator('#calorie-chart-summary')).toContainText('Записано днів: 2');
+  const measurements = await chart.evaluate((svg) => {
+    const rect = svg.getBoundingClientRect();
+    const point = svg.querySelector('[data-calorie-point] .calorie-point-hitarea').getBoundingClientRect();
+    return { ratio: svg.viewBox.baseVal.width / svg.viewBox.baseVal.height, renderedRatio: rect.width / rect.height, pointDifference: Math.abs(point.width - point.height), width: rect.width };
+  });
+  expect(Math.abs(measurements.ratio - measurements.renderedRatio)).toBeLessThan(0.03);
+  expect(measurements.pointDifference).toBeLessThan(1);
+  expect(measurements.width).toBeLessThan(400);
 });
 
 test('weight chart keeps labels and markers proportional on a phone-sized screen', async ({ page }) => {
