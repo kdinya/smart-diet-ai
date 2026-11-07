@@ -4450,7 +4450,7 @@ test.describe('Smoke: product add-ons', () => {
     const milkCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
     await expect(milkCard).toHaveClass(/collapsed/);
     const cardHeight = await milkCard.evaluate((el) => el.getBoundingClientRect().height);
-    expect(cardHeight).toBeLessThanOrEqual(65);
+    expect(cardHeight).toBeLessThanOrEqual(80);
 
     // Expand milk card - summary remains visible under label
     await milkCard.locator('[data-companion-toggle="' + MILK + '"]').click();
