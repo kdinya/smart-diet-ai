@@ -4305,25 +4305,50 @@ test.describe('Smoke: product add-ons', () => {
     expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50 }]);
   });
 
-  test('an empty add-ons list in main diary modal shows only the add button and allows picking an add-on', async ({ page }) => {
+  test('an empty add-ons list in main diary modal hides the field without add button, adding add-ons is only in product editor', async ({ page }) => {
     const borsch = { id: '33333333-3333-4333-8333-333333333333', name: 'Borsch', grams: 300, kcal: 180, protein: 6, fat: 8, carbs: 20 };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [borsch, milk], foods: [], weights: [] });
+
+    // In diary modal, Borsch has no add-ons -> companions field and add button are hidden
     await page.evaluate(() => openModal('food', 'dinner'));
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#product-companions-field')).toBeHidden();
+    await expect(page.locator('#product-companion-add')).toBeHidden();
+    await page.click('#modal-close');
+
+    // In meal picker, Borsch has no add-ons -> companions field is hidden and no pick-companion-add button
+    await page.evaluate((b) => openMealPicker(b), borsch);
+    await expect(page.locator('#pick-companions-field')).toBeHidden();
+    await expect(page.locator('#pick-companion-add')).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // In product editor, add-on button is visible and allows configuring saved add-ons
+    await page.evaluate((b) => openProductModal(b), borsch);
     await expect(page.locator('#product-companions-field')).toBeVisible();
-    await expect(page.locator('#product-companions-field > label')).toBeHidden();
     await expect(page.locator('#product-companion-add')).toBeVisible();
     await page.click('#product-companion-add');
     await page.locator('#pick-body [data-pick-product]', { hasText: 'Milk' }).click();
     await expect(page.locator('#product-companions-list')).toContainText('Milk');
-    await expect(page.locator('#product-companions-field > label')).toBeVisible();
     await page.click('#food-save');
-    await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Borsch', 'Milk']);
+    expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
+
+    // Now adding Borsch in diary modal displays its saved add-on without add button, and allows editing grams without mutating saved product
+    await page.evaluate(() => openModal('food', 'dinner'));
+    await page.fill('#food-name', 'Borsch');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#product-companions-field')).toBeVisible();
+    await expect(page.locator('#product-companion-add')).toBeHidden();
+    await expect(page.locator('#product-companions-list')).toContainText('Milk');
+    const card = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
+    await card.locator(`[data-companion-toggle="${MILK}"]`).click();
+    await card.locator(`input[data-companion-grams="${MILK}"]`).fill('150');
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams]))).toEqual([['Borsch', 300], ['Milk', 150]]);
     expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
   });
 
-  test('add-on checkbox appears before the name and removal requires confirmation', async ({ page }) => {
+  test('add-on checkbox appears before the name and removal in diary does not mutate saved product', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
@@ -4349,6 +4374,8 @@ test.describe('Smoke: product add-ons', () => {
     await card.locator(`[data-companion-remove="${MILK}"]`).click();
     await page.click('#confirm-ok');
     await expect(card).toHaveCount(0);
+    // Saved product setting is NOT mutated by removal in diary modal!
+    expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 100 }]);
   });
 
   test('add-on card shows portions dropdown and calculated calories/macros, updating bidirectionally', async ({ page }) => {
@@ -4479,5 +4506,44 @@ test.describe('Smoke: product add-ons', () => {
     await sugarCard.locator('input[data-companion-on="' + sugar.id + '"]').uncheck();
     await expect(summary).toContainText('+32 kcal');
     await expect(summary).toContainText('P 1.7 · F 1.8 · C 2.4 g');
+  });
+
+  test('products with add-ons display an indicator icon in My Products and in meal addition views', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+
+    // 1. In My Products tab
+    await openView(page, 'products');
+    const coffeeItem = page.locator(`.product-item[data-product-id="${COFFEE}"]`);
+    const milkItem = page.locator(`.product-item[data-product-id="${MILK}"]`);
+    await expect(coffeeItem.locator('.product-name .product-has-companions')).toBeVisible();
+    await expect(milkItem.locator('.product-name .product-has-companions')).toHaveCount(0);
+
+    // 2. In Product Picker list when adding to meal
+    await openView(page, 'diary');
+    await page.evaluate(() => openProductPicker());
+    await expect(page.locator(`.pick-item[data-pick-product="${COFFEE}"] .product-has-companions`)).toBeVisible();
+    await expect(page.locator(`.pick-item[data-pick-product="${MILK}"] .product-has-companions`)).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // 3. In Meal Picker title
+    await page.evaluate((c) => openMealPicker(c), coffee);
+    await expect(page.locator('#pick-title .product-has-companions')).toBeVisible();
+    await page.evaluate(() => closePick());
+
+    await page.evaluate((m) => openMealPicker(m), milk);
+    await expect(page.locator('#pick-title .product-has-companions')).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // 4. In Food modal next to Food/dish field
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#food-companion-badge .product-has-companions')).toBeVisible();
+
+    await page.fill('#food-name', 'Milk');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#food-companion-badge .product-has-companions')).toHaveCount(0);
+    await page.click('#modal-close');
   });
 });
