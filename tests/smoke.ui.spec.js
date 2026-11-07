@@ -4430,4 +4430,54 @@ test.describe('Smoke: product add-ons', () => {
     await expect(prodCard).toBeVisible();
     await expect(prodCard).toHaveClass(/collapsed/);
   });
+
+  test('add-on cards display total summed macros under label in collapsed and expanded state, with compact height and matching control heights', async ({ page }) => {
+    const sugar = { id: '44444444-4444-4444-8444-444444444444', name: 'Sugar', grams: 10, kcal: 40, protein: 0, fat: 0, carbs: 10 };
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }, { id: sugar.id, grams: 10 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, sugar], foods: [], weights: [] });
+
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+
+    const summary = page.locator('#product-companions-summary');
+    await expect(summary).toBeVisible();
+    // Sum: Milk (64 kcal, P 3.3, F 3.6, C 4.8) + Sugar (40 kcal, P 0, F 0, C 10) = 104 kcal, P 3.3, F 3.6, C 14.8
+    await expect(summary).toContainText('+104 kcal');
+    await expect(summary).toContainText('P 3.3 · F 3.6 · C 14.8 g');
+
+    // Cards are collapsed by default and compact (height <= 65px)
+    const milkCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
+    await expect(milkCard).toHaveClass(/collapsed/);
+    const cardHeight = await milkCard.evaluate((el) => el.getBoundingClientRect().height);
+    expect(cardHeight).toBeLessThanOrEqual(65);
+
+    // Expand milk card - summary remains visible under label
+    await milkCard.locator('[data-companion-toggle="' + MILK + '"]').click();
+    await expect(milkCard).not.toHaveClass(/collapsed/);
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('+104 kcal');
+
+    // Controls have matching heights
+    const portionsBtn = milkCard.locator('.dd-btn');
+    const gramsInput = milkCard.locator('input[data-companion-grams="' + MILK + '"]');
+    if (await portionsBtn.count() > 0) {
+      const h1 = await portionsBtn.evaluate((el) => el.getBoundingClientRect().height);
+      const h2 = await gramsInput.evaluate((el) => el.getBoundingClientRect().height);
+      expect(Math.abs(h1 - h2)).toBeLessThanOrEqual(2);
+    }
+
+    // Changing grams updates total summary in real time
+    await gramsInput.fill('50');
+    await gramsInput.dispatchEvent('input');
+    // Milk 50g: 32 kcal, P 1.7, F 1.8, C 2.4 + Sugar: 40 kcal -> 72 kcal, P 1.7, F 1.8, C 12.4
+    await expect(summary).toContainText('+72 kcal');
+    await expect(summary).toContainText('P 1.7 · F 1.8 · C 12.4 g');
+
+    // Unchecking sugar updates total summary in real time to milk only
+    const sugarCard = page.locator('#product-companions-list [data-companion-card="' + sugar.id + '"]');
+    await sugarCard.locator('input[data-companion-on="' + sugar.id + '"]').uncheck();
+    await expect(summary).toContainText('+32 kcal');
+    await expect(summary).toContainText('P 1.7 · F 1.8 · C 2.4 g');
+  });
 });
