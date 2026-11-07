@@ -4513,14 +4513,14 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
 
     // 1. In My Products tab
-    await page.click('button[data-tab="products"]');
+    await openView(page, 'products');
     const coffeeItem = page.locator(`.product-item[data-product-id="${COFFEE}"]`);
     const milkItem = page.locator(`.product-item[data-product-id="${MILK}"]`);
     await expect(coffeeItem.locator('.product-name .product-has-companions')).toBeVisible();
     await expect(milkItem.locator('.product-name .product-has-companions')).toHaveCount(0);
 
     // 2. In Product Picker list when adding to meal
-    await page.click('button[data-tab="diary"]');
+    await openView(page, 'diary');
     await page.evaluate(() => openProductPicker());
     await expect(page.locator(`.pick-item[data-pick-product="${COFFEE}"] .product-has-companions`)).toBeVisible();
     await expect(page.locator(`.pick-item[data-pick-product="${MILK}"] .product-has-companions`)).toHaveCount(0);
