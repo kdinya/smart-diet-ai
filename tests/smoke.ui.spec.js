@@ -4148,3 +4148,37 @@ test('weight chart range controls filter dates and points reveal accessible deta
   await expect(page.locator('#weight-chart-tooltip')).toBeHidden();
   await expect(page.locator('#weight-chart [data-weight-point]')).toHaveCount(2);
 });
+
+test('settings sections offer localized help dialogs in both languages', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+  await openView(page, 'settings');
+  const headings = page.locator('#view-settings h2[data-settings-help]');
+  await expect(headings).toHaveCount(10);
+  const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
+  expect(parity).toBe(true);
+  const englishHelp = await page.evaluate(() => Object.fromEntries(Object.keys(I.en).filter((key) => key.startsWith('settingsHelp') && key.endsWith('Body')).map((key) => { const suffix = key.slice('settingsHelp'.length, -'Body'.length); return [suffix, [I.en[`settingsHelp${suffix}Title`], I.en[key]]]; })));
+  for (const heading of await headings.all()) {
+    const key = await heading.getAttribute('data-settings-help');
+    const button = heading.locator('.settings-info-btn');
+    await expect(button).toHaveAttribute('aria-label', 'About this section');
+    await button.click();
+    const suffix = key[0].toUpperCase() + key.slice(1);
+    await expect(page.locator('#info-title')).toHaveText(englishHelp[suffix][0]);
+    await expect(page.locator('#info-body')).toHaveText(englishHelp[suffix][1]);
+    await page.locator('#info-close').click();
+  }
+
+  await page.selectOption('#pref-lang', 'uk');
+  await page.locator('#save-lang').click();
+  const ukrainianHelp = await page.evaluate(() => Object.fromEntries(Object.keys(I.uk).filter((key) => key.startsWith('settingsHelp') && key.endsWith('Body')).map((key) => { const suffix = key.slice('settingsHelp'.length, -'Body'.length); return [suffix, [I.uk[`settingsHelp${suffix}Title`], I.uk[key]]]; })));
+  for (const heading of await headings.all()) {
+    const key = await heading.getAttribute('data-settings-help');
+    const button = heading.locator('.settings-info-btn');
+    await expect(button).toHaveAttribute('aria-label', 'Про цей розділ');
+    await button.click();
+    const suffix = key[0].toUpperCase() + key.slice(1);
+    await expect(page.locator('#info-title')).toHaveText(ukrainianHelp[suffix][0]);
+    await expect(page.locator('#info-body')).toHaveText(ukrainianHelp[suffix][1]);
+    await page.locator('#info-close').click();
+  }
+});
