@@ -175,6 +175,15 @@ async function run() {
   check('Anonymous visitor cannot read synced profiles when rows exist', emptyOrDenied(rAnon), describe(rAnon));
   rAnon = await rest('weight_entries');
   check('Anonymous visitor cannot read weight entries when rows exist', emptyOrDenied(rAnon), describe(rAnon));
+  r = await rest('products', {
+    as: 'a', method: 'POST',
+    body: { user_id: A, name: 'CI companion product', grams: 100, kcal: 50, protein: 0, fat: 0, carbs: 10, companions: [{ id: '22222222-2222-4222-8222-222222222222', grams: 30 }] },
+  });
+  check('Owner can save a product with usual add-ons', r.status === 201, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI companion product')}&select=companions` });
+  check('Usual add-ons are read back unchanged', Array.isArray(r.json) && r.json.length === 1 && r.json[0].companions[0].grams === 30, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=companions` });
+  check('Products without add-ons default to an empty list', Array.isArray(r.json) && r.json.length === 1 && Array.isArray(r.json[0].companions) && r.json[0].companions.length === 0, describe(r));
   rAnon = await rest('products');
   check('Anonymous visitor cannot read user products when rows exist', emptyOrDenied(rAnon), describe(rAnon));
   rAnon = await rest('profiles');
