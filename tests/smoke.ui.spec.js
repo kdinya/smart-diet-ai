@@ -4320,6 +4320,34 @@ test.describe('Smoke: product add-ons', () => {
     expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
   });
 
+  test('add-on checkbox appears before the name and removal requires confirmation', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+
+    const card = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
+    const checkbox = card.locator(`input[data-companion-on="${MILK}"]`);
+    await expect(checkbox).toBeChecked();
+    const order = await card.evaluate((el) => {
+      const label = el.querySelector('.companion-toggle-label');
+      return [...label.children].map((child) => child.matches('input') ? 'checkbox' : 'name');
+    });
+    expect(order).toEqual(['checkbox', 'name']);
+    await expect(card.locator(`input[data-companion-grams="${MILK}"]`)).toBeHidden();
+
+    await card.locator(`[data-companion-toggle="${MILK}"]`).click();
+    await expect(card.locator(`input[data-companion-grams="${MILK}"]`)).toBeVisible();
+    await card.locator(`[data-companion-remove="${MILK}"]`).click();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.click('#confirm-cancel');
+    await expect(card).toBeVisible();
+    await card.locator(`[data-companion-remove="${MILK}"]`).click();
+    await page.click('#confirm-ok');
+    await expect(card).toHaveCount(0);
+  });
+
   test('add-on card shows portions dropdown and calculated calories/macros, updating bidirectionally', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
