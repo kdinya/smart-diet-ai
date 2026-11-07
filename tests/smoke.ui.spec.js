@@ -4037,6 +4037,7 @@ test('calorie chart shows daily intake, goal details and filters by period', asy
     foods: [
       { id: 'c-today', name: 'Lunch', meal: 'lunch', kcal: 650, protein: 30, fat: 20, carbs: 70, date: today, createdAt: 3 },
       { id: 'c-4d', name: 'Dinner', meal: 'dinner', kcal: 1200, protein: 45, fat: 35, carbs: 140, date: day(4), createdAt: 2 },
+      { id: 'c-zero', name: 'Uncounted meal', meal: 'breakfast', kcal: 0, protein: 0, fat: 0, carbs: 0, date: day(2), createdAt: 4 },
       { id: 'c-12d', name: 'Breakfast', meal: 'breakfast', kcal: 400, protein: 20, fat: 10, carbs: 50, date: day(12), createdAt: 1 },
       { id: 'c-40d', name: 'Older meal', meal: 'lunch', kcal: 2000, protein: 50, fat: 60, carbs: 220, date: day(40), createdAt: 0 },
     ],
@@ -4050,6 +4051,8 @@ test('calorie chart shows daily intake, goal details and filters by period', asy
   const chart = page.locator('#calorie-chart');
   await expect(chart).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(3);
+  await expect(chart.locator('[data-calorie-point][data-value="0"]')).toHaveCount(0);
+  await expect(chart.locator(`[data-calorie-point][data-date="${day(2)}"]`)).toHaveCount(0);
   await expect(page.locator('#calorie-chart-summary')).toContainText('3 days logged');
   await expect(page.locator('#calorie-chart-summary')).toContainText('2,250 kcal total');
   await expect(chart.locator('line[stroke-dasharray="7 6"]')).toHaveCount(1);
@@ -4061,6 +4064,7 @@ test('calorie chart shows daily intake, goal details and filters by period', asy
   await page.locator('[data-calorie-range="7d"]').click();
   await expect(page.locator('[data-calorie-range="7d"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(chart.locator(`[data-calorie-point][data-date="${day(4)}"]`)).toBeVisible();
   await expect(page.locator('#calorie-chart-summary')).toContainText('2 days logged');
   await page.locator('[data-calorie-range="all"]').click();
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(4);
