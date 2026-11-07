@@ -4309,12 +4309,12 @@ test.describe('Smoke: product add-ons', () => {
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeVisible();
-    await expect(page.locator('#product-companions-field label')).toBeHidden();
+    await expect(page.locator('#product-companions-field > label')).toBeHidden();
     await expect(page.locator('#product-companion-add')).toBeVisible();
     await page.click('#product-companion-add');
     await page.locator('#pick-body [data-pick-product]', { hasText: 'Milk' }).click();
     await expect(page.locator('#product-companions-list')).toContainText('Milk');
-    await expect(page.locator('#product-companions-field label')).toBeVisible();
+    await expect(page.locator('#product-companions-field > label')).toBeVisible();
     await page.click('#food-save');
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Borsch', 'Milk']);
     expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
