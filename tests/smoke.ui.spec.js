@@ -4294,7 +4294,10 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate(() => openModal('food', 'breakfast'));
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
-    const companionInput = page.locator('#product-companions-list').locator(`input[data-companion-grams="${MILK}"]`);
+    const card = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
+    await expect(card).toHaveClass(/collapsed/);
+    await card.locator(`[data-companion-toggle="${MILK}"]`).click();
+    const companionInput = card.locator(`input[data-companion-grams="${MILK}"]`);
     await expect(companionInput).toBeVisible();
     await companionInput.fill('75');
     await page.click('#food-save');
@@ -4357,6 +4360,9 @@ test.describe('Smoke: product add-ons', () => {
 
     const companionCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
     await expect(companionCard).toBeVisible();
+    await expect(companionCard).toHaveClass(/collapsed/);
+    await companionCard.locator(`[data-companion-toggle="${MILK}"]`).click();
+    await expect(companionCard).not.toHaveClass(/collapsed/);
 
     const portionsSelect = companionCard.locator('select[data-companion-portions="' + MILK + '"]');
     const gramsInput = companionCard.locator('input[data-companion-grams="' + MILK + '"]');
@@ -4380,5 +4386,48 @@ test.describe('Smoke: product add-ons', () => {
     await expect(portionsSelect).toHaveValue('2');
     await expect(nutritionInfo).toContainText('128 kcal');
     await expect(nutritionInfo).toContainText('P 6.6 · F 7.2 · C 9.6 g');
+  });
+
+  test('add-on cards are collapsed by default in all windows, portions and grams in one row, and icons match app design', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+
+    // 1. Food modal (diary entry) - collapsed by default
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    const foodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
+    await expect(foodCard).toBeVisible();
+    await expect(foodCard).toHaveClass(/collapsed/);
+    const delBtn = foodCard.locator(`[data-companion-remove="${MILK}"]`);
+    await expect(delBtn).toHaveClass(/del/);
+    await expect(delBtn.locator('svg')).toBeVisible();
+
+    // Verify portions and grams are in one row when expanded
+    await foodCard.locator(`[data-companion-toggle="${MILK}"]`).click();
+    await expect(foodCard).not.toHaveClass(/collapsed/);
+    const controls = foodCard.locator('.companion-controls');
+    const isOneRow = await controls.evaluate((el) => {
+      const fields = el.querySelectorAll('.companion-field');
+      if (fields.length < 2) return false;
+      const r1 = fields[0].getBoundingClientRect();
+      const r2 = fields[1].getBoundingClientRect();
+      return Math.abs(r1.top - r2.top) < 4;
+    });
+    expect(isOneRow).toBe(true);
+    await page.click('#modal-close');
+
+    // 2. Meal picker modal - collapsed by default
+    await page.evaluate((c) => openMealPicker(c), coffee);
+    const pickCard = page.locator('#pick-companions-list [data-companion-card="' + MILK + '"]');
+    await expect(pickCard).toBeVisible();
+    await expect(pickCard).toHaveClass(/collapsed/);
+    await page.evaluate(() => closePick());
+
+    // 3. Product editor modal - collapsed by default
+    await page.evaluate((c) => openProductModal(c), coffee);
+    const prodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
+    await expect(prodCard).toBeVisible();
+    await expect(prodCard).toHaveClass(/collapsed/);
   });
 });
