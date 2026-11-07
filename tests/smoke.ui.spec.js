@@ -4507,4 +4507,43 @@ test.describe('Smoke: product add-ons', () => {
     await expect(summary).toContainText('+32 kcal');
     await expect(summary).toContainText('P 1.7 · F 1.8 · C 2.4 g');
   });
+
+  test('products with add-ons display an indicator icon in My Products and in meal addition views', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+
+    // 1. In My Products tab
+    await page.click('button[data-tab="products"]');
+    const coffeeItem = page.locator(`.product-item[data-product-id="${COFFEE}"]`);
+    const milkItem = page.locator(`.product-item[data-product-id="${MILK}"]`);
+    await expect(coffeeItem.locator('.product-name .product-has-companions')).toBeVisible();
+    await expect(milkItem.locator('.product-name .product-has-companions')).toHaveCount(0);
+
+    // 2. In Product Picker list when adding to meal
+    await page.click('button[data-tab="diary"]');
+    await page.evaluate(() => openProductPicker());
+    await expect(page.locator(`.pick-item[data-pick-product="${COFFEE}"] .product-has-companions`)).toBeVisible();
+    await expect(page.locator(`.pick-item[data-pick-product="${MILK}"] .product-has-companions`)).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // 3. In Meal Picker title
+    await page.evaluate((c) => openMealPicker(c), coffee);
+    await expect(page.locator('#pick-title .product-has-companions')).toBeVisible();
+    await page.evaluate(() => closePick());
+
+    await page.evaluate((m) => openMealPicker(m), milk);
+    await expect(page.locator('#pick-title .product-has-companions')).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // 4. In Food modal next to Food/dish field
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#food-companion-badge .product-has-companions')).toBeVisible();
+
+    await page.fill('#food-name', 'Milk');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#food-companion-badge .product-has-companions')).toHaveCount(0);
+    await page.click('#modal-close');
+  });
 });
