@@ -153,6 +153,15 @@ async function run() {
     body: { user_id: A, name: 'CI product', grams: 100, kcal: 200, protein: 10, fat: 5, carbs: 20, verified: true },
   });
   check('Owner can insert a product', r.status === 201, describe(r));
+  r = await rest('products', {
+    as: 'a', method: 'POST',
+    body: { user_id: A, name: 'CI companion product', grams: 100, kcal: 50, protein: 0, fat: 0, carbs: 10, companions: [{ id: '22222222-2222-4222-8222-222222222222', grams: 30 }] },
+  });
+  check('Owner can save a product with usual add-ons', r.status === 201, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI companion product')}&select=companions` });
+  check('Usual add-ons are read back unchanged', Array.isArray(r.json) && r.json.length === 1 && r.json[0].companions[0].grams === 30, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=companions` });
+  check('Products without add-ons default to an empty list', Array.isArray(r.json) && r.json.length === 1 && Array.isArray(r.json[0].companions) && r.json[0].companions.length === 0, describe(r));
 
   r = await rest('user_profiles', { as: 'a', method: 'POST', body: { user_id: A, data: { name: 'CI A', goals: { kcal: 2000 } } } });
   check('Owner can save a profile document', r.status === 201, describe(r));

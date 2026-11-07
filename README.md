@@ -49,6 +49,7 @@
 - Share the app with friends from **Settings**.
 - Invite a friend with a one-time link from the Friends section; they confirm the request in the assistant's bubble.
 - See your current weight under the date; tap it to open your weight-loss achievements.
+- Save usual add-ons for a product (for example, milk for coffee); they are added with it in the same meal, each with its own grams.
 
 **Other**
 - English and Ukrainian interface.

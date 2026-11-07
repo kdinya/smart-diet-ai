@@ -4216,3 +4216,47 @@ test('settings sections offer localized help dialogs in both languages', async (
     await page.locator('#info-close').click();
   }
 });
+
+test.describe('Smoke: product add-ons', () => {
+  const MILK = '22222222-2222-4222-8222-222222222222';
+  const COFFEE = '11111111-1111-4111-8111-111111111111';
+  const milk = { id: MILK, name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 };
+
+  test('a usual add-on is saved on a product from the product editor', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [milk], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.click('#product-new');
+    await page.fill('#food-name', 'Coffee');
+    await page.fill('#food-kcal', '5');
+    await page.click('#product-companion-add');
+    await page.locator('#pick-body [data-pick-product]', { hasText: 'Milk' }).click();
+    await expect(page.locator('#product-companions-list')).toContainText('Milk');
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.products.find((p) => p.name === 'Coffee')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
+  });
+
+  test('adding a product adds its checked add-ons to the same meal with their own grams', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await expect(page.locator('#pick-companions-list')).toContainText('Milk');
+    await expect(page.locator(`input[data-companion-on="${MILK}"]`)).toBeChecked();
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal, f.meal]))).toEqual([
+      ['Coffee', 100, 2, expect.any(String)],
+      ['Milk', 50, 32, expect.any(String)],
+    ]);
+    const meals = await page.evaluate(() => [...new Set(state.foods.map((f) => f.meal))]);
+    expect(meals).toHaveLength(1);
+  });
+
+  test('an unchecked add-on is not added', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.locator(`input[data-companion-on="${MILK}"]`).uncheck();
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Coffee']);
+    expect(await page.evaluate(() => state.products.find((p) => p.id === '11111111-1111-4111-8111-111111111111').companions)).toEqual([{ id: MILK, grams: 50 }]);
+  });
+});
