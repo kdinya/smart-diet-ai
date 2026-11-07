@@ -4259,4 +4259,64 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Coffee']);
     expect(await page.evaluate(() => state.products.find((p) => p.id === '11111111-1111-4111-8111-111111111111').companions)).toEqual([{ id: MILK, grams: 50 }]);
   });
+  test('adding a product from the main diary modal adds its checked add-ons to the same meal', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#product-companions-field')).toBeVisible();
+    await expect(page.locator('#product-companions-list')).toContainText('Milk');
+    await expect(page.locator(`input[data-companion-on="${MILK}"]`)).toBeChecked();
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal, f.meal]))).toEqual([
+      ['Coffee', 100, 2, 'breakfast'],
+      ['Milk', 50, 32, 'breakfast'],
+    ]);
+  });
+
+  test('unchecking an add-on in the main diary modal leaves it unlogged', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'lunch'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator(`input[data-companion-on="${MILK}"]`)).toBeVisible();
+    await page.locator(`input[data-companion-on="${MILK}"]`).uncheck();
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Coffee']);
+    expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50 }]);
+  });
+
+  test('editing add-on grams in the main diary modal does not mutate the saved product setting', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+    const companionInput = page.locator('#product-companions-list').locator(`input[data-companion-grams="${MILK}"]`);
+    await expect(companionInput).toBeVisible();
+    await companionInput.fill('75');
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.foods.find((f) => f.name === 'Milk')?.grams)).toBe(75);
+    expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50 }]);
+  });
+
+  test('an empty add-ons list in main diary modal shows only the add button and allows picking an add-on', async ({ page }) => {
+    const borsch = { id: '33333333-3333-4333-8333-333333333333', name: 'Borsch', grams: 300, kcal: 180, protein: 6, fat: 8, carbs: 20 };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [borsch, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'dinner'));
+    await page.fill('#food-name', 'Borsch');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#product-companions-field')).toBeVisible();
+    await expect(page.locator('#product-companions-field label')).toBeHidden();
+    await expect(page.locator('#product-companion-add')).toBeVisible();
+    await page.click('#product-companion-add');
+    await page.locator('#pick-body [data-pick-product]', { hasText: 'Milk' }).click();
+    await expect(page.locator('#product-companions-list')).toContainText('Milk');
+    await expect(page.locator('#product-companions-field label')).toBeVisible();
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Borsch', 'Milk']);
+    expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
+  });
 });
