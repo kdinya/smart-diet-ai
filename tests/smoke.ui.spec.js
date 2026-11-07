@@ -4319,4 +4319,38 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => f.name))).toEqual(['Borsch', 'Milk']);
     expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
   });
+
+  test('add-on card shows portions dropdown and calculated calories/macros, updating bidirectionally', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.fill('#food-name', 'Coffee');
+    await page.dispatchEvent('#food-name', 'change');
+
+    const companionCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
+    await expect(companionCard).toBeVisible();
+
+    const portionsSelect = companionCard.locator('select[data-companion-portions="' + MILK + '"]');
+    const gramsInput = companionCard.locator('input[data-companion-grams="' + MILK + '"]');
+    const nutritionInfo = companionCard.locator('[data-companion-nutrition="' + MILK + '"]');
+
+    await expect(portionsSelect).toHaveValue('1');
+    await expect(gramsInput).toHaveValue('100');
+    await expect(nutritionInfo).toContainText('64 kcal');
+    await expect(nutritionInfo).toContainText('P 3.3 · F 3.6 · C 4.8 g');
+
+    // Changing portions updates grams and nutrition
+    await portionsSelect.selectOption('0.5');
+    await portionsSelect.dispatchEvent('change');
+    await expect(gramsInput).toHaveValue('50');
+    await expect(nutritionInfo).toContainText('32 kcal');
+    await expect(nutritionInfo).toContainText('P 1.7 · F 1.8 · C 2.4 g');
+
+    // Changing grams updates portions and nutrition
+    await gramsInput.fill('200');
+    await gramsInput.dispatchEvent('input');
+    await expect(portionsSelect).toHaveValue('2');
+    await expect(nutritionInfo).toContainText('128 kcal');
+    await expect(nutritionInfo).toContainText('P 6.6 · F 7.2 · C 9.6 g');
+  });
 });
