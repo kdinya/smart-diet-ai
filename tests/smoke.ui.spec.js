@@ -3986,17 +3986,18 @@ test.describe('Smoke: previous weight on home', () => {
 test.describe('Smoke: assistant chat launcher choices', () => {
   test('home hero does not contain Ask Dietitian CTA and assistant chat button opens speech cloud with general and calorie options', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
-    await expect(page.locator('#view-home .card.hero [data-action="open-ask"]')).toHaveCount(0);
-
-    const mascot = page.locator('#bot-peeker');
-    await expect(mascot).toBeVisible();
-    await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await page.evaluate(() => {
+      if (typeof setBotServiceState === 'function') setBotServiceState({ period: 'day', pajamas: false });
       clearTimeout(window.botWelcomeTimer);
       window.botWelcomeTimer = null;
       window.botWelcomeShown = true;
       if (typeof hideBotComic === 'function') hideBotComic(true);
     });
+    await expect(page.locator('#view-home .card.hero [data-action="open-ask"]')).toHaveCount(0);
+
+    const mascot = page.locator('#bot-peeker');
+    await expect(mascot).toBeVisible();
+    await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await mascot.click();
 
     const chatAction = page.locator('#bot-chat-action-fab');
@@ -4019,6 +4020,7 @@ test.describe('Smoke: assistant chat launcher choices', () => {
     await page.locator('#ask-close').click();
     await expect(page.locator('#ask-panel')).not.toHaveClass(/open/);
     await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
+    await waitForTransformTransition(mascot);
 
     await mascot.click();
     await expect(chatAction).toBeVisible();
