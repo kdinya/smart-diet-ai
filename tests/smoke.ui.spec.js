@@ -4348,9 +4348,11 @@ test.describe('Smoke: product add-ons', () => {
     expect(await page.evaluate(() => state.products.find((p) => p.name === 'Borsch')?.companions)).toEqual([{ id: MILK, grams: 100 }]);
   });
 
-  test('add-on checkbox appears before the name and removal in diary does not mutate saved product', async ({ page }) => {
+  test('add-on checkbox appears before the name, delete icon is only in product editor and absent in meals', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+
+    // 1. Food modal in diary: delete button is NOT rendered
     await page.evaluate(() => openModal('food', 'breakfast'));
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
@@ -4364,18 +4366,34 @@ test.describe('Smoke: product add-ons', () => {
     });
     expect(order).toEqual(['checkbox', 'name']);
     await expect(card.locator(`input[data-companion-grams="${MILK}"]`)).toBeHidden();
+    await expect(card.locator(`[data-companion-remove="${MILK}"]`)).toHaveCount(0);
 
     await card.locator(`[data-companion-toggle="${MILK}"]`).click();
     await expect(card.locator(`input[data-companion-grams="${MILK}"]`)).toBeVisible();
-    await card.locator(`[data-companion-remove="${MILK}"]`).click();
+    await expect(card.locator(`[data-companion-remove="${MILK}"]`)).toHaveCount(0);
+    await page.click('#modal-close');
+
+    // 2. Meal picker modal: delete button is NOT rendered
+    await page.evaluate((c) => openMealPicker(c), coffee);
+    const pickCard = page.locator(`#pick-companions-list [data-companion-card="${MILK}"]`);
+    await expect(pickCard).toBeVisible();
+    await expect(pickCard.locator(`[data-companion-remove="${MILK}"]`)).toHaveCount(0);
+    await page.evaluate(() => closePick());
+
+    // 3. Product editor: delete button IS rendered and deletes companion
+    await page.evaluate((c) => openProductModal(c), coffee);
+    const prodCard = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
+    await expect(prodCard).toBeVisible();
+    const delBtn = prodCard.locator(`[data-companion-remove="${MILK}"]`);
+    await expect(delBtn).toBeVisible();
+    await delBtn.click();
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.click('#confirm-cancel');
-    await expect(card).toBeVisible();
-    await card.locator(`[data-companion-remove="${MILK}"]`).click();
+    await expect(prodCard).toBeVisible();
+    await delBtn.click();
     await page.click('#confirm-ok');
-    await expect(card).toHaveCount(0);
-    // Saved product setting is NOT mutated by removal in diary modal!
-    expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 100 }]);
+    await expect(prodCard).toHaveCount(0);
+    await page.click('#modal-close');
   });
 
   test('add-on card shows portions dropdown and calculated calories/macros, updating bidirectionally', async ({ page }) => {
@@ -4419,16 +4437,14 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
 
-    // 1. Food modal (diary entry) - collapsed by default
+    // 1. Food modal (diary entry) - collapsed by default, no delete button
     await page.evaluate(() => openModal('food', 'breakfast'));
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     const foodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
     await expect(foodCard).toBeVisible();
     await expect(foodCard).toHaveClass(/collapsed/);
-    const delBtn = foodCard.locator(`[data-companion-remove="${MILK}"]`);
-    await expect(delBtn).toHaveClass(/del/);
-    await expect(delBtn.locator('svg')).toBeVisible();
+    await expect(foodCard.locator(`[data-companion-remove="${MILK}"]`)).toHaveCount(0);
 
     // Verify portions and grams are in one row when expanded
     await foodCard.locator(`[data-companion-toggle="${MILK}"]`).click();
@@ -4444,18 +4460,22 @@ test.describe('Smoke: product add-ons', () => {
     expect(isOneRow).toBe(true);
     await page.click('#modal-close');
 
-    // 2. Meal picker modal - collapsed by default
+    // 2. Meal picker modal - collapsed by default, no delete button
     await page.evaluate((c) => openMealPicker(c), coffee);
     const pickCard = page.locator('#pick-companions-list [data-companion-card="' + MILK + '"]');
     await expect(pickCard).toBeVisible();
     await expect(pickCard).toHaveClass(/collapsed/);
+    await expect(pickCard.locator(`[data-companion-remove="${MILK}"]`)).toHaveCount(0);
     await page.evaluate(() => closePick());
 
-    // 3. Product editor modal - collapsed by default
+    // 3. Product editor modal - collapsed by default, delete button is present and matches app design
     await page.evaluate((c) => openProductModal(c), coffee);
     const prodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
     await expect(prodCard).toBeVisible();
     await expect(prodCard).toHaveClass(/collapsed/);
+    const delBtn = prodCard.locator(`[data-companion-remove="${MILK}"]`);
+    await expect(delBtn).toHaveClass(/del/);
+    await expect(delBtn.locator('svg')).toBeVisible();
   });
 
   test('add-on cards display total summed macros under label in collapsed and expanded state, with compact height and matching control heights', async ({ page }) => {
