@@ -3990,6 +3990,13 @@ test.describe('Smoke: assistant chat launcher choices', () => {
 
     const mascot = page.locator('#bot-peeker');
     await expect(mascot).toBeVisible();
+    await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
+    await page.evaluate(() => {
+      clearTimeout(window.botWelcomeTimer);
+      window.botWelcomeTimer = null;
+      window.botWelcomeShown = true;
+      if (typeof hideBotComic === 'function') hideBotComic(true);
+    });
     await mascot.click();
 
     const chatAction = page.locator('#bot-chat-action-fab');
