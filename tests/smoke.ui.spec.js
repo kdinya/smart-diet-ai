@@ -3743,7 +3743,7 @@ test('a qualifying weigh-in can keep the existing plan, enforces weekly interval
 
   await page.reload();
   await page.clock.fastForward(2200);
-  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925, lastPlanReviewDate: '2026-10-01' }; save(); });
+  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925, lastPlanReviewDate: '2026-10-01' }; state.weights = []; save(); });
   expect(1925 - 1876).toBe(49);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '99.9');
