@@ -3261,9 +3261,9 @@ test('assistant follows local night, morning, day, and evening routines', async 
     return order.indexOf('upper_arm_l') > order.indexOf('torso') && bone.scaleY === 1 && Math.abs(bone.rotation) < 5;
   });
   await expect.poll(isArmInFront).toBe(true);
-  await setTime('2026-11-03T19:59:00');
+  await setTime('2026-11-03T20:59:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
-  await setTime('2026-11-03T20:00:00');
+  await setTime('2026-11-03T21:00:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'evening');
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
@@ -3759,6 +3759,35 @@ test('logging weight closer to the goal celebrates progress', async ({ page }) =
 });
 
 test.describe('Smoke: first-visit greeting and shared product notice', () => {
+  test('assistant remains cheerful and active during daytime hours without pajama transitions', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T11:45:00') });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => {
+      clearTimeout(botWelcomeTimer);
+      botWelcomeTimer = null;
+      botWelcomeScheduled = false;
+      botWelcomeShown = true;
+      applyBotTimeBaseline();
+    });
+    const mascot = page.locator('#bot-peeker');
+    const zzz = page.locator('#bot-zzz');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await expect(mascot).toHaveAttribute('data-time-period', 'day');
+    await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
+    await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+    await expect(zzz).not.toHaveClass(/is-sleeping/);
+
+    for (let i = 0; i < 12; i++) {
+      const motion = await page.evaluate(() => nextRandomBotMotion());
+      expect(['wave', 'thinking', 'celebration', 'wink', 'nod', 'surprise']).toContain(motion);
+      expect(motion).not.toBe('sleepy');
+      expect(motion).not.toBe('sad');
+      await page.evaluate((m) => setBotMotion(m, 80), motion);
+      expect(await mascot.getAttribute('data-time-period')).toBe('day');
+      expect(await mascot.evaluate((el) => el.classList.contains('bot-wears-sleepwear'))).toBe(false);
+    }
+  });
+
   test('greets a first-time visitor in Ukrainian and English on the setup screen', async ({ page }) => {
     await openApp(page, { prefs: { lang: 'uk' }, foods: [], weights: [] });
     await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
@@ -4401,7 +4430,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(nutritionInfo).toContainText('P 3.3 · F 3.6 · C 4.8 g');
 
     // Changing portions updates grams and nutrition
-    await portionsSelect.selectOption('0.5');
+    await portionsSelect.selectOption('0.5', { force: true });
     await portionsSelect.dispatchEvent('change');
     await expect(gramsInput).toHaveValue('50');
     await expect(nutritionInfo).toContainText('32 kcal');
