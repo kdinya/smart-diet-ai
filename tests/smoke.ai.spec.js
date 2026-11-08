@@ -600,7 +600,7 @@ test.describe('Smoke: dietitian launcher', () => {
 
   test('assistant appearance sliders, localized label and overlays behave correctly', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
-  await page.clock.install();
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const fab = page.locator('#bot-chat-action-fab');
   const legacyFab = page.locator('#chat-fab');
   const mascot = page.locator('#bot-peeker');
