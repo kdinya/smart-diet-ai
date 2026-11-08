@@ -4093,10 +4093,12 @@ test('calorie chart shows daily intake, goal details and filters by period', asy
   await page.locator('[data-calorie-range="7d"]').click();
   await expect(page.locator('[data-calorie-range="7d"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(1);
   await expect(chart.locator(`[data-calorie-point][data-date="${day(4)}"]`)).toBeVisible();
   await expect(page.locator('#calorie-chart-summary')).toContainText('2 days logged');
   await page.locator('[data-calorie-range="all"]').click();
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(4);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(3);
 });
 
 test('calorie chart keeps labels and points proportional on a phone-sized screen', async ({ page }) => {
@@ -4115,6 +4117,7 @@ test('calorie chart keeps labels and points proportional on a phone-sized screen
   await expect(page.locator('[data-i18n="calorieChartTitle"]')).toHaveText('Динаміка калорій');
   const chart = page.locator('#calorie-chart');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(1);
   await expect(page.locator('#calorie-chart-summary')).toContainText('Записано днів: 2');
   const measurements = await chart.evaluate((svg) => {
     const rect = svg.getBoundingClientRect();
