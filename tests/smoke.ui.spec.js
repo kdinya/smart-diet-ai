@@ -1160,6 +1160,37 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#pick-body .pick-item .muted').first()).toHaveCSS('font-size', '12px');
   });
 
+  test('my products list can be sorted by name, calories, protein, fat, and carbs, defaulting to name', async ({ page }) => {
+    const products = [
+      { id: 'p-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 },
+      { id: 'p-buckwheat', name: 'Buckwheat', grams: 100, kcal: 340, protein: 12, fat: 3, carbs: 70 },
+      { id: 'p-cheese', name: 'Cheese', grams: 100, kcal: 350, protein: 25, fat: 28, carbs: 1.5 },
+      { id: 'p-avocado', name: 'Avocado', grams: 100, kcal: 160, protein: 2, fat: 15, carbs: 9 },
+    ];
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products });
+    await openView(page, 'products');
+
+    const sortSelect = page.locator('#product-sort');
+    await expect(sortSelect).toHaveValue('name');
+    const productNames = page.locator('#products-list .product-name');
+    await expect(productNames).toHaveText(['Apple', 'Avocado', 'Buckwheat', 'Cheese']);
+
+    await sortSelect.selectOption('kcal');
+    await expect(productNames).toHaveText(['Cheese', 'Buckwheat', 'Avocado', 'Apple']);
+
+    await sortSelect.selectOption('protein');
+    await expect(productNames).toHaveText(['Cheese', 'Buckwheat', 'Avocado', 'Apple']);
+
+    await sortSelect.selectOption('fat');
+    await expect(productNames).toHaveText(['Cheese', 'Avocado', 'Buckwheat', 'Apple']);
+
+    await sortSelect.selectOption('carbs');
+    await expect(productNames).toHaveText(['Buckwheat', 'Apple', 'Avocado', 'Cheese']);
+
+    await sortSelect.selectOption('name');
+    await expect(productNames).toHaveText(['Apple', 'Avocado', 'Buckwheat', 'Cheese']);
+  });
+
   test('verified products show the same check in each product picker modal', async ({ page }) => {
     const products = [
       { id: 'verified-oats', name: 'Oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, verified: true },
