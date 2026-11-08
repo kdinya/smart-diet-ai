@@ -4011,10 +4011,12 @@ test.describe('Smoke: assistant chat launcher choices', () => {
     await expect(page.locator('#chat-panel')).not.toHaveClass(/open/);
     await page.locator('#ask-close').click();
     await expect(page.locator('#ask-panel')).not.toHaveClass(/open/);
+    await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
 
     await mascot.click();
     await expect(chatAction).toBeVisible();
     await chatAction.click();
+    await expect(bubble).toHaveClass(/is-visible/);
     await expect(calcBtn).toBeVisible();
     await calcBtn.click();
     await expect(page.locator('#chat-panel')).toHaveClass(/open/);
