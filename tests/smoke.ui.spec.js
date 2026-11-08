@@ -3261,9 +3261,9 @@ test('assistant follows local night, morning, day, and evening routines', async 
     return order.indexOf('upper_arm_l') > order.indexOf('torso') && bone.scaleY === 1 && Math.abs(bone.rotation) < 5;
   });
   await expect.poll(isArmInFront).toBe(true);
-  await setTime('2026-11-03T19:59:00');
+  await setTime('2026-11-03T20:59:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'day');
-  await setTime('2026-11-03T20:00:00');
+  await setTime('2026-11-03T21:00:00');
   await expect(mascot).toHaveAttribute('data-time-period', 'evening');
   await expect(mascot).toHaveAttribute('data-spine-mood', 'sleepy');
   await expect(mascot).toHaveClass(/bot-wears-sleepwear/);
@@ -3695,7 +3695,7 @@ test('legacy profile initialization migrates the birth date without blocking app
   expect((await readStore(page)).prefs.birthDate).toBeTruthy();
 });
 
-test('a qualifying weigh-in offers a plan update and acceptance preserves the profile baseline', async ({ page }) => {
+test('a qualifying weigh-in offers a plan update based on trend and acceptance preserves the profile baseline', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3706,18 +3706,21 @@ test('a qualifying weigh-in offers a plan update and acceptance preserves the pr
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
-  await expect(bubble).toContainText(`Update your weight-loss plan?`);
+  await expect(bubble).toContainText('7-day trend');
+  await expect(bubble).toContainText('90.0 kg');
+  await expect(bubble).toContainText('Update your weight-loss plan?');
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
   await bubble.locator('.bot-comic-actions button').first().dispatchEvent('click');
   await expect(bubble).not.toHaveClass(/is-visible/);
   const saved = await readStore(page);
   expect(saved.prefs.kcal).toBe(candidateKcal);
+  expect(saved.prefs.lastPlanReviewDate).toBe('2026-11-03');
   expect(saved.prefs.currentWeight).toBe(100);
   expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
   expect(saved.weights.map(item => item.value)).toContain(90);
 });
 
-test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal does not prompt', async ({ page }) => {
+test('a qualifying weigh-in can keep the existing plan, enforces weekly interval, and drops under 50 kcal do not prompt', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3729,10 +3732,18 @@ test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal 
   await expect(bubble).toContainText('Update your weight-loss plan?');
   await bubble.locator('.bot-comic-actions button').nth(1).evaluate(button => button.click());
   expect((await readStore(page)).prefs.kcal).toBe(2236);
+  expect((await readStore(page)).prefs.lastPlanReviewDate).toBe('2026-11-03');
+
+  // A weigh-in 2 days later does not prompt even with lower weight because 7 days have not elapsed
+  await page.clock.fastForward(2 * 86400 * 1000);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '88');
+  await page.locator('#weight-save').click();
+  await expect(bubble).not.toHaveClass(/is-visible/);
 
   await page.reload();
   await page.clock.fastForward(2200);
-  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925 }; save(); });
+  await page.evaluate(() => { state.prefs = { ...state.prefs, kcal: 1925, lastPlanReviewDate: '2026-10-01' }; state.weights = []; save(); });
   expect(1925 - 1876).toBe(49);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '99.9');
@@ -3741,6 +3752,29 @@ test('a qualifying weigh-in can keep the existing plan and a drop under 50 kcal 
   const afterSmallDrop = await readStore(page);
   expect(afterSmallDrop.prefs.currentWeight).toBe(100);
   expect(afterSmallDrop.weights.map(item => item.value)).toContain(99.9);
+});
+
+test('home hero card contains avocado illustration cleanly within bounds', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  const hero = page.locator('#view-home .card.hero');
+  await expect(hero).toBeVisible();
+  const styles = await hero.evaluate((el) => {
+    const after = window.getComputedStyle(el, '::after');
+    const h2 = el.querySelector('h2');
+    const p = el.querySelector('p');
+    return {
+      minHeight: parseFloat(window.getComputedStyle(el).minHeight),
+      top: parseFloat(after.top),
+      right: parseFloat(after.right),
+      h2Z: window.getComputedStyle(h2).zIndex,
+      pZ: window.getComputedStyle(p).zIndex,
+      afterZ: after.zIndex,
+    };
+  });
+  expect(styles.top).toBeGreaterThanOrEqual(0);
+  expect(styles.minHeight).toBeGreaterThanOrEqual(140);
+  expect(Number(styles.h2Z)).toBeGreaterThan(Number(styles.afterZ || 0));
+  expect(Number(styles.pZ)).toBeGreaterThan(Number(styles.afterZ || 0));
 });
 
 test('logging weight closer to the goal celebrates progress', async ({ page }) => {
@@ -3759,6 +3793,35 @@ test('logging weight closer to the goal celebrates progress', async ({ page }) =
 });
 
 test.describe('Smoke: first-visit greeting and shared product notice', () => {
+  test('assistant remains cheerful and active during daytime hours without pajama transitions', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-03T11:45:00') });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await page.evaluate(() => {
+      clearTimeout(botWelcomeTimer);
+      botWelcomeTimer = null;
+      botWelcomeScheduled = false;
+      botWelcomeShown = true;
+      applyBotTimeBaseline();
+    });
+    const mascot = page.locator('#bot-peeker');
+    const zzz = page.locator('#bot-zzz');
+    await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await expect(mascot).toHaveAttribute('data-time-period', 'day');
+    await expect(mascot).toHaveAttribute('data-spine-mood', 'idle');
+    await expect(mascot).not.toHaveClass(/bot-wears-sleepwear/);
+    await expect(zzz).not.toHaveClass(/is-sleeping/);
+
+    for (let i = 0; i < 12; i++) {
+      const motion = await page.evaluate(() => nextRandomBotMotion());
+      expect(['wave', 'thinking', 'celebration', 'wink', 'nod', 'surprise']).toContain(motion);
+      expect(motion).not.toBe('sleepy');
+      expect(motion).not.toBe('sad');
+      await page.evaluate((m) => setBotMotion(m, 80), motion);
+      expect(await mascot.getAttribute('data-time-period')).toBe('day');
+      expect(await mascot.evaluate((el) => el.classList.contains('bot-wears-sleepwear'))).toBe(false);
+    }
+  });
+
   test('greets a first-time visitor in Ukrainian and English on the setup screen', async ({ page }) => {
     await openApp(page, { prefs: { lang: 'uk' }, foods: [], weights: [] });
     await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
@@ -4075,10 +4138,12 @@ test('calorie chart shows daily intake, goal details and filters by period', asy
   await page.locator('[data-calorie-range="7d"]').click();
   await expect(page.locator('[data-calorie-range="7d"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(1);
   await expect(chart.locator(`[data-calorie-point][data-date="${day(4)}"]`)).toBeVisible();
   await expect(page.locator('#calorie-chart-summary')).toContainText('2 days logged');
   await page.locator('[data-calorie-range="all"]').click();
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(4);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(3);
 });
 
 test('calorie chart keeps labels and points proportional on a phone-sized screen', async ({ page }) => {
@@ -4097,6 +4162,7 @@ test('calorie chart keeps labels and points proportional on a phone-sized screen
   await expect(page.locator('[data-i18n="calorieChartTitle"]')).toHaveText('Динаміка калорій');
   const chart = page.locator('#calorie-chart');
   await expect(chart.locator('[data-calorie-point]')).toHaveCount(2);
+  await expect(chart.locator('line[stroke="#28754f"]')).toHaveCount(1);
   await expect(page.locator('#calorie-chart-summary')).toContainText('Записано днів: 2');
   const measurements = await chart.evaluate((svg) => {
     const rect = svg.getBoundingClientRect();
@@ -4430,7 +4496,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(nutritionInfo).toContainText('P 3.3 · F 3.6 · C 4.8 g');
 
     // Changing portions updates grams and nutrition
-    await portionsSelect.selectOption('0.5');
+    await portionsSelect.selectOption('0.5', { force: true });
     await portionsSelect.dispatchEvent('change');
     await expect(gramsInput).toHaveValue('50');
     await expect(nutritionInfo).toContainText('32 kcal');

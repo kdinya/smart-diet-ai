@@ -345,8 +345,9 @@ async function openDietitianChat(page) {
   const mascot = page.locator('#bot-peeker');
   const chatAction = page.locator('#bot-chat-action-fab');
   if (await mascot.isVisible()) {
+    await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await mascot.click();
-    await expect(chatAction).toBeVisible();
+    await expect(chatAction).toBeVisible({ timeout: 10000 });
     await chatAction.click();
     const calcChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
     await expect(calcChoice).toBeVisible();
@@ -361,8 +362,9 @@ async function openAskChat(page) {
   const mascot = page.locator('#bot-peeker');
   const chatAction = page.locator('#bot-chat-action-fab');
   if (await mascot.isVisible()) {
+    await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await mascot.click();
-    await expect(chatAction).toBeVisible();
+    await expect(chatAction).toBeVisible({ timeout: 10000 });
     await chatAction.click();
     const askChoice = page.locator('.bot-comic-actions [data-action="open-ask"]');
     await expect(askChoice).toBeVisible();
