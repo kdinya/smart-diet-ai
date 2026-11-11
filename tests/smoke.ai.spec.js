@@ -1161,6 +1161,7 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
   });
 
   test('floating dietitian chat history survives close and reload, clears with confirmation, and remains account-scoped', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-06T12:00:00') });
     await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'uk' } });
     const reply = JSON.stringify({ items: [{ name: 'Вівсянка', grams: 50, kcal: 190, protein: 7, fat: 3, carbs: 32 }], total: { kcal: 190, protein: 7, fat: 3, carbs: 32 }, note: 'Орієнтовна порція.' });
     await page.route('https://api.groq.com/**', route => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: reply } }] }) }));
