@@ -1836,6 +1836,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   });
 
   test('product plus shows a reminder while asleep and does not open the meal picker', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
     await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
     await openView(page, 'products');
