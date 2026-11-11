@@ -4711,6 +4711,14 @@ test('floating nutrition summary mirrors home and selected diary cards as they l
   });
 
   const badge = page.locator('#nutrition-badge');
+  const typeSizes = await page.evaluate(() => ({
+    calories: getComputedStyle(document.querySelector('.nutrition-badge-calories')).fontSize,
+    weight: getComputedStyle(document.querySelector('.weight-badge-value')).fontSize,
+    macros: getComputedStyle(document.querySelector('.nutrition-badge-macros')).fontSize,
+    weightLabel: getComputedStyle(document.querySelector('.weight-badge-label')).fontSize,
+  }));
+  expect(typeSizes.calories).toBe(typeSizes.weight);
+  expect(typeSizes.macros).toBe(typeSizes.weightLabel);
   await expect(badge).not.toHaveClass(/is-floating/);
   await page.evaluate(() => {
     const tile = document.querySelector('#view-home [data-nutrition-key="kcal"]');
