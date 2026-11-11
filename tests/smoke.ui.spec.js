@@ -4059,7 +4059,7 @@ test.describe('Smoke: floating current weight', () => {
     await expect.poll(() => badge.evaluate(el => el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(0);
     const floating = await badge.evaluate(el => ({ position: getComputedStyle(el).position, z: Number(getComputedStyle(el).zIndex), top: el.getBoundingClientRect().top }));
     expect(floating.position).toBe('fixed');
-    expect(floating.z).toBeLessThan(40);
+    expect(floating.z).toBeGreaterThan(50);
     expect(floating.top).toBeLessThan(50);
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(badge).not.toHaveClass(/is-floating/);
@@ -4726,6 +4726,34 @@ test('floating nutrition summary mirrors home and selected diary cards as they l
   });
   await expect(page.locator('#weight-badge')).toHaveClass(/is-floating/);
   await expect(badge).toHaveClass(/is-floating/);
+  const floatingLayers = await page.evaluate(() => {
+    const weight = document.querySelector('#weight-badge');
+    const nutrition = document.querySelector('#nutrition-badge');
+    const actions = document.querySelector('#home-meals .meal-analyze')?.closest('.meal-actions');
+    const hitsBadgeOnOverlap = badge => {
+      const badgeRect = badge.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      const left = Math.max(badgeRect.left, actionsRect.left);
+      const right = Math.min(badgeRect.right, actionsRect.right);
+      const top = Math.max(badgeRect.top, actionsRect.top);
+      const bottom = Math.min(badgeRect.bottom, actionsRect.bottom);
+      if (right <= left || bottom <= top) return true;
+      return document.elementFromPoint((left + right) / 2, (top + bottom) / 2)?.closest(`#${badge.id}`) === badge;
+    };
+    return {
+      z: [getComputedStyle(weight).zIndex, getComputedStyle(nutrition).zIndex, getComputedStyle(actions).zIndex],
+      weightCoversActions: hitsBadgeOnOverlap(weight),
+      nutritionCoversActions: hitsBadgeOnOverlap(nutrition),
+    };
+  });
+  expect(floatingLayers.z.map(Number)).toEqual([55, 54, 4]);
+  expect(floatingLayers.weightCoversActions).toBe(true);
+  expect(floatingLayers.nutritionCoversActions).toBe(true);
+  const badgeSpacing = await badge.evaluate(el => {
+    const style = getComputedStyle(el);
+    return { top: style.paddingTop, bottom: style.paddingBottom, between: style.rowGap };
+  });
+  expect(badgeSpacing).toEqual({ top: '10px', bottom: '10px', between: '5px' });
   await expect(badge.locator('.nutrition-badge-calories')).toContainText('500/2000');
   await expect(badge.locator('.nutrition-badge-calories')).toContainText('ккал');
   const assertMacroMatchesTile = async key => {
