@@ -1849,11 +1849,12 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#bot-comic .bot-comic-actions button').click();
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#products-list [data-add-product]').first().click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
-    await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Доброго ранку! Я ще сонний, але сніданок — це дуже важлива справа 🍳😴');
   });
 
   test('AI-recommended food shows the sleep reminder before opening the meal picker', async ({ page }) => {
@@ -1921,7 +1922,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('a sleepy assistant allows morning food and gives a gentle reminder in the evening', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     const add = meal.locator('[data-action="add-food"]');
@@ -1929,8 +1930,10 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await add.click();
     const bubble = page.locator('#bot-comic');
     await expect(page.locator('#modal')).toHaveClass(/open/);
-    await expect(bubble).not.toHaveClass(/is-visible/);
+    await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('Доброго ранку! Я ще сонний, але сніданок — це дуже важлива справа 🍳😴');
     await page.locator('#modal-close').click();
+    await page.evaluate(() => hideBotComic(true));
 
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'evening', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
@@ -1952,7 +1955,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
-    await page.evaluate(() => localStorage.setItem('smartdiet-sleep-food-reminder', String(Date.now())));
+    await page.evaluate(() => localStorage.setItem('smartdiet-sleep-food-morning', String(Date.now())));
     await meal.locator('[data-action="add-food"]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
