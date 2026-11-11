@@ -1827,7 +1827,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await meal.locator('[data-action="add-food"]').click();
     await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('О, нічний перекус! Я вже в піжамі, але для запису смаколика знайду хвилинку 🍎😴');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await page.locator('#bot-comic .bot-comic-actions button').click();
@@ -1874,7 +1874,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#ask-product-action-diary').click();
     await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
+    await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('О, нічний перекус! Я вже в піжамі, але для запису смаколика знайду хвилинку 🍎😴');
     await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
   });
@@ -1902,7 +1902,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await add.click();
     const bubble = page.locator('#bot-comic');
     await expect(bubble).toHaveClass(/is-visible/);
-    await expect(bubble.locator('.bot-comic-text')).toHaveText('Вже спати пора, а ти збираєшся їсти? 😴');
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('О, нічний перекус! Я вже в піжамі, але для запису смаколика знайду хвилинку 🍎😴');
     await bubble.locator('.bot-comic-actions button').click();
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
@@ -1919,7 +1919,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
   });
 
-  test('a dozing assistant warns about food, but an awake assistant does not', async ({ page }) => {
+  test('a sleepy assistant allows morning food and gives a gentle reminder in the evening', async ({ page }) => {
     await openApp(page, store());
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'morning', pajamas: true }); });
     const meal = page.locator('#home-meals .meal-card').first();
@@ -1928,7 +1928,15 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await add.click();
     const bubble = page.locator('#bot-comic');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(bubble).not.toHaveClass(/is-visible/);
+    await page.locator('#modal-close').click();
+
+    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'evening', pajamas: true }); });
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
+    await add.click();
     await expect(bubble).toHaveClass(/is-visible/);
+    await expect(bubble.locator('.bot-comic-text')).toHaveText('О, нічний перекус! Я вже в піжамі, але для запису смаколика знайду хвилинку 🍎😴');
     await bubble.locator('.bot-comic-actions button').click();
     await expect(bubble).not.toHaveClass(/is-visible/);
 
