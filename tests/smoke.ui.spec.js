@@ -4687,3 +4687,86 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#modal-close');
   });
 });
+
+test('floating nutrition summary mirrors home and selected diary cards as they leave the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  const dates = await page.evaluate(() => {
+    const today = new Date();
+    const previous = new Date(today);
+    previous.setDate(previous.getDate() - 1);
+    const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return { today: iso(today), previous: iso(previous) };
+  });
+  const food = (id, date, kcal, protein, fat, carbs) => ({
+    id, name: 'Nutrition summary test', meal: 'breakfast', grams: 100,
+    kcal, protein, fat, carbs, date, createdAt: 1,
+  });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', kcal: 2000, protein: 172, fat: 70, carbs: 242 },
+    foods: [
+      food('aaaa1111-1111-4111-8111-111111111111', dates.today, 500, 56, 20, 80),
+      food('bbbb2222-2222-4222-8222-222222222222', dates.previous, 900, 90, 35, 120),
+    ],
+    weights: [],
+  });
+
+  const badge = page.locator('#nutrition-badge');
+  await expect(badge).not.toHaveClass(/is-floating/);
+  await page.evaluate(() => {
+    const tile = document.querySelector('#view-home [data-nutrition-key="kcal"]');
+    window.scrollTo(0, window.scrollY + tile.getBoundingClientRect().bottom - 35);
+  });
+  await expect(page.locator('#weight-badge')).toHaveClass(/is-floating/);
+  await expect(badge).toHaveClass(/is-floating/);
+  await expect(badge.locator('.nutrition-badge-calories')).toContainText('500/2000');
+  await expect(badge.locator('.nutrition-badge-calories')).toContainText('ккал');
+  const assertMacroMatchesTile = async key => {
+    const expected = await page.evaluate(key => {
+      const root = document.querySelector('#view-home.active, #view-diary.active');
+      const rect = root?.querySelector(`[data-nutrition-key="${key}"]`)?.getBoundingClientRect();
+      return !!rect && (key === 'fat' ? rect.top <= -(rect.height / 2) : rect.bottom <= 0);
+    }, key);
+    if (expected) await expect(badge.locator(`[data-macro="${key}"]`)).toHaveClass(/is-visible/);
+    else await expect(badge.locator(`[data-macro="${key}"]`)).not.toHaveClass(/is-visible/);
+  };
+  await assertMacroMatchesTile('protein');
+
+  const revealMacro = async key => {
+    await page.evaluate(key => {
+      const tile = document.querySelector(`#view-home.active [data-nutrition-key="${key}"], #view-diary.active [data-nutrition-key="${key}"]`);
+      const rect = tile.getBoundingClientRect();
+      const delta = key === 'fat' ? rect.top + rect.height / 2 + 12 : rect.bottom + 12;
+      window.scrollTo(0, Math.max(0, window.scrollY + delta));
+    }, key);
+    await page.waitForTimeout(100);
+    await expect(badge.locator(`[data-macro="${key}"]`)).toHaveClass(/is-visible/);
+  };
+  await revealMacro('protein');
+  await expect(badge.locator('[data-macro="protein"]')).toContainText('Б56/172');
+  await revealMacro('fat');
+  await expect(badge.locator('[data-macro="fat"]')).toContainText('Ж20/70');
+  await revealMacro('carbs');
+  await expect(badge.locator('[data-macro="carbs"]')).toContainText('В80/242');
+  await expect(badge.locator('[data-macro="protein"] strong')).toHaveClass(/under/);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(badge.locator('.nutrition-macro.is-visible')).toHaveCount(0);
+  await expect(badge).not.toHaveClass(/is-floating/);
+
+  await openView(page, 'diary');
+  await page.evaluate(date => {
+    const input = document.querySelector('#diary-date');
+    input.value = date;
+    input.dispatchEvent(new Event('change'));
+  }, dates.previous);
+  await expect(page.locator('#diary-summary [data-nutrition-key="kcal"] > strong').first()).toHaveText('900');
+  await page.evaluate(() => {
+    const tile = document.querySelector('#view-diary [data-nutrition-key="kcal"]');
+    window.scrollTo(0, window.scrollY + tile.getBoundingClientRect().bottom + 12);
+  });
+  await expect(badge).toHaveClass(/is-floating/);
+  await expect(badge.locator('.nutrition-badge-calories')).toContainText('900/2000');
+  await assertMacroMatchesTile('protein');
+  await revealMacro('protein');
+  await expect(badge.locator('[data-macro="protein"]')).toContainText('Б90/172');
+});
