@@ -4880,7 +4880,6 @@ test.describe('Smoke: product add-ons', () => {
     await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Chicken');
 
     // Clicking edit on Shawarma opens composite modal
-    await shawarmaItem.locator('.product-toggle').click();
     await shawarmaItem.locator('[data-edit-product]').click();
     await expect(page.locator('#composite-modal')).toHaveClass(/open/);
     await page.click('#composite-modal-close');
