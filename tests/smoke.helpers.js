@@ -528,6 +528,7 @@ function befriend(backend) {
 async function addProduct(page, name, kcal) {
   await openView(page, 'products');
   await page.click('#product-new');
+  await page.click('#product-type-simple');
   await page.fill('#food-name', name);
   await page.fill('#food-kcal', kcal);
   await page.click('#food-save');

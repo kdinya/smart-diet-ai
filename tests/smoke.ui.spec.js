@@ -65,6 +65,7 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Parser product');
     await page.evaluate(async () => navigator.clipboard.writeText('Энергетическая ценность\t263 ккал\nБелки\t6.93 г\nЖиры\t1.2 г\nУглеводы\t45 г'));
     await page.click('#product-import-clipboard');
@@ -91,6 +92,7 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await page.evaluate(async () => navigator.clipboard.writeText(`263 ккал\nТакож 1,100 кДж ● Енергія\nБілки\n6.93 г\nРекомендована добова норма споживання: 118 г\nВуглеводи\n30 г\nРекомендована добова норма споживання: 182 г\nЦукор\n12 г\nЖири\n11.93 г\nРекомендована добова норма споживання: 53 г\nНасичені жирні кислоти\n8 г`));
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Test product');
     await page.fill('#food-grams', '100');
     await page.fill('#food-kcal', '200');
@@ -143,6 +145,7 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Вівсянка');
     await page.click('#product-calc-search');
     await expect(page.locator('#calc-search-modal')).toHaveClass(/open/);
@@ -165,6 +168,7 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await page.evaluate(async () => navigator.clipboard.writeText('Just a product description, no nutrition facts.'));
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Test product');
     await page.click('#product-import-clipboard');
     await expect(page.locator('#product-import-modal')).not.toHaveClass(/open/);
@@ -1008,6 +1012,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Buckwheat');
     await page.fill('#food-kcal', '110');
     await page.click('#food-save');
@@ -1027,6 +1032,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [], products: [original] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Buckwheat');
     await page.fill('#food-grams', '100');
     await page.fill('#food-kcal', '130');
@@ -1088,6 +1094,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Storage test');
     await page.fill('#food-grams', '100');
     await page.evaluate(() => {
@@ -4446,6 +4453,7 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [milk], foods: [], weights: [] });
     await openView(page, 'products');
     await page.click('#product-new');
+    await page.click('#product-type-simple');
     await page.fill('#food-name', 'Coffee');
     await page.fill('#food-kcal', '5');
     await page.click('#product-companion-add');
@@ -4872,11 +4880,13 @@ test.describe('Smoke: product add-ons', () => {
     await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Chicken');
 
     // Clicking edit on Shawarma opens composite modal
+    await shawarmaItem.locator('.product-toggle').click();
     await shawarmaItem.locator('[data-edit-product]').click();
     await expect(page.locator('#composite-modal')).toHaveClass(/open/);
     await page.click('#composite-modal-close');
 
     // Clicking edit on Pita opens traditional modal
+    await pitaItem.locator('.product-toggle').click();
     await pitaItem.locator('[data-edit-product]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await page.click('#modal-close');
