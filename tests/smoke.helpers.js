@@ -245,7 +245,7 @@ async function handleSocial(route, req, url, backend, json, table, uid) {
     if (item.from_user !== uid || !areFriends(backend, uid, item.to_user, 'accepted')) {
       return json(403, { code: '42501', message: 'new row violates row-level security policy for table "product_shares"' });
     }
-    if (!item.name || item.name.length > 120 || SHARE_VALUE_KEYS.some((key) => !(item[key] >= 0 && item[key] <= 10000))) {
+    if (!item.name || item.name.length > 120 || SHARE_VALUE_KEYS.some((key) => !(item[key] >= 0 && item[key] <= 10000)) || !Array.isArray(item.components ?? []) || (item.components ?? []).length > 50 || Buffer.byteLength(JSON.stringify(item.components ?? []), 'utf8') > 65536 || (item.components ?? []).some((c) => !c || typeof c.id !== 'string' || c.id.length > 64 || typeof c.name !== 'string' || c.name.length > 120 || ['grams', 'kcal', 'protein', 'fat', 'carbs'].some((key) => !(Number(c[key]) >= 0 && Number(c[key]) <= 9999999)))) {
       return json(400, { code: '23514', message: 'new row for relation "product_shares" violates check constraint' });
     }
     if (rows.filter((row) => row.from_user === uid && row.to_user === item.to_user).length >= 20) {

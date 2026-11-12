@@ -354,6 +354,7 @@ create table if not exists public.product_shares (
   constraint product_shares_no_self check (from_user <> to_user)
 );
 alter table public.product_shares add column if not exists verified boolean not null default false;
+alter table public.product_shares add column if not exists components jsonb not null default '[]'::jsonb check (jsonb_typeof(components) = 'array' and octet_length(components::text) <= 65536);
 
 create index if not exists product_shares_inbox_idx on public.product_shares (to_user, from_user, created_at);
 create index if not exists product_shares_sender_idx on public.product_shares (from_user, created_at);

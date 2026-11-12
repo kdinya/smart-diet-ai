@@ -281,11 +281,14 @@ async function run() {
   r = await rest('profiles', { as: 'b', query: `user_id=${eq(A)}&select=user_id` });
   check('Friends can read each other profile', rows(r) === 1, describe(r));
 
+  const recipeComponents = [{ id: 'component-oats', name: 'CI oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 }, { id: 'component-milk', name: 'CI milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 }];
   r = await rest('product_shares', {
-    as: 'a', method: 'POST', prefer: 'return=representation', body: shareBody(A, B, 'CI shared 1'),
+    as: 'a', method: 'POST', prefer: 'return=representation', body: { ...shareBody(A, B, 'CI shared 1'), components: recipeComponents },
   });
   const shareOne = r.json?.[0]?.id;
   check('Friend can receive a shared product', r.status === 201 && !!shareOne, describe(r));
+  r = await rest('product_shares', { as: 'b', query: `id=${eq(shareOne)}&select=components` });
+  check('Recipient receives all shared recipe components', JSON.stringify(r.json?.[0]?.components) === JSON.stringify(recipeComponents), describe(r));
 
   r = await rest('product_shares', { as: 'a', method: 'POST', body: shareBody(A, C, 'CI to stranger') });
   check('Cannot share with a non-friend', denied(r), describe(r));
