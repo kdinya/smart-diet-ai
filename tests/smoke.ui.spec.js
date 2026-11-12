@@ -4850,6 +4850,97 @@ test.describe('Smoke: product add-ons', () => {
     });
   });
 
+  test('verified checkbox stays available for simple-product creation and editing', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.click('#product-new');
+    await page.click('#product-type-simple');
+    await expect(page.locator('#product-verified-label')).toBeVisible();
+    await page.locator('#product-verified').check();
+    await page.fill('#food-name', 'Verified oats');
+    await page.fill('#food-grams', '100');
+    await page.fill('#food-kcal', '150');
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.products.find((product) => product.name === 'Verified oats')?.verified)).toBe(true);
+
+    const product = page.locator('.product-item', { hasText: 'Verified oats' });
+    await product.locator('[data-toggle-product]').click();
+    await product.locator('[data-edit-product]').click();
+    await expect(page.locator('#product-verified-label')).toBeVisible();
+    await expect(page.locator('#product-verified')).toBeChecked();
+    await page.locator('#product-verified').uncheck();
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => state.products.find((item) => item.name === 'Verified oats')?.verified)).toBe(false);
+  });
+
+  test('a new composite ingredient can be saved separately, but existing products have no save option', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.click('#product-new');
+    await page.click('#product-type-composite');
+    await page.fill('#composite-name', 'Test bowl');
+    await page.click('#composite-add-ingredient');
+    await expect(page.locator('#ingredient-save-product-label')).toBeHidden();
+    await page.fill('#food-name', 'New ingredient');
+    await expect(page.locator('#ingredient-save-product-label')).toBeVisible();
+    await page.locator('#ingredient-save-product').check();
+    await page.fill('#food-grams', '100');
+    await page.fill('#food-kcal', '120');
+    await page.fill('#food-protein', '4');
+    await page.fill('#food-fat', '2');
+    await page.fill('#food-carbs', '20');
+    await page.click('#food-save');
+    await expect(page.locator('#composite-ingredients-list')).toContainText('New ingredient');
+    const newIngredientCard = page.locator('#composite-ingredients-list [data-ingredient-id]');
+    await expect(newIngredientCard).toHaveClass(/collapsed/);
+    await expect(newIngredientCard.locator('.product-name')).toHaveText('New ingredient');
+    await expect(newIngredientCard.locator('[data-edit-ingredient]')).toBeHidden();
+    expect(await newIngredientCard.evaluate((card) => getComputedStyle(card).borderTopWidth)).toBe('1px');
+    expect(await newIngredientCard.locator('.product-row').evaluate((row) => getComputedStyle(row).borderTopWidth)).toBe('0px');
+    await newIngredientCard.locator('[data-toggle-ingredient]').click();
+    await expect(newIngredientCard.locator('[data-edit-ingredient]')).toBeVisible();
+    await expect(newIngredientCard.locator('.product-row')).toContainText('120');
+    await expect.poll(() => page.evaluate(() => state.products.some((product) => product.name === 'New ingredient'))).toBe(true);
+
+    await page.click('#composite-add-ingredient');
+    await page.click('#pick-product');
+    await page.locator('#pick-body [data-pick-product]', { hasText: 'Pita' }).click();
+    await expect(page.locator('#ingredient-save-product-label')).toBeHidden();
+    await page.click('#food-save');
+    await page.click('#composite-save-btn');
+
+    await expect.poll(() => page.evaluate(() => {
+      const dish = state.products.find((product) => product.name === 'Test bowl');
+      return { productCount: state.products.filter((product) => product.name === 'New ingredient').length, componentCount: dish?.components.length };
+    })).toEqual({ productCount: 1, componentCount: 2 });
+  });
+
+  test('composite dish verification can be set at creation and changed when editing', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita, chicken], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.click('#product-new');
+    await page.click('#product-type-composite');
+    await page.fill('#composite-name', 'Verified shawarma');
+    await page.locator('#composite-verified').check();
+    await page.click('#composite-add-ingredient');
+    await page.click('#pick-product');
+    await page.locator('#pick-body [data-pick-product]', { hasText: 'Pita' }).click();
+    await page.click('#food-save');
+    await page.click('#composite-save-btn');
+
+    await expect.poll(() => page.evaluate(() => state.products.find((product) => product.name === 'Verified shawarma')?.verified)).toBe(true);
+    const dish = page.locator('.product-item', { hasText: 'Verified shawarma' });
+    await dish.locator('[data-toggle-product]').click();
+    await dish.locator('[data-edit-product]').click();
+    await expect(page.locator('#composite-verified')).toBeChecked();
+    await page.locator('#composite-verified').uncheck();
+    await page.click('#composite-save-btn');
+    await expect.poll(() => page.evaluate(() => state.products.find((product) => product.name === 'Verified shawarma')?.verified)).toBe(false);
+  });
+
   test('simple product choice opens traditional product editor without composite fields', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita], foods: [], weights: [] });
     await openView(page, 'products');
@@ -4897,7 +4988,12 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
 
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
-    await page.locator(`[data-edit-ingredient="${PITA}"]`).click();
+    const pitaCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${PITA}"]`);
+    await expect(pitaCard).toHaveClass(/collapsed/);
+    await expect(pitaCard.locator('[data-edit-ingredient]')).toBeHidden();
+    await pitaCard.locator('[data-toggle-ingredient]').click();
+    await expect(pitaCard.locator('[data-edit-ingredient]')).toBeVisible();
+    await pitaCard.locator('[data-edit-ingredient]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
 
     await page.fill('#food-grams', '200');
@@ -4923,7 +5019,10 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
 
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
-    await page.locator(`[data-delete-ingredient="${CHICKEN}"]`).click();
+    const chickenCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${CHICKEN}"]`);
+    await expect(chickenCard).toHaveClass(/collapsed/);
+    await chickenCard.locator('[data-toggle-ingredient]').click();
+    await chickenCard.locator('[data-delete-ingredient]').click();
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.click('#confirm-ok');
 
