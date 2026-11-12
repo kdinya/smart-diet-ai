@@ -3749,21 +3749,41 @@ test('a qualifying weigh-in offers a plan update based on trend and acceptance p
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
-  await expect(bubble).toContainText('7-day trend');
+  await expect(bubble).toContainText('latest recorded weight');
   await expect(bubble).toContainText('90.0 kg');
-  await expect(bubble).toContainText('Update your weight-loss plan?');
-  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(2);
-  await bubble.locator('.bot-comic-actions button').first().dispatchEvent('click');
-  await expect(bubble).not.toHaveClass(/is-visible/);
+  await expect(bubble).toContainText('1781 kcal');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
   const saved = await readStore(page);
-  expect(saved.prefs.kcal).toBe(candidateKcal);
-  expect(saved.prefs.lastPlanReviewDate).toBe('2026-11-03');
+  expect(saved.prefs.kcal).toBe(2236);
   expect(saved.prefs.currentWeight).toBe(100);
   expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
   expect(saved.weights.map(item => item.value)).toContain(90);
 });
 
-test('a qualifying weigh-in can keep the existing plan, enforces weekly interval, and drops under 50 kcal do not prompt', async ({ page }) => {
+test('a lower weigh-in reports a lower same-pace target without changing the saved goal', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-12T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 45, sex: 'male', height: 185, currentWeight: 97, currentWeightDate: '2026-10-28', targetWeight: 85, activity: 'low', pace: 25, kcal: 1721, protein: 172, carbs: 141, fat: 52 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '93');
+  await page.locator('#weight-save').click();
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toContainText('93.0 kg');
+  await expect(bubble).toContainText('1680 kcal');
+  await expect(bubble).toContainText('currently 1721 kcal');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  const saved = await readStore(page);
+  expect(saved.prefs.kcal).toBe(1721);
+  expect(saved.prefs.protein).toBe(172);
+  expect(saved.prefs.carbs).toBe(141);
+  expect(saved.prefs.fat).toBe(52);
+  expect(saved.prefs.currentWeight).toBe(97);
+  expect(saved.weights.map(item => item.value)).toContain(93);
+});
+
+test('a qualifying weigh-in can keep the existing plan and reports small drops without applying them', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3772,17 +3792,18 @@ test('a qualifying weigh-in can keep the existing plan, enforces weekly interval
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
-  await expect(bubble).toContainText('Update your weight-loss plan?');
-  await bubble.locator('.bot-comic-actions button').nth(1).evaluate(button => button.click());
+  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
   expect((await readStore(page)).prefs.kcal).toBe(2236);
-  expect((await readStore(page)).prefs.lastPlanReviewDate).toBe('2026-11-03');
 
-  // A weigh-in 2 days later does not prompt even with lower weight because 7 days have not elapsed
+  // A new lower weigh-in is reported even when the last review was less than 7 days ago
   await page.clock.fastForward(2 * 86400 * 1000);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '88');
   await page.locator('#weight-save').click();
-  await expect(bubble).not.toHaveClass(/is-visible/);
+  await expect(bubble).toContainText('88.0 kg');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
 
   await page.reload();
   await page.clock.fastForward(2200);
@@ -3791,10 +3812,17 @@ test('a qualifying weigh-in can keep the existing plan, enforces weekly interval
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '99.9');
   await page.locator('#weight-save').click();
-  await expect(bubble).not.toHaveClass(/is-visible/);
+  await expect(bubble).toContainText('99.9 kg');
+  await expect(bubble).toContainText('1876 kcal');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
+  const beforeChoice = await readStore(page);
+  expect(beforeChoice.prefs.kcal).toBe(1925);
+  expect(beforeChoice.prefs.currentWeight).toBe(100);
+  expect(beforeChoice.weights.map(item => item.value)).toContain(99.9);
   const afterSmallDrop = await readStore(page);
+  expect(afterSmallDrop.prefs.kcal).toBe(1925);
   expect(afterSmallDrop.prefs.currentWeight).toBe(100);
-  expect(afterSmallDrop.weights.map(item => item.value)).toContain(99.9);
 });
 
 test('home hero card contains avocado illustration cleanly within bounds', async ({ page }) => {
