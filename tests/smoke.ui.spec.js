@@ -4806,3 +4806,45 @@ test('floating nutrition summary mirrors home and selected diary cards as they l
   await revealMacro('protein');
   await expect(badge.locator('[data-macro="protein"]')).toContainText('Б90/172');
 });
+
+
+test('adaptive calorie target stays below the saved profile goal', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-12T12:00:00') });
+  const foods = [];
+  const weights = [];
+  const start = new Date('2026-10-28T12:00:00');
+  for (let i = 0; i < 15; i += 1) {
+    const date = new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10);
+    const value = 97 - i * 0.13230519480519742;
+    if (i > 0) weights.push({ id: `w-${i}`, value: +value.toFixed(3), date });
+    for (const [meal, kcal] of [['breakfast', 500], ['lunch', 794], ['dinner', 1000]]) {
+      foods.push({ id: `f-${i}-${meal}`, name: meal, meal, grams: 100, kcal, protein: 30, fat: 20, carbs: 70, date, createdAt: i * 10 + foods.length });
+    }
+  }
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', age: 45, sex: 'male', height: 185, currentWeight: 97, currentWeightDate: '2026-10-28', targetWeight: 85, activity: 'low', pace: 25, kcal: 1721, protein: 172, carbs: 141, fat: 52 },
+    foods,
+    weights,
+  });
+  const result = await page.evaluate(() => {
+    const series = trendSeries().filter(x => dayNum(x.d) > dayNum(iso()) - 28);
+    const days = {};
+    const meals = {};
+    state.foods.forEach(food => {
+      if (!foodIsCounted(food) || dayNum(food.date) >= dayNum(iso())) return;
+      days[food.date] = (days[food.date] || 0) + (+food.kcal || 0);
+      (meals[food.date] = meals[food.date] || new Set()).add(food.meal);
+    });
+    const calories = Object.keys(days).filter(date => ['breakfast', 'lunch', 'dinner'].every(meal => meals[date]?.has(meal)) && days[date] >= 800).map(date => days[date]);
+    const estimatedMaintenance = Math.round(calories.reduce((sum, value) => sum + value, 0) / calories.length - slopePerDay(series.map(point => ({ n: dayNum(point.d), v: point.tr }))) * KCAL_KG);
+    return { profileGoal: state.prefs.kcal, estimatedMaintenance, adaptive: adaptiveTarget() };
+  });
+  expect(result.estimatedMaintenance).toBe(3109);
+  expect(result.adaptive).toBeNull();
+  expect(result.profileGoal).toBe(1721);
+  await expect(page.locator('#progress-notes')).not.toContainText('2332');
+  const lowerGoalResult = await page.evaluate(() => { state.prefs.kcal = 2500; return adaptiveTarget(); });
+  expect(lowerGoalResult.kcal).toBe(2332);
+  expect(lowerGoalResult.kcal).toBeLessThan(2500);
+  expect(await page.evaluate(() => { state.prefs.kcal = 1500; return adaptiveTarget(); })).toBeNull();
+});
