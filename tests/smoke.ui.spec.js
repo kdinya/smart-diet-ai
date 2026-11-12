@@ -5257,6 +5257,44 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('.product-actions')).toHaveClass(/is-open/);
     await expect(page.locator('[data-share-product]')).toBeVisible();
     await expect(page.locator('[data-edit-product]')).toBeVisible();
+    const circles = page.locator('[data-more-product] svg circle');
+    await expect(circles.nth(0)).toHaveAttribute('cx', '12');
+    await expect(circles.nth(0)).toHaveAttribute('cy', '5');
+    await expect(circles.nth(1)).toHaveAttribute('cx', '12');
+    await expect(circles.nth(1)).toHaveAttribute('cy', '12');
+    await expect(circles.nth(2)).toHaveAttribute('cx', '12');
+    await expect(circles.nth(2)).toHaveAttribute('cy', '19');
+  });
+
+  test('product action menu renders as an overlay and ingredient picking allows exclusion and adding extra ingredients', async ({ page }) => {
+    const banana = { id: 'p-banana', name: 'Banana', grams: 100, kcal: 89, protein: 1.1, fat: 0.3, carbs: 22.8 };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish, banana], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const moreBtn = page.locator('[data-more-product]').first();
+    await moreBtn.click();
+    await expect(page.locator('.product-actions').first()).toHaveClass(/is-open/);
+    const panelPosition = await page.locator('.product-actions-panel').first().evaluate((el) => window.getComputedStyle(el).position);
+    expect(panelPosition).toBe('absolute');
+
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    await expect(page.locator('[data-component-item]')).toHaveCount(2);
+
+    await page.locator('[data-component-toggle="c-oats"]').uncheck();
+    await expect.poll(() => page.evaluate(() => [pickProduct.grams, pickProduct.kcal])).toEqual([100, 48]);
+
+    await page.locator('[data-component-toggle="c-oats"]').check();
+    await expect.poll(() => page.evaluate(() => [pickProduct.grams, pickProduct.kcal])).toEqual([150, 280]);
+
+    await page.click('#pick-component-add');
+    await expect(page.locator('#pick-search-field')).toBeVisible();
+    await page.locator('[data-pick-product="p-banana"]').click();
+    await expect(page.locator('[data-component-item]')).toHaveCount(3);
+    await expect.poll(() => page.evaluate(() => [pickProduct.grams, pickProduct.kcal])).toEqual([250, 369]);
+
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 250, 369]]);
+    expect(await page.evaluate(() => state.products.find((p) => p.name === 'Oatmeal bowl').components.length)).toBe(2);
   });
 
   test('adding a dish lists its ingredients and edits apply only to that entry', async ({ page }) => {
