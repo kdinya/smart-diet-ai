@@ -1620,8 +1620,8 @@ test.describe('Smoke: review fixes', () => {
     expect(result.inboxBeforeAccept.hasIcon).toBe(true);
     expect(result.components.map(item => item.name)).toEqual(['Oats', 'Milk']);
     expect(result.components.map(item => item.kcal)).toEqual([230, 50]);
-    expect(result.productCardText).toContain('Oats');
-    expect(result.productCardText).toContain('Milk');
+    expect(result.productCardText).not.toContain('Oats');
+    expect(result.productCardText).not.toContain('Milk');
     expect(result.hasAcceptedIcon).toBe(true);
   });
 
@@ -5000,8 +5000,9 @@ test.describe('Smoke: product add-ons', () => {
     await expect(pitaItem.locator('.product-name .product-is-composite')).toHaveCount(0);
 
     await shawarmaItem.locator('.product-toggle').click();
-    await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Pita');
-    await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Chicken');
+    await expect(shawarmaItem.locator('.product-components-preview')).toHaveCount(0);
+    await shawarmaItem.locator('[data-more-product]').click();
+    await expect(shawarmaItem.locator('[data-edit-product]')).toBeVisible();
 
     // Clicking edit on Shawarma opens composite modal
     await shawarmaItem.locator('[data-edit-product]').click();
@@ -5234,4 +5235,38 @@ test('adaptive calorie target stays below the saved profile goal', async ({ page
   expect(lowerGoalResult.kcal).toBe(2332);
   expect(lowerGoalResult.kcal).toBeLessThan(2500);
   expect(await page.evaluate(() => { state.prefs.kcal = 1500; return adaptiveTarget(); })).toBeNull();
+});
+
+test.describe('Smoke: composite dish display and ingredient editing', () => {
+  const dish = {
+    id: '33333333-3333-4333-8333-333333333333', name: 'Oatmeal bowl', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65,
+    components: [
+      { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+      { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+    ],
+  };
+
+  test('the product list shows only the dish totals and keeps actions behind the more button', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
+    await openView(page, 'products');
+    await expect(page.locator('.product-components-preview')).toHaveCount(0);
+    await expect(page.locator('[data-more-product]')).toHaveCount(1);
+    await expect(page.locator('.product-actions')).not.toHaveClass(/is-open/);
+    await page.locator('[data-toggle-product]').first().click();
+    await page.locator('[data-more-product]').first().click();
+    await expect(page.locator('.product-actions')).toHaveClass(/is-open/);
+    await expect(page.locator('[data-share-product]')).toBeVisible();
+    await expect(page.locator('[data-edit-product]')).toBeVisible();
+  });
+
+  test('adding a dish lists its ingredients and edits apply only to that entry', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    await expect(page.locator('[data-component-grams]')).toHaveCount(2);
+    await page.locator('[data-component-grams="c-oats"]').fill('30');
+    await expect.poll(() => page.evaluate(() => [pickProduct.grams, pickProduct.kcal])).toEqual([130, 165]);
+    expect(await page.evaluate(() => state.products.find((p) => p.name === 'Oatmeal bowl').kcal)).toBe(280);
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 130, 165]]);
+  });
 });
