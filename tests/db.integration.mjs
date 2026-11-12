@@ -184,6 +184,16 @@ async function run() {
   check('Usual add-ons are read back unchanged', Array.isArray(r.json) && r.json.length === 1 && r.json[0].companions[0].grams === 30, describe(r));
   r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=companions` });
   check('Products without add-ons default to an empty list', Array.isArray(r.json) && r.json.length === 1 && Array.isArray(r.json[0].companions) && r.json[0].companions.length === 0, describe(r));
+
+  r = await rest('products', {
+    as: 'a', method: 'POST',
+    body: { user_id: A, name: 'CI composite product', grams: 250, kcal: 300, protein: 20, fat: 10, carbs: 30, components: [{ id: '22222222-2222-4222-8222-222222222222', grams: 150 }] },
+  });
+  check('Owner can save a product with recipe components', r.status === 201, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI composite product')}&select=components` });
+  check('Recipe components are read back unchanged', Array.isArray(r.json) && r.json.length === 1 && r.json[0].components[0].grams === 150, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=components` });
+  check('Products without recipe components default to an empty list', Array.isArray(r.json) && r.json.length === 1 && Array.isArray(r.json[0].components) && r.json[0].components.length === 0, describe(r));
   rAnon = await rest('products');
   check('Anonymous visitor cannot read user products when rows exist', emptyOrDenied(rAnon), describe(rAnon));
   rAnon = await rest('profiles');
