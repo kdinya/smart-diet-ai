@@ -288,7 +288,8 @@ async function run() {
   const shareOne = r.json?.[0]?.id;
   check('Friend can receive a shared product', r.status === 201 && !!shareOne, describe(r));
   r = await rest('product_shares', { as: 'b', query: `id=${eq(shareOne)}&select=components` });
-  check('Recipient receives all shared recipe components', JSON.stringify(r.json?.[0]?.components) === JSON.stringify(recipeComponents), describe(r));
+  const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
+  check('Recipient receives all shared recipe components', JSON.stringify(sortKeys(r.json?.[0]?.components)) === JSON.stringify(sortKeys(recipeComponents)), describe(r));
 
   r = await rest('product_shares', { as: 'a', method: 'POST', body: shareBody(A, C, 'CI to stranger') });
   check('Cannot share with a non-friend', denied(r), describe(r));
