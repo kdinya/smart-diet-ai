@@ -4795,38 +4795,70 @@ test.describe('Smoke: product add-ons', () => {
   test('a composite product calculates calories and macros from ingredients and saves components', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita, chicken], foods: [], weights: [] });
     await openView(page, 'products');
+
+    // 1. Click create product -> product type modal opens
     await page.click('#product-new');
-    await page.fill('#food-name', 'Shawarma');
-    await page.click('#product-component-add');
+    await expect(page.locator('#product-type-modal')).toHaveClass(/open/);
+
+    // 2. Choose composite dish -> composite modal opens
+    await page.click('#product-type-composite');
+    await expect(page.locator('#composite-modal')).toHaveClass(/open/);
+    await page.fill('#composite-name', 'Shawarma');
+
+    // 3. Add first ingredient via full product modal
+    await page.click('#composite-add-ingredient');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.click('#pick-product');
     await page.locator('#pick-body [data-pick-product]', { hasText: 'Pita' }).click();
-    await expect(page.locator('#product-components-list')).toContainText('Pita');
-    await page.click('#product-component-add');
-    await page.locator('#pick-body [data-pick-product]', { hasText: 'Chicken' }).click();
-    await expect(page.locator('#product-components-list')).toContainText('Chicken');
-
-    await expect(page.locator('#food-grams')).toHaveValue('200');
-    await expect(page.locator('#food-kcal')).toHaveValue('410');
-    await expect(page.locator('#food-protein')).toHaveValue('32');
-    await expect(page.locator('#food-fat')).toHaveValue('5');
-    await expect(page.locator('#food-carbs')).toHaveValue('50');
-
     await page.click('#food-save');
+    await expect(page.locator('#composite-ingredients-list')).toContainText('Pita');
+
+    // 4. Add second ingredient via continuous plus button
+    await page.click('#composite-add-ingredient');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.click('#pick-product');
+    await page.locator('#pick-body [data-pick-product]', { hasText: 'Chicken' }).click();
+    await page.click('#food-save');
+    await expect(page.locator('#composite-ingredients-list')).toContainText('Chicken');
+
+    // 5. Verify live totals summary
+    await expect(page.locator('#composite-summary')).toContainText('200');
+    await expect(page.locator('#composite-summary')).toContainText('410');
+
+    // 6. Save dish
+    await page.click('#composite-save-btn');
+    await expect(page.locator('#composite-modal')).not.toHaveClass(/open/);
+
     await expect.poll(() => page.evaluate(() => {
       const p = state.products.find((x) => x.name === 'Shawarma');
-      return p ? { grams: p.grams, kcal: p.kcal, protein: p.protein, fat: p.fat, carbs: p.carbs, components: p.components } : null;
+      return p ? { grams: p.grams, kcal: p.kcal, protein: p.protein, fat: p.fat, carbs: p.carbs, count: p.components.length } : null;
     })).toEqual({
       grams: 200,
       kcal: 410,
       protein: 32,
       fat: 5,
       carbs: 50,
-      components: [{ id: PITA, grams: 100 }, { id: CHICKEN, grams: 100 }],
+      count: 2,
     });
+  });
+
+  test('simple product choice opens traditional product editor without composite fields', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.click('#product-new');
+    await expect(page.locator('#product-type-modal')).toHaveClass(/open/);
+
+    await page.click('#product-type-simple');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-calc-field')).toBeVisible();
+    await expect(page.locator('#composite-modal')).not.toHaveClass(/open/);
+    await page.click('#modal-close');
   });
 
   test('composite products display an indicator icon in My Products and show ingredients list when expanded', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
-    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, grams: 100 }, { id: CHICKEN, grams: 100 }] };
+    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
 
     await openView(page, 'products');
@@ -4838,54 +4870,66 @@ test.describe('Smoke: product add-ons', () => {
     await shawarmaItem.locator('.product-toggle').click();
     await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Pita');
     await expect(shawarmaItem.locator('.product-components-preview')).toContainText('Chicken');
+
+    // Clicking edit on Shawarma opens composite modal
+    await shawarmaItem.locator('[data-edit-product]').click();
+    await expect(page.locator('#composite-modal')).toHaveClass(/open/);
+    await page.click('#composite-modal-close');
+
+    // Clicking edit on Pita opens traditional modal
+    await pitaItem.locator('[data-edit-product]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.click('#modal-close');
   });
 
-  test('editing ingredient grams updates composite product calories and macros', async ({ page }) => {
+  test('editing ingredient in composite product updates dish totals', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
-    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, grams: 100 }, { id: CHICKEN, grams: 100 }] };
+    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
 
-    await page.evaluate((s) => openProductModal(state.products.find((p) => p.id === s.id)), shawarma);
-    await page.locator(`[data-component-toggle="${PITA}"]`).click();
-    await page.fill(`input[data-component-grams="${PITA}"]`, '200');
+    await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
+    await page.locator(`[data-edit-ingredient="${PITA}"]`).click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
 
-    await expect(page.locator('#food-grams')).toHaveValue('300');
-    await expect(page.locator('#food-kcal')).toHaveValue('660');
-    await expect(page.locator('#food-protein')).toHaveValue('40');
-
+    await page.fill('#food-grams', '200');
+    await page.fill('#food-kcal', '500');
     await page.click('#food-save');
+
+    await expect(page.locator('#composite-summary')).toContainText('300');
+    await expect(page.locator('#composite-summary')).toContainText('660');
+
+    await page.click('#composite-save-btn');
     await expect.poll(() => page.evaluate(() => {
       const p = state.products.find((x) => x.id === '55555555-5555-4555-8555-555555555555');
-      return p ? { grams: p.grams, kcal: p.kcal, components: p.components } : null;
+      return p ? { grams: p.grams, kcal: p.kcal } : null;
     })).toEqual({
       grams: 300,
       kcal: 660,
-      components: [{ id: PITA, grams: 200 }, { id: CHICKEN, grams: 100 }],
     });
   });
 
   test('removing an ingredient asks for confirmation and recalculates totals', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
-    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, grams: 100 }, { id: CHICKEN, grams: 100 }] };
+    const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
 
-    await page.evaluate((s) => openProductModal(state.products.find((p) => p.id === s.id)), shawarma);
-    await page.locator(`[data-component-remove="${CHICKEN}"]`).click();
+    await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
+    await page.locator(`[data-delete-ingredient="${CHICKEN}"]`).click();
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.click('#confirm-ok');
 
-    await expect(page.locator('#product-components-list')).not.toContainText('Chicken');
-    await expect(page.locator('#food-grams')).toHaveValue('100');
-    await expect(page.locator('#food-kcal')).toHaveValue('250');
+    await expect(page.locator('#composite-ingredients-list')).not.toContainText('Chicken');
+    await expect(page.locator('#composite-summary')).toContainText('100');
+    await expect(page.locator('#composite-summary')).toContainText('250');
 
-    await page.click('#food-save');
+    await page.click('#composite-save-btn');
     await expect.poll(() => page.evaluate(() => {
       const p = state.products.find((x) => x.id === '55555555-5555-4555-8555-555555555555');
-      return p ? { grams: p.grams, kcal: p.kcal, components: p.components } : null;
+      return p ? { grams: p.grams, kcal: p.kcal, count: p.components.length } : null;
     })).toEqual({
       grams: 100,
       kcal: 250,
-      components: [{ id: PITA, grams: 100 }],
+      count: 1,
     });
   });
 });

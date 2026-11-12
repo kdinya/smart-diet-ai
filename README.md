@@ -51,7 +51,7 @@
 - Invite a friend with a one-time link from the Friends section; they confirm the request in the assistant's bubble.
 - See your current weight under the date; tap it to open your weight-loss achievements.
 - Save usual add-ons for a product (for example, milk for coffee); they are added with it in the same meal, each with its own grams.
-- Create composite products (recipes) made of ingredients from your products. Calories and macros calculate automatically, each ingredient can be edited or removed, and composite products are marked with a recipe badge in My products.
+- Create simple products or composite dishes made of multiple ingredients. In composite dishes, add unlimited ingredients with full nutrition controls (calorie search, clipboard, macros), edit or remove ingredients, and see live auto-calculated totals with a recipe badge in My products.
 
 **Other**
 - English and Ukrainian interface.
