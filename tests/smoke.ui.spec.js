@@ -1592,6 +1592,39 @@ test.describe('Smoke: review fixes', () => {
     expect(drafts[0].items.reduce((s, it) => s + it.kcal, 0)).toBeLessThanOrEqual(2000);
   });
 
+  test('accepting a shared composite dish preserves its recipe and displays the recipe icon', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const result = await page.evaluate(async () => {
+      const components = [
+        { id: 'sender-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+        { id: 'sender-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+      ];
+      const sentProduct = sharedProductPayload({ id: 'dish-id', name: 'Oat bowl', grams: 160, kcal: 280, protein: 11, fat: 6, carbs: 45, components });
+      const chain = { delete() { return this; }, eq() { return this; }, select() { return this; }, then(resolve) { resolve({ data: [{ id: 'share-composite' }], error: null }); } };
+      sb = { from: () => chain };
+      runSync = async () => {};
+      user = { id: 'u-recipient' };
+      inboxRows = [{ id: 'share-composite', name: 'Oat bowl', grams: 160, kcal: 280, protein: 11, fat: 6, carbs: 45, from_user: 'u-sender', components }];
+      renderInbox();
+      const inbox = document.querySelector('[data-share-id="share-composite"]');
+      const inboxBeforeAccept = { names: inbox.textContent, hasIcon: !!inbox.querySelector('.product-is-composite') };
+      await resolveShare('share-composite', true);
+      renderProducts();
+      const product = state.products.find(item => item.name === 'Oat bowl');
+      const card = document.querySelector(`#products-list [data-product-id="${product?.id}"]`);
+      return { sentComponents: sentProduct.components, inboxBeforeAccept, components: product?.components, productCardText: card?.textContent, hasAcceptedIcon: !!card?.querySelector('.product-is-composite') };
+    });
+    expect(result.sentComponents.map(item => item.name)).toEqual(['Oats', 'Milk']);
+    expect(result.inboxBeforeAccept.names).toContain('Oats');
+    expect(result.inboxBeforeAccept.names).toContain('Milk');
+    expect(result.inboxBeforeAccept.hasIcon).toBe(true);
+    expect(result.components.map(item => item.name)).toEqual(['Oats', 'Milk']);
+    expect(result.components.map(item => item.kcal)).toEqual([230, 50]);
+    expect(result.productCardText).toContain('Oats');
+    expect(result.productCardText).toContain('Milk');
+    expect(result.hasAcceptedIcon).toBe(true);
+  });
+
   test('accepting a product that was already recalled does not save it', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     const saved = await page.evaluate(async () => {
