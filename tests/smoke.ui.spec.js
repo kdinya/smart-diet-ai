@@ -3752,7 +3752,7 @@ test('a qualifying weigh-in offers a plan update based on trend and acceptance p
   await expect(bubble).toContainText('latest recorded weight');
   await expect(bubble).toContainText('90.0 kg');
   await expect(bubble).toContainText('1781 kcal');
-  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goals have not changed.');
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
   const saved = await readStore(page);
   expect(saved.prefs.kcal).toBe(2236);
@@ -3772,8 +3772,11 @@ test('a lower weigh-in reports a lower same-pace target without changing the sav
   const bubble = page.locator('#bot-comic');
   await expect(bubble).toContainText('93.0 kg');
   await expect(bubble).toContainText('1680 kcal');
+  await expect(bubble).toContainText('protein 167 g');
+  await expect(bubble).toContainText('fat 50 g');
+  await expect(bubble).toContainText('carbohydrates 141 g');
   await expect(bubble).toContainText('currently 1721 kcal');
-  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goals have not changed.');
   const saved = await readStore(page);
   expect(saved.prefs.kcal).toBe(1721);
   expect(saved.prefs.protein).toBe(172);
@@ -3781,6 +3784,28 @@ test('a lower weigh-in reports a lower same-pace target without changing the sav
   expect(saved.prefs.fat).toBe(52);
   expect(saved.prefs.currentWeight).toBe(97);
   expect(saved.weights.map(item => item.value)).toContain(93);
+});
+
+test('a lower weigh-in reports recalculated macros in Ukrainian without changing saved goals', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-12T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'uk', botMode: 'mascot', age: 45, sex: 'male', height: 185, currentWeight: 97, currentWeightDate: '2026-10-28', targetWeight: 85, activity: 'low', pace: 25, kcal: 1721, protein: 172, carbs: 141, fat: 52 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '93');
+  await page.locator('#weight-save').click();
+  const bubble = page.locator('#bot-comic');
+  await expect(bubble).toContainText('1680 ккал');
+  await expect(bubble).toContainText('білки 167 г');
+  await expect(bubble).toContainText('жири 50 г');
+  await expect(bubble).toContainText('вуглеводи 141 г');
+  await expect(bubble).toContainText('збережені цілі не змінено');
+  const saved = await readStore(page);
+  expect(saved.prefs.kcal).toBe(1721);
+  expect(saved.prefs.protein).toBe(172);
+  expect(saved.prefs.carbs).toBe(141);
+  expect(saved.prefs.fat).toBe(52);
+  expect(saved.prefs.currentWeight).toBe(97);
 });
 
 test('a qualifying weigh-in can keep the existing plan and reports small drops without applying them', async ({ page }) => {
@@ -3792,7 +3817,7 @@ test('a qualifying weigh-in can keep the existing plan and reports small drops w
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
   const bubble = page.locator('#bot-comic');
-  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goals have not changed.');
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
   expect((await readStore(page)).prefs.kcal).toBe(2236);
 
@@ -3802,7 +3827,7 @@ test('a qualifying weigh-in can keep the existing plan and reports small drops w
   await page.fill('#weight-value', '88');
   await page.locator('#weight-save').click();
   await expect(bubble).toContainText('88.0 kg');
-  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goals have not changed.');
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
 
   await page.reload();
@@ -3814,7 +3839,7 @@ test('a qualifying weigh-in can keep the existing plan and reports small drops w
   await page.locator('#weight-save').click();
   await expect(bubble).toContainText('99.9 kg');
   await expect(bubble).toContainText('1876 kcal');
-  await expect(bubble).toContainText('This is only a recommendation; your saved goal has not changed.');
+  await expect(bubble).toContainText('This is only a recommendation; your saved goals have not changed.');
   await expect(bubble.locator('.bot-comic-actions button')).toHaveCount(0);
   const beforeChoice = await readStore(page);
   expect(beforeChoice.prefs.kcal).toBe(1925);
