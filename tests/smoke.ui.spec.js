@@ -4142,6 +4142,7 @@ test.describe('Smoke: weight badge and achievements', () => {
   test('the current weight shows under the date and opens the achievements window', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 80 }, { date: '2026-01-20', value: 78.5 }] });
     await expect(page.locator('#weight-badge-value')).toHaveText('78.5');
+    await expect(page.locator('#weight-badge-diff')).toHaveText('(-1.5)');
     await expect(page.locator('#weight-badge .weight-badge-unit')).toHaveText('kg');
     await expect(page.locator('#weight-badge .weight-badge-label')).toHaveText('My weight');
 
@@ -4186,6 +4187,20 @@ test.describe('Smoke: weight badge and achievements', () => {
     await page.locator('#achievements-close').click();
     await expect(page.locator('#achievements-modal')).not.toHaveClass(/open/);
   });
+
+  test('the weight badge shows cumulative weight loss or gain in the first line', async ({ page }) => {
+    // When weight is gained
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 70 }, { date: '2026-01-20', value: 71.5 }] });
+    await expect(page.locator('#weight-badge-value')).toHaveText('71.5');
+    await expect(page.locator('#weight-badge-diff')).toHaveText('(+1.5)');
+    await expect(page.locator('#weight-badge .weight-badge-unit')).toHaveText('kg');
+
+    // When single weight observation exists
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [{ date: '2026-01-01', value: 75 }] });
+    await expect(page.locator('#weight-badge-value')).toHaveText('75');
+    await expect(page.locator('#weight-badge-diff')).toHaveText('(-0)');
+  });
+
 });
 
 test.describe('Smoke: floating current weight', () => {
