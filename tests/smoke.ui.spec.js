@@ -2336,6 +2336,53 @@ test('weekly rate shows zero instead of an empty value when nothing was weighed 
   await expect(page.locator('#progress-stats .metric').nth(3).locator('strong')).toHaveText('0.00');
 });
 
+test('total weight change metric shows elapsed days since profile weight date in third row', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
+  await openApp(page, {
+    prefs: { ...BASE_PREFS, lang: 'uk', tone: 'fun', currentWeight: 90, currentWeightDate: '2026-10-31', targetWeight: 80 },
+    foods: [],
+    weights: [{ id: 'w-1', value: 89, date: '2026-11-02' }],
+  });
+  await page.evaluate(() => showView('stats'));
+  const totalMetric = page.locator('#progress-stats .metric').filter({ hasText: 'Зміна ваги від старту' });
+  await expect(totalMetric.locator('strong')).toHaveText('-1.0');
+  await expect(totalMetric.locator('.metric-sub')).toHaveText('за 2 дні від початку');
+
+  await page.evaluate(() => {
+    state.prefs.currentWeightDate = '2026-11-01';
+    state.prefs.tone = 'standard';
+    renderProgress();
+  });
+  const totalMetricStd = page.locator('#progress-stats .metric').filter({ hasText: 'Загальна втрата від ваги в профілі' });
+  await expect(totalMetricStd.locator('.metric-sub')).toHaveText('за 1 день від початку');
+
+  await page.evaluate(() => {
+    state.prefs.currentWeightDate = '2026-11-02';
+    renderProgress();
+  });
+  await expect(totalMetricStd.locator('.metric-sub')).toHaveText('за 0 днів від початку');
+
+  await page.evaluate(() => {
+    state.prefs.lang = 'en';
+    state.prefs.currentWeightDate = '2026-10-28';
+    renderProgress();
+  });
+  const totalMetricEn = page.locator('#progress-stats .metric').filter({ hasText: 'Total weight loss since profile weight' });
+  await expect(totalMetricEn.locator('.metric-sub')).toHaveText('in 5 days from start');
+
+  await page.evaluate(() => {
+    state.prefs.currentWeightDate = '2026-11-01';
+    renderProgress();
+  });
+  await expect(totalMetricEn.locator('.metric-sub')).toHaveText('in 1 day from start');
+
+  await page.evaluate(() => {
+    state.weights = [];
+    renderProgress();
+  });
+  await expect(page.locator('#progress-stats .metric-sub')).toHaveCount(0);
+});
+
 test('profile weight date can be backfilled from the calendar and a new weight defaults to today', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-02T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, name: 'Weight tester', currentWeight: 97 }, foods: [], weights: [] });
