@@ -2344,7 +2344,7 @@ test('total weight change metric shows elapsed days since profile weight date in
     weights: [{ id: 'w-1', value: 89, date: '2026-11-02' }],
   });
   await page.evaluate(() => showView('stats'));
-  const totalMetric = page.locator('#progress-stats .metric').filter({ hasText: 'Зміна ваги від старту' });
+  const totalMetric = page.locator('#progress-stats .metric').filter({ has: page.locator('button[data-metric-info="totalLost"]') });
   await expect(totalMetric.locator('strong')).toHaveText('-1.0');
   await expect(totalMetric.locator('.metric-sub')).toHaveText('за 2 дні від початку');
 
