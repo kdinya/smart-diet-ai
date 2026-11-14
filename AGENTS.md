@@ -123,6 +123,7 @@
 - Run the applicable syntax/static checks from CI for the files changed. Do not claim a test passed unless it was actually run and its result was observed.
 - Do not weaken, remove, or broadly skip a test just to make a run green. Fix stale assertions only when they conflict with the intended behavior, and add regression coverage for the behavior being changed.
 - In the completion report, name the commands run and summarize pass/fail counts. Clearly state any suite that could not be completed and why.
+- **Efficient, High-Quality Edits:** Read only the code sections a change needs (targeted searches and line ranges, not full reads of `index.html`). Batch related edits into one branch and one PR, and iterate with the narrowest failing test before running the full smoke suite once as the final gate. Run the database job only when database, schema, auth, or sync code changes. Every UI change adds or updates a regression test, including a 360px layout check where inputs or controls change.
 
 
 Before pushing any commit:
