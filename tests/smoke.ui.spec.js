@@ -5386,4 +5386,55 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 130, 165]]);
   });
+
+  test('editing a composite dish entry in food diary allows adjusting grams per ingredient and updates totals without altering product', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const banana = { id: 'p-banana', name: 'Banana', grams: 100, kcal: 89, protein: 1.1, fat: 0.3, carbs: 22.8 };
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [dish, banana],
+      foods: [{
+        id: 'food-composite-1',
+        name: 'Oatmeal bowl',
+        meal: 'breakfast',
+        grams: 160,
+        kcal: 280,
+        protein: 12,
+        fat: 7,
+        carbs: 65,
+        date: today,
+        createdAt: Date.now(),
+        components: [
+          { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+          { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+        ]
+      }],
+      weights: []
+    });
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals [data-edit-food]')).toHaveCount(1);
+    await page.locator('#diary-meals [data-edit-food]').click();
+
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#food-components-field')).toBeVisible();
+    await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
+
+    await page.locator('#food-components-list [data-component-grams="c-oats"]').fill('30');
+    await expect(page.locator('#food-grams')).toHaveValue('130');
+    await expect(page.locator('#food-kcal')).toHaveValue('165');
+
+    await page.click('#food-component-add');
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.locator('[data-pick-product="p-banana"]').click();
+    await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(3);
+    await expect(page.locator('#food-grams')).toHaveValue('230');
+    await expect(page.locator('#food-kcal')).toHaveValue('254');
+
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+
+    await expect.poll(() => page.evaluate(() => state.foods.map(f => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 230, 254]]);
+    expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').components.length)).toBe(2);
+    expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').grams)).toBe(160);
+  });
 });
