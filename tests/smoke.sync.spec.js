@@ -777,3 +777,33 @@ test.describe('Smoke: data safety under slow uploads', () => {
     await expect.poll(() => page.evaluate(() => syncQueue.foods.length)).toBe(0);
   });
 });
+
+test.describe('Smoke: dish ingredients sync', () => {
+  test('a synced dish entry without saved ingredients gains the device ingredients and uploads them', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const backend = createBackend();
+    backend.tables.food_entries.push({
+      id: 'food-merge-1', user_id: 'user-alice', name: 'Oatmeal bowl', meal_type: 'breakfast', grams: 160, kcal: 280,
+      protein: 12, fat: 7, carbs: 65, entry_date: today, snack_id: null, meal_order: null, created_at: new Date().toISOString()
+    });
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await connectSupabase(page);
+    await signIn(page, 'alice@example.test');
+    await expect.poll(() => page.evaluate(() => state.foods.some((f) => f.id === 'food-merge-1'))).toBe(true);
+    expect(await page.evaluate(() => (state.foods.find((f) => f.id === 'food-merge-1').components || []).length)).toBe(0);
+
+    await page.evaluate(async () => {
+      const entry = state.foods.find((f) => f.id === 'food-merge-1');
+      entry.components = [
+        { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+        { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+      ];
+      await pullRemote();
+      runSync();
+    });
+    await expect.poll(() => page.evaluate(() => (state.foods.find((f) => f.id === 'food-merge-1').components || []).length)).toBe(2);
+    await expect.poll(() => backend.tables.food_entries.find((row) => row.id === 'food-merge-1')?.components?.length ?? 0, { timeout: 15000 }).toBe(2);
+    expect(backend.tables.food_entries.find((row) => row.id === 'food-merge-1').components.map((c) => c.name)).toEqual(['Oats', 'Milk']);
+  });
+});
