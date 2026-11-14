@@ -140,7 +140,7 @@ async function run() {
   // Owner writes
   r = await rest('food_entries', {
     as: 'a', method: 'POST', prefer: 'return=representation',
-    body: { user_id: A, name: 'CI oatmeal', meal_type: 'breakfast', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60, entry_date: day },
+    body: { user_id: A, name: 'CI oatmeal', meal_type: 'breakfast', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60, entry_date: day, components: [{ id: 'c-oats', name: 'Oats', grams: 100, kcal: 350, protein: 12, fat: 6, carbs: 60, enabled: true }] },
   });
   const foodId = r.json?.[0]?.id;
   check('Owner can insert a food entry', r.status === 201 && !!foodId, describe(r));
@@ -163,6 +163,8 @@ async function run() {
   check('Owner reads own weigh-ins', rows(r) === 1, describe(r));
   r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=id` });
   check('Owner reads own products', rows(r) === 1, describe(r));
+  r = await rest('food_entries', { as: 'a', query: `id=${eq(foodId)}&select=components` });
+  check('Diary entry keeps its dish ingredients', Array.isArray(r.json?.[0]?.components) && r.json[0].components[0]?.id === 'c-oats', describe(r));
   r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=verified` });
   check('Product verified flag is stored', Array.isArray(r.json) && r.json[0]?.verified === true, describe(r));
   r = await rest('user_profiles', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
