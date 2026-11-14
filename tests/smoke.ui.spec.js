@@ -2380,6 +2380,14 @@ test('total weight change metric shows elapsed days since profile weight date in
   await expect(totalMetricEn.locator('.metric-sub')).toHaveText('in 1 day from start');
 
   await page.evaluate(() => {
+    state.prefs.lang = 'uk';
+    state.prefs.currentWeightDate = '2026-10-25';
+    state.weights = [{ id: 'w-1', value: 88, date: '2026-10-28' }];
+    renderProgress();
+  });
+  await expect(totalMetric.locator('.metric-sub')).toHaveText('за 8 днів від початку');
+
+  await page.evaluate(() => {
     state.weights = [];
     renderProgress();
   });
