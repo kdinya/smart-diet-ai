@@ -2142,10 +2142,12 @@ test.describe('Smoke: current date card', () => {
     await expect(date.locator('.date-month')).toHaveText(expected.month);
     const layout = await date.evaluate((el) => {
       const weekday = el.querySelector('.date-weekday');
+      const dayMonth = el.querySelector('.date-day-month');
       const day = el.querySelector('.date-day');
       const month = el.querySelector('.date-month');
       return {
         weekdayAlign: getComputedStyle(weekday).textAlign,
+        dayMonthJustify: getComputedStyle(dayMonth).justifyContent,
         dayFontSize: parseFloat(getComputedStyle(day).fontSize),
         dayFontWeight: parseInt(getComputedStyle(day).fontWeight, 10),
         monthFontSize: parseFloat(getComputedStyle(month).fontSize),
@@ -2155,6 +2157,7 @@ test.describe('Smoke: current date card', () => {
       };
     });
     expect(layout.weekdayAlign).toBe('right');
+    expect(layout.dayMonthJustify).toBe('flex-end');
     expect(layout.dayFontSize).toBeCloseTo(15.4, 1);
     expect(layout.dayFontWeight).toBeGreaterThanOrEqual(700);
     expect(layout.monthFontSize).toBeCloseTo(12.9, 1);
