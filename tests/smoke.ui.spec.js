@@ -5437,4 +5437,78 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').components.length)).toBe(2);
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').grams)).toBe(160);
   });
+
+  test('a diary dish keeps its saved ingredient amounts when the product gains a new ingredient later', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const bowl = {
+      id: 'p-bowl-live', name: 'Oatmeal bowl', grams: 260, kcal: 370, protein: 16, fat: 11, carbs: 85,
+      components: [
+        { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+        { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+        { id: 'c-banana', name: 'Banana', grams: 100, kcal: 89, protein: 1.1, fat: 0.3, carbs: 22.8 },
+      ]
+    };
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [bowl],
+      foods: [{
+        id: 'food-saved-dish', name: 'Oatmeal bowl', meal: 'breakfast', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65,
+        date: today, createdAt: Date.now(),
+        components: [
+          { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+          { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+        ]
+      }],
+      weights: []
+    });
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals .meal-detail').first()).not.toContainText('Banana');
+    await page.locator('#diary-meals [data-edit-food]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
+    await expect(page.locator('#food-components-list [data-component-grams="c-oats"]')).toHaveValue('60');
+    await expect(page.locator('#food-components-list [data-component-grams="c-milk"]')).toHaveValue('100');
+    await expect(page.locator('#food-components-list')).not.toContainText('Banana');
+    await expect(page.locator('#food-grams')).toHaveValue('160');
+  });
+
+  test('saved dish ingredients keep their enabled state and gram amounts through cloud row mapping', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
+    const cleaned = await page.evaluate(() => sanitizeEntryComponents([
+      { id: 'c-oats', name: 'Oats', grams: 37.25, kcal: 120, protein: 4, fat: 2, carbs: 20, enabled: true },
+      { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5, enabled: false },
+      { id: '', name: 'Broken', grams: 10 },
+    ]));
+    expect(cleaned).toEqual([
+      { id: 'c-oats', name: 'Oats', grams: 37.25, kcal: 120, protein: 4, fat: 2, carbs: 20, enabled: true },
+      { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5, enabled: false },
+    ]);
+  });
+
+  test('an older dish entry without saved ingredients does not borrow ingredients added to the product later', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const bowl = {
+      id: 'p-bowl-live', name: 'Oatmeal bowl', grams: 260, kcal: 370, protein: 16, fat: 11, carbs: 85,
+      components: [
+        { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+        { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+        { id: 'c-banana', name: 'Banana', grams: 100, kcal: 89, protein: 1.1, fat: 0.3, carbs: 22.8 },
+      ]
+    };
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [bowl],
+      foods: [{
+        id: 'food-legacy-dish', name: 'Oatmeal bowl', meal: 'breakfast', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65,
+        date: today, createdAt: Date.now()
+      }],
+      weights: []
+    });
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals .meal-detail').first()).not.toContainText('Banana');
+    await page.locator('#diary-meals [data-edit-food]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#food-components-field')).toBeHidden();
+    await expect(page.locator('#food-grams')).toHaveValue('160');
+  });
 });
