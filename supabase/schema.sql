@@ -22,6 +22,9 @@ alter table public.food_entries add column if not exists meal_type text not null
 alter table public.food_entries drop constraint if exists food_entries_meal_type_check;
 alter table public.food_entries add constraint food_entries_meal_type_check check (meal_type in ('breakfast', 'lunch', 'dinner', 'snack'));
 
+-- Dish ingredients saved with a diary entry, so later product edits do not change past meals.
+alter table public.food_entries add column if not exists components jsonb check (components is null or jsonb_typeof(components) = 'array');
+
 create table if not exists public.weight_entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
