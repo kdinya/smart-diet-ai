@@ -5512,3 +5512,101 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-grams')).toHaveValue('160');
   });
 });
+
+test.describe('Smoke: dish ingredient gram fields and legacy shared products', () => {
+  const bowl = {
+    id: '44444444-4444-4444-8444-444444444444', name: 'Oatmeal bowl', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65,
+    components: [
+      { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+      { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+    ],
+  };
+
+  test('ingredient gram fields show no unit suffix and right-aligned numbers in add and edit dialogs', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [bowl],
+      foods: [{ id: 'food-bowl-fields', name: 'Oatmeal bowl', meal: 'breakfast', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65, date: today, createdAt: Date.now(), components: bowl.components }],
+      weights: []
+    });
+
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-edit-food]').click();
+    const editInput = page.locator('#food-components-list [data-component-grams="c-oats"]');
+    await expect(editInput).toHaveCSS('text-align', 'right');
+    expect(await editInput.evaluate((el) => el.parentElement.textContent.trim())).toBe('');
+    expect(await page.locator('#food-components-list .companion-unit').count()).toBe(0);
+    await page.locator('#modal-close').click();
+
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    const pickInput = page.locator('#pick-components-list [data-component-grams="c-oats"]');
+    await expect(pickInput).toHaveCSS('text-align', 'right');
+    expect(await pickInput.evaluate((el) => el.parentElement.textContent.trim())).toBe('');
+    expect(await page.locator('#pick-components-list .companion-unit').count()).toBe(0);
+  });
+
+  test('ingredient gram fields stay inside their cards in the edit dialog at 360px', async ({ page }) => {
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [bowl],
+      foods: [{ id: 'food-bowl-360-edit', name: 'Oatmeal bowl', meal: 'breakfast', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65, date: today, createdAt: Date.now(), components: bowl.components }],
+      weights: []
+    });
+    await page.setViewportSize({ width: 360, height: 740 });
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-edit-food]').click();
+    await expect(page.locator('#food-components-list [data-component-grams]')).toHaveCount(2);
+    const fit = await page.evaluate(() => {
+      const inputs = [...document.querySelectorAll('#food-components-list [data-component-grams]')];
+      const outside = inputs.filter((input) => {
+        const card = input.closest('[data-component-item]').getBoundingClientRect();
+        const box = input.getBoundingClientRect();
+        return box.left < card.left || box.right > card.right;
+      }).length;
+      return { outside, pageOverflow: document.documentElement.scrollWidth > window.innerWidth };
+    });
+    expect(fit).toEqual({ outside: 0, pageOverflow: false });
+  });
+
+  test('ingredient gram fields stay inside their cards in the add dialog at 360px', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [bowl], foods: [], weights: [] });
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    await expect(page.locator('#pick-components-list [data-component-grams]')).toHaveCount(2);
+    const fit = await page.evaluate(() => {
+      const inputs = [...document.querySelectorAll('#pick-components-list [data-component-grams]')];
+      const outside = inputs.filter((input) => {
+        const card = input.closest('[data-component-item]').getBoundingClientRect();
+        const box = input.getBoundingClientRect();
+        return box.left < card.left || box.right > card.right;
+      }).length;
+      return { outside, pageOverflow: document.documentElement.scrollWidth > window.innerWidth };
+    });
+    expect(fit).toEqual({ outside: 0, pageOverflow: false });
+  });
+
+  test('a product shared without ingredients by an older version is accepted as a plain product', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const result = await page.evaluate(async () => {
+      const chain = { delete() { return this; }, eq() { return this; }, select() { return this; }, then(resolve) { resolve({ data: [{ id: 'share-legacy' }], error: null }); } };
+      sb = { from: () => chain };
+      runSync = async () => {};
+      user = { id: 'u-recipient' };
+      inboxRows = [{ id: 'share-legacy', name: 'Old oats', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25, from_user: 'u-sender' }];
+      renderInbox();
+      const inbox = document.querySelector('[data-share-id="share-legacy"]');
+      const inboxText = inbox ? inbox.textContent : '';
+      await resolveShare('share-legacy', true);
+      renderProducts();
+      const product = state.products.find((item) => item.name === 'Old oats');
+      const card = document.querySelector(`#products-list [data-product-id="${product?.id}"]`);
+      return { inboxText, saved: !!product, components: product ? (product.components || []) : null, hasIcon: !!card?.querySelector('.product-is-composite') };
+    });
+    expect(result.inboxText).toContain('Old oats');
+    expect(result.saved).toBe(true);
+    expect(result.components).toEqual([]);
+    expect(result.hasIcon).toBe(false);
+  });
+});
