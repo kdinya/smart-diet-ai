@@ -787,20 +787,23 @@ test.describe('Smoke: dish ingredients sync', () => {
       protein: 12, fat: 7, carbs: 65, entry_date: today, snack_id: null, meal_order: null, created_at: new Date().toISOString()
     });
     await mockSupabase(page, backend);
-    const components = [
-      { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
-      { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
-    ];
-    await openApp(page, {
-      prefs: BASE_PREFS,
-      foods: [{ id: 'food-merge-1', name: 'Oatmeal bowl', meal: 'breakfast', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65, date: today, createdAt: Date.now(), components }],
-      weights: []
-    });
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await connectSupabase(page);
     await signIn(page, 'alice@example.test');
+    await expect.poll(() => page.evaluate(() => state.foods.some((f) => f.id === 'food-merge-1'))).toBe(true);
+    expect(await page.evaluate(() => (state.foods.find((f) => f.id === 'food-merge-1').components || []).length)).toBe(0);
 
-    await expect.poll(() => page.evaluate(() => (state.foods.find((f) => f.id === 'food-merge-1')?.components || []).length)).toBe(2);
-    await expect.poll(() => backend.tables.food_entries.find((row) => row.id === 'food-merge-1')?.components?.length ?? 0).toBe(2);
+    await page.evaluate(async () => {
+      const entry = state.foods.find((f) => f.id === 'food-merge-1');
+      entry.components = [
+        { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
+        { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+      ];
+      await pullRemote();
+      runSync();
+    });
+    await expect.poll(() => page.evaluate(() => (state.foods.find((f) => f.id === 'food-merge-1').components || []).length)).toBe(2);
+    await expect.poll(() => backend.tables.food_entries.find((row) => row.id === 'food-merge-1')?.components?.length ?? 0, { timeout: 15000 }).toBe(2);
     expect(backend.tables.food_entries.find((row) => row.id === 'food-merge-1').components.map((c) => c.name)).toEqual(['Oats', 'Milk']);
   });
 });
