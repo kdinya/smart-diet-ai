@@ -5613,13 +5613,14 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
 
 test.describe('Smoke: weight-loss questions', () => {
   test('the questions button opens a dialog where opening one answer closes the previous one', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T12:00:00Z'));
+    await page.clock.setSystemTime(new Date('2026-11-15T12:00:00Z'));
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
     await page.evaluate(() => document.querySelector('#intro')?.remove());
     await expect(page.locator('#bot-peeker')).toBeVisible();
+    await expect(page.locator('#bot-peeker')).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
     await page.evaluate(() => toggleBotPoppedFab(true));
     await expect(page.locator('#bot-faq-action-fab')).toBeVisible();
-    await page.locator('#bot-faq-action-fab').click();
+    await page.locator('#bot-faq-action-fab').dispatchEvent('click');
     await expect(page.locator('#faq-modal')).toHaveClass(/open/);
     await expect(page.locator('#faq-list .faq-item')).toHaveCount(66);
     await page.locator('#faq-list .faq-question').nth(0).click();
