@@ -5610,3 +5610,25 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
     expect(result.hasIcon).toBe(false);
   });
 });
+
+test.describe('Smoke: weight-loss questions', () => {
+  test('the questions button opens a dialog where opening one answer closes the previous one', async ({ page }) => {
+    await page.clock.setSystemTime(new Date('2026-11-15T12:00:00Z'));
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
+    await page.evaluate(() => document.querySelector('#intro')?.remove());
+    await expect(page.locator('#bot-peeker')).toBeVisible();
+    await expect(page.locator('#bot-peeker')).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
+    await page.evaluate(() => toggleBotPoppedFab(true));
+    await expect(page.locator('#bot-faq-action-fab')).toBeVisible();
+    await page.locator('#bot-faq-action-fab').dispatchEvent('click');
+    await expect(page.locator('#faq-modal')).toHaveClass(/open/);
+    await expect(page.locator('#faq-list .faq-item')).toHaveCount(66);
+    await page.locator('#faq-list .faq-question').nth(0).click();
+    await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeVisible();
+    await page.locator('#faq-list .faq-question').nth(1).click();
+    await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeHidden();
+    await expect(page.locator('#faq-list .faq-answer').nth(1)).toBeVisible();
+    await page.locator('#faq-close').click();
+    await expect(page.locator('#faq-modal')).not.toHaveClass(/open/);
+  });
+});
