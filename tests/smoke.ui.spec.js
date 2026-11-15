@@ -5620,6 +5620,13 @@ test.describe('Smoke: weight-loss questions', () => {
     await expect(page.locator('#bot-peeker')).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
     await page.evaluate(() => toggleBotPoppedFab(true));
     await expect(page.locator('#bot-faq-action-fab')).toBeVisible();
+    const onCircle = await page.evaluate(() => {
+      const m = document.getElementById('bot-peeker').getBoundingClientRect();
+      const cx = m.left + m.width / 2, cy = m.top + m.height / 2;
+      const dist = (id) => { const el = document.getElementById(id); return Math.hypot(parseFloat(el.style.left) + el.offsetWidth / 2 - cx, parseFloat(el.style.top) + el.offsetHeight / 2 - cy); };
+      return { faq: dist('bot-faq-action-fab'), average: (dist('bot-chat-action-fab') + dist('bot-settings-fab')) / 2 };
+    });
+    expect(Math.abs(onCircle.faq - onCircle.average)).toBeLessThan(2);
     await page.locator('#bot-faq-action-fab').dispatchEvent('click');
     await expect(page.locator('#faq-modal')).toHaveClass(/open/);
     await expect(page.locator('#faq-list .faq-item')).toHaveCount(66);
@@ -5628,6 +5635,8 @@ test.describe('Smoke: weight-loss questions', () => {
     await page.locator('#faq-list .faq-question').nth(1).click();
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeHidden();
     await expect(page.locator('#faq-list .faq-answer').nth(1)).toBeVisible();
+    await page.locator('#faq-list .faq-item').nth(60).scrollIntoViewIfNeeded();
+    await expect(page.locator('#faq-close')).toBeInViewport();
     await page.locator('#faq-close').click();
     await expect(page.locator('#faq-modal')).not.toHaveClass(/open/);
   });
