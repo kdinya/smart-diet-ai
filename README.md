@@ -26,7 +26,7 @@
 - **Storage cleanup:** when browser storage is full, the app offers to delete diary entries older than 12 months that are already saved in the cloud. Profile, weight, goals and products stay.
 - **Analyze buttons:** next to each meal and next to today's meals on the Overview and Diary screens, get a short review of that meal or of the whole day, with 2–3 tips.
 - **Ask the Dietitian:** ask any general nutrition question. These questions do not include your diary or your profile.
-- **Weight-loss questions:** tap the question button next to the assistant to open 66 common weight-loss questions, each with a detailed answer. Opening one answer closes the previous one.
+- **Weight-loss questions:** tap the question button next to the assistant to open common weight-loss questions, each with a detailed answer. Opening one answer closes the previous one.
 
 **Save products you eat often**
 - Keep foods in "My products" with a standard portion, and add them to your diary in seconds.

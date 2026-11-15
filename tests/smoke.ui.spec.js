@@ -5630,11 +5630,15 @@ test.describe('Smoke: weight-loss questions', () => {
     await page.locator('#bot-faq-action-fab').dispatchEvent('click');
     await expect(page.locator('#faq-modal')).toHaveClass(/open/);
     await expect(page.locator('#faq-list .faq-item')).toHaveCount(66);
+    await expect(page.locator('#faq-list .faq-answer').nth(0)).toHaveAttribute('aria-hidden', 'true');
     await page.locator('#faq-list .faq-question').nth(0).click();
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeVisible();
+    await expect(page.locator('#faq-list .faq-answer').nth(0)).toHaveAttribute('aria-hidden', 'false');
     await page.locator('#faq-list .faq-question').nth(1).click();
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeHidden();
+    await expect(page.locator('#faq-list .faq-answer').nth(0)).toHaveAttribute('aria-hidden', 'true');
     await expect(page.locator('#faq-list .faq-answer').nth(1)).toBeVisible();
+    await expect(page.locator('#faq-list .faq-answer').nth(1)).toHaveAttribute('aria-hidden', 'false');
     await page.locator('#faq-list .faq-item').nth(60).scrollIntoViewIfNeeded();
     await expect(page.locator('#faq-close')).toBeInViewport();
     await page.locator('#faq-close').click();
