@@ -5629,7 +5629,10 @@ test.describe('Smoke: weight-loss questions', () => {
     expect(Math.abs(onCircle.faq - onCircle.average)).toBeLessThan(2);
     await page.locator('#bot-faq-action-fab').dispatchEvent('click');
     await expect(page.locator('#faq-modal')).toHaveClass(/open/);
-    await expect(page.locator('#faq-list .faq-item')).toHaveCount(66);
+    await expect(page.locator('#faq-list .faq-category')).toHaveCount(7);
+    await expect(page.locator('#faq-list .faq-category-title').first()).toContainText('What to do to lose weight');
+    await expect(page.locator('#faq-list .faq-category[data-category="app"] .faq-category-title')).toContainText('Using the Smart Diet AI app');
+    await expect(page.locator('#faq-list .faq-item')).toHaveCount(86);
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toHaveAttribute('aria-hidden', 'true');
     await page.locator('#faq-list .faq-question').nth(0).click();
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeVisible();
