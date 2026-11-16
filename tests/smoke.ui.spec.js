@@ -5648,3 +5648,87 @@ test.describe('Smoke: weight-loss questions', () => {
     await expect(page.locator('#faq-modal')).not.toHaveClass(/open/);
   });
 });
+
+test.describe('Smoke: pediatric calorie goals', () => {
+  test('child maintenance is estimated separately and target weight does not change calories', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-16T12:00:00') });
+    const prefs = { ...BASE_PREFS, name: 'Teen', birthDate: '2012-11-16', sex: 'male', height: 186, currentWeight: 80, currentWeightDate: '2026-11-16', targetWeight: 72, activity: 'moderate', pace: 0 };
+    await openApp(page, { prefs, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await expect(page.locator('#profile-pace')).toHaveValue('0');
+    await expect(page.locator('#profile-target-field')).toBeVisible();
+    await expect(page.locator('#profile-pace-preview')).toContainText('3675');
+    await page.locator('#save-profile').click();
+    const saved = await readStore(page);
+    expect(saved.prefs.targetWeight).toBe(72);
+    expect(saved.prefs.kcal).toBe(3675);
+    await page.reload();
+    await expect(page.locator('#profile-target')).toHaveValue('72');
+    await expect(page.locator('#profile-pace-preview')).toContainText('3675');
+  });
+
+  test('child deficit requires pediatrician-set calories and persists in both languages', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-16T12:00:00') });
+    const prefs = { ...BASE_PREFS, name: 'Teen', birthDate: '2012-11-16', sex: 'male', height: 186, currentWeight: 80, currentWeightDate: '2026-11-16', targetWeight: 72, activity: 'moderate', pace: 0 };
+    await openApp(page, { prefs, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.locator('#profile-pace').evaluate((el) => { el.value = '-1'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await expect(page.locator('#profile-pediatric-kcal-field')).toBeVisible();
+    await expect(page.locator('#profile-pediatric-notice')).toBeVisible();
+    await page.locator('#save-profile').click();
+    await expect.poll(async () => (await readStore(page)).prefs?.pace).toBe(0);
+    await page.fill('#profile-pediatric-kcal', '3400');
+    await page.locator('#profile-pediatric-kcal').dispatchEvent('change');
+    await page.fill('#profile-target', '75');
+    await page.locator('#profile-target').dispatchEvent('change');
+    await page.locator('#profile-pace').evaluate((el) => { el.value = '-1'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await page.locator('#save-profile').click();
+    await expect.poll(async () => (await readStore(page)).prefs?.pace).toBe(-1);
+    let saved = await readStore(page);
+    expect(saved.prefs.targetWeight).toBe(75);
+    expect(saved.prefs.pediatricTargetKcal).toBe(3400);
+    expect(saved.prefs.kcal).toBe(3400);
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await expect(page.locator('#profile-pediatric-kcal')).toBeVisible();
+    await page.reload();
+    saved = await readStore(page);
+    expect(saved.prefs.pace).toBe(-1);
+    expect(saved.prefs.pediatricTargetKcal).toBe(3400);
+    expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
+  });
+
+  test('child onboarding accepts a child birth date and keeps adult guidance out of the saved goal', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 760 });
+    await page.clock.install({ time: new Date('2026-11-16T12:00:00') });
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-guest').click();
+    await page.evaluate(() => {
+      const set = (id, value) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      set('onboard-name', 'Teen'); set('onboard-birth', '2012-11-16'); set('onboard-height', '186'); set('onboard-weight', '80'); set('onboard-target', '72'); set('onboard-pace', '0');
+    });
+    await expect(page.locator('#onboard-pace')).toHaveValue('0');
+    await expect(page.locator('#onboard-pediatric-notice')).toBeVisible();
+    await page.locator('#onboarding-save').click();
+    await expect.poll(async () => (await readStore(page)).prefs?.setupComplete).toBe(true);
+    const saved = await readStore(page);
+    expect(saved.prefs.kcal).toBe(2698);
+    expect(saved.prefs.targetWeight).toBe(72);
+    await expect(page.locator('#onboarding-modal')).not.toHaveClass(/open/);
+    await openView(page, 'settings');
+    await expect(page.locator('#view-settings')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test('child calorie prescription and desired weight survive backup parsing', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS }, foods: [], weights: [] });
+    const parsed = await page.evaluate(() => parseBackup(JSON.stringify({
+      foods: [], weights: [], products: [],
+      prefs: { name: 'Teen', birthDate: '2012-11-16', sex: 'male', height: 186, currentWeight: 80, targetWeight: 72, pediatricTargetKcal: 3400, pace: -1, activity: 'moderate', kcal: 3400, recommendation: { pediatric: true, clinicianSet: true, maintenance: false }, setupComplete: true },
+    })).prefs);
+    expect(parsed.targetWeight).toBe(72);
+    expect(parsed.pediatricTargetKcal).toBe(3400);
+    expect(parsed.pace).toBe(-1);
+    expect(parsed.recommendation.clinicianSet).toBe(true);
+  });
+});
