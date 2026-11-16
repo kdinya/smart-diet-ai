@@ -5632,7 +5632,7 @@ test.describe('Smoke: weight-loss questions', () => {
     await expect(page.locator('#faq-list .faq-category')).toHaveCount(7);
     await expect(page.locator('#faq-list .faq-category-title').first()).toContainText('What to do to lose weight');
     await expect(page.locator('#faq-list .faq-category[data-category="app"] .faq-category-title')).toContainText('Using the Smart Diet AI app');
-    await expect(page.locator('#faq-list .faq-item')).toHaveCount(86);
+    await expect(page.locator('#faq-list .faq-item')).toHaveCount(87);
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toHaveAttribute('aria-hidden', 'true');
     await page.locator('#faq-list .faq-question').nth(0).click();
     await expect(page.locator('#faq-list .faq-answer').nth(0)).toBeVisible();
