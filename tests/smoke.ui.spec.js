@@ -3989,7 +3989,8 @@ test('a lower weigh-in shows same-pace calories and macros in progress without c
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '93');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await page.locator('#weight-goal-cancel').click();
   await page.evaluate(() => showView('stats'));
   const note = page.locator('#progress-notes .progress-target-note');
   await expect(note).toContainText('93.0 kg');
@@ -4014,7 +4015,8 @@ test('a lower weigh-in shows recalculated macros in Ukrainian under progress wit
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '93');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await page.locator('#weight-goal-cancel').click();
   await page.evaluate(() => showView('stats'));
   const note = page.locator('#progress-notes .progress-target-note');
   await expect(note).toContainText('93.0 кг');
