@@ -3857,7 +3857,7 @@ test('legacy profile initialization migrates the birth date without blocking app
   expect((await readStore(page)).prefs.birthDate).toBeTruthy();
 });
 
-test('a lower weigh-in shows an informational target under progress without changing the profile', async ({ page }) => {
+test('a lower weigh-in offers the recalculated target and can be declined without changing the profile', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3865,8 +3865,9 @@ test('a lower weigh-in shows an informational target under progress without chan
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#bot-comic')).toContainText('1781 kcal');
-  await page.getByRole('button', { name: 'Keep current goals' }).click();
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await expect(page.locator('#weight-goal-message')).toContainText('1781 kcal/day');
+  await page.locator('#weight-goal-cancel').click();
   await page.evaluate(() => showView('stats'));
   const note = page.locator('#progress-notes .progress-target-note');
   await expect(note).toContainText('90.0 kg');
@@ -3880,7 +3881,7 @@ test('a lower weigh-in shows an informational target under progress without chan
   expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
   expect(saved.weights.map(item => item.value)).toContain(90);
 });
-test('weigh-in bubble updates all targets only after confirmation', async ({ page }) => {
+test('weigh-in goal dialog updates all targets only after confirmation', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
@@ -3889,14 +3890,15 @@ test('weigh-in bubble updates all targets only after confirmation', async ({ pag
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#bot-comic')).toContainText('1781 kcal');
-  await expect(page.locator('#bot-comic')).toContainText('protein 162 g');
-  await expect(page.locator('#bot-comic')).toContainText('fat 53 g');
-  await expect(page.locator('#bot-comic')).toContainText('carbs 164 g');
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await expect(page.locator('#weight-goal-message')).toContainText('1781 kcal/day');
+  await expect(page.locator('#weight-goal-protein')).toHaveValue('162');
+  await expect(page.locator('#weight-goal-fat')).toHaveValue('53');
+  await expect(page.locator('#weight-goal-carbs')).toHaveValue('164');
   const before = await readStore(page);
   expect(before.prefs.kcal).toBe(2236);
   expect(before.prefs.protein).toBe(160);
-  await page.getByRole('button', { name: 'Update goals' }).click();
+  await page.locator('#weight-goal-apply').click();
   const after = await readStore(page);
   expect(after.prefs.kcal).toBe(1781);
   expect(after.prefs.protein).toBe(162);
@@ -3910,7 +3912,48 @@ test('weigh-in bubble updates all targets only after confirmation', async ({ pag
   await expect(page.locator('#pref-carbs')).toHaveValue('164');
 });
 
-test('a recommendation exactly 50 kcal below the saved goal does not open the assistant bubble', async ({ page }) => {
+test('the weight goal dialog accepts custom calorie and macro values and keeps weight history', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '90');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await page.fill('#weight-goal-kcal', '1900');
+  await page.fill('#weight-goal-protein', '150');
+  await page.fill('#weight-goal-carbs', '190');
+  await page.fill('#weight-goal-fat', '60');
+  await page.locator('#weight-goal-apply').click();
+  const saved = await readStore(page);
+  expect(saved.prefs.kcal).toBe(1900);
+  expect(saved.prefs.protein).toBe(150);
+  expect(saved.prefs.carbs).toBe(190);
+  expect(saved.prefs.fat).toBe(60);
+  expect(saved.prefs.currentWeight).toBe(100);
+  expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
+  expect(saved.weights.map(item => item.value)).toContain(90);
+});
+
+test('the weight goal dialog is localized in Ukrainian and can be dismissed without changing goals', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'uk', botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '90');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-title')).toHaveText('Перевір денні цілі');
+  await expect(page.locator('#weight-goal-message')).toContainText('щонайменше на 10%');
+  await expect(page.locator('#weight-goal-cancel')).toHaveText('Залишити поточні');
+  await page.locator('#weight-goal-cancel').click();
+  const saved = await readStore(page);
+  expect(saved.prefs.kcal).toBe(2236);
+  expect(saved.weights.map(item => item.value)).toContain(90);
+});
+
+test('a recommendation less than 10% below the saved goal does not open the goal dialog', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 1831, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3918,7 +3961,7 @@ test('a recommendation exactly 50 kcal below the saved goal does not open the as
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#bot-comic')).not.toContainText('1781 kcal');
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
   await page.evaluate(() => showView('stats'));
   await expect(page.locator('#progress-notes .progress-target-note')).toContainText('1781 kcal');
   expect((await readStore(page)).prefs.kcal).toBe(1831);
@@ -3932,7 +3975,7 @@ test('a lower weigh-in shows same-pace calories and macros in progress without c
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '93');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#bot-comic')).not.toContainText('1680 kcal');
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
   await page.evaluate(() => showView('stats'));
   const note = page.locator('#progress-notes .progress-target-note');
   await expect(note).toContainText('93.0 kg');
@@ -3957,7 +4000,7 @@ test('a lower weigh-in shows recalculated macros in Ukrainian under progress wit
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '93');
   await page.locator('#weight-save').click();
-  await expect(page.locator('#bot-comic')).not.toContainText('1680 ккал');
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
   await page.evaluate(() => showView('stats'));
   const note = page.locator('#progress-notes .progress-target-note');
   await expect(note).toContainText('93.0 кг');
@@ -3981,7 +4024,7 @@ test('progress recommendation recalculates after each lower weigh-in and survive
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '90');
   await page.locator('#weight-save').click();
-  await page.getByRole('button', { name: 'Keep current goals' }).click();
+  await page.locator('#weight-goal-cancel').click();
   await page.reload();
   await page.clock.fastForward(2200);
   await page.evaluate(() => showView('stats'));
@@ -3996,7 +4039,7 @@ test('progress recommendation recalculates after each lower weigh-in and survive
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '88');
   await page.locator('#weight-save').click();
-  await page.getByRole('button', { name: 'Keep current goals' }).click();
+  await page.locator('#weight-goal-cancel').click();
   await expect(page.locator('#progress-notes .progress-target-note')).toContainText('88.0 kg');
   expect((await readStore(page)).prefs.kcal).toBe(2236);
 
