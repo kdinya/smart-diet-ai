@@ -5844,6 +5844,11 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(1);
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
     await expect(compItem.locator('[data-info-product]')).toHaveCount(1);
+    await expect(itemWithNote.locator('.product-has-note')).toHaveCount(1);
+    await expect(itemWithNote.locator('.product-has-note')).toHaveAttribute('title', 'Has additional information');
+    await expect(itemWithoutNote.locator('.product-has-note')).toHaveCount(0);
+    await expect(compItem.locator('.product-has-note')).toHaveCount(1);
+    await expect(compItem.locator('.product-has-note')).toHaveAttribute('title', 'Has additional information');
 
     await itemWithNote.locator('[data-toggle-product]').click();
     await itemWithNote.locator('[data-more-product]').click();
@@ -5873,6 +5878,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     store = await readStore(page);
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBeUndefined();
     await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(0);
+    await expect(itemWithNote.locator('.product-has-note')).toHaveCount(0);
 
     await itemWithoutNote.locator('[data-toggle-product]').click();
     await itemWithoutNote.locator('[data-more-product]').click();
@@ -5889,6 +5895,14 @@ test.describe('Smoke: pediatric calorie goals', () => {
     store = await readStore(page);
     expect(store.products.find(p => p.id === PROD_WITHOUT_NOTE).note).toBe('Fuji apple');
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(1);
+    await expect(itemWithoutNote.locator('.product-has-note')).toHaveCount(1);
+    await page.setViewportSize({ width: 360, height: 760 });
+    await expect(itemWithoutNote.locator('.product-has-note')).toBeVisible();
+    await openView(page, 'settings');
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await openView(page, 'products');
+    await expect(itemWithoutNote.locator('.product-has-note')).toHaveAttribute('title', 'Має додаткову інформацію');
 
     const backupJson = JSON.stringify({
       foods: [], weights: [],
