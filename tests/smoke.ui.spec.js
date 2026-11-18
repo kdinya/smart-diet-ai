@@ -5857,20 +5857,45 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
-    await expect(page.locator('#product-note-modal-text')).toHaveValue('Brand X, low fat');
+    await expect(page.locator('#product-note-view-section')).toBeVisible();
+    await expect(page.locator('#product-note-edit-section')).toBeHidden();
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Brand X, low fat');
+    await expect(page.locator('#product-note-view-edit')).toBeVisible();
+    await expect(page.locator('#product-note-view-delete')).toBeVisible();
+    await expect(page.locator('#product-note-modal-ok')).toBeVisible();
 
+    // Cancel edit returns to view mode with original note
+    await page.click('#product-note-view-edit');
+    await expect(page.locator('#product-note-view-section')).toBeHidden();
+    await expect(page.locator('#product-note-edit-section')).toBeVisible();
+    await expect(page.locator('#product-note-modal-text')).toHaveValue('Brand X, low fat');
+    await page.fill('#product-note-modal-text', 'Temporary unsaved note');
+    await page.click('#product-note-modal-cancel');
+    await expect(page.locator('#product-note-view-section')).toBeVisible();
+    await expect(page.locator('#product-note-edit-section')).toBeHidden();
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Brand X, low fat');
+
+    // Edit and save returns to view mode with updated note, OK closes
+    await page.click('#product-note-view-edit');
     await page.fill('#product-note-modal-text', 'Brand X, updated note');
     await page.click('#product-note-modal-save');
+    await expect(page.locator('#product-note-view-section')).toBeVisible();
+    await expect(page.locator('#product-note-edit-section')).toBeHidden();
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Brand X, updated note');
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await page.click('#product-note-modal-ok');
     await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
 
     let store = await readStore(page);
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
 
+    // Reopen info to delete note with confirmation
     await itemWithNote.locator('[data-toggle-product]').click();
     await itemWithNote.locator('[data-more-product]').click();
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
-    await page.click('#product-note-modal-delete');
+    await expect(page.locator('#product-note-view-section')).toBeVisible();
+    await page.click('#product-note-view-delete');
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.click('#confirm-ok');
     await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
