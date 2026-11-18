@@ -5845,6 +5845,10 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
     await expect(compItem.locator('[data-info-product]')).toHaveCount(1);
 
+    await itemWithNote.locator('[data-toggle-product]').click();
+    await itemWithNote.locator('[data-more-product]').click();
+    await expect(itemWithNote.locator('[data-info-product]')).toBeVisible();
+
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
@@ -5857,6 +5861,8 @@ test.describe('Smoke: pediatric calorie goals', () => {
     let store = await readStore(page);
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
 
+    await itemWithNote.locator('[data-toggle-product]').click();
+    await itemWithNote.locator('[data-more-product]').click();
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await page.click('#product-note-modal-delete');
@@ -5868,6 +5874,8 @@ test.describe('Smoke: pediatric calorie goals', () => {
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBeUndefined();
     await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(0);
 
+    await itemWithoutNote.locator('[data-toggle-product]').click();
+    await itemWithoutNote.locator('[data-more-product]').click();
     await itemWithoutNote.locator('[data-edit-product]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-toggle')).toBeVisible();
