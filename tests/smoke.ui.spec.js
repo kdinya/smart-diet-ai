@@ -5825,4 +5825,69 @@ test.describe('Smoke: pediatric calorie goals', () => {
     expect(parsed.pace).toBe(-1);
     expect(parsed.recommendation.clinicianSet).toBe(true);
   });
+
+  test('user can add, view, edit and delete additional information note for simple product and composite dish; note icon shows only when note is present', async ({ page }) => {
+    const PROD_WITH_NOTE = '77777777-7777-4777-8777-777777777777';
+    const PROD_WITHOUT_NOTE = '88888888-8888-4888-8888-888888888888';
+    const COMP_WITH_NOTE = '99999999-9999-4999-8999-999999999999';
+    const prodWithNote = { id: PROD_WITH_NOTE, name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10, fat: 0, carbs: 4, note: 'Brand X, low fat' };
+    const prodWithoutNote = { id: PROD_WITHOUT_NOTE, name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 };
+    const compWithNote = { id: COMP_WITH_NOTE, name: 'Fruit Bowl', grams: 200, kcal: 111, protein: 10.3, fat: 0.2, carbs: 18, note: 'Best served chilled', components: [{ id: PROD_WITH_NOTE, name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10, fat: 0, carbs: 4 }, { id: PROD_WITHOUT_NOTE, name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }] };
+
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [prodWithNote, prodWithoutNote, compWithNote], foods: [], weights: [] });
+
+    await openView(page, 'products');
+    const itemWithNote = page.locator(`.product-item[data-product-id="${PROD_WITH_NOTE}"]`);
+    const itemWithoutNote = page.locator(`.product-item[data-product-id="${PROD_WITHOUT_NOTE}"]`);
+    const compItem = page.locator(`.product-item[data-product-id="${COMP_WITH_NOTE}"]`);
+
+    await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(1);
+    await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
+    await expect(compItem.locator('[data-info-product]')).toHaveCount(1);
+
+    await itemWithNote.locator('[data-info-product]').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
+    await expect(page.locator('#product-note-modal-text')).toHaveValue('Brand X, low fat');
+
+    await page.fill('#product-note-modal-text', 'Brand X, updated note');
+    await page.click('#product-note-modal-save');
+    await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
+
+    let store = await readStore(page);
+    expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
+
+    await itemWithNote.locator('[data-info-product]').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await page.click('#product-note-modal-delete');
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.click('#confirm-ok');
+    await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
+
+    store = await readStore(page);
+    expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBeUndefined();
+    await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(0);
+
+    await itemWithoutNote.locator('[data-edit-product]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-toggle')).toBeVisible();
+    await expect(page.locator('#product-note-field')).toBeHidden();
+    await page.click('#product-note-toggle');
+    await expect(page.locator('#product-note-field')).toBeVisible();
+    await page.fill('#product-note-input', 'Fuji apple');
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+
+    store = await readStore(page);
+    expect(store.products.find(p => p.id === PROD_WITHOUT_NOTE).note).toBe('Fuji apple');
+    await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(1);
+
+    const backupJson = JSON.stringify({
+      foods: [], weights: [],
+      products: [{ id: 'b1', name: 'Note product', grams: 100, kcal: 100, protein: 5, fat: 2, carbs: 10, note: 'Saved in backup' }],
+      prefs: { ...BASE_PREFS }
+    });
+    const parsed = await page.evaluate((json) => parseBackup(json), backupJson);
+    expect(parsed.products[0].note).toBe('Saved in backup');
+  });
 });
