@@ -5854,6 +5854,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await itemWithNote.locator('[data-more-product]').click();
     await expect(itemWithNote.locator('[data-info-product]')).toBeVisible();
 
+    await page.setViewportSize({ width: 360, height: 760 });
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
@@ -5863,6 +5864,13 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(page.locator('#product-note-view-edit')).toBeVisible();
     await expect(page.locator('#product-note-view-delete')).toBeVisible();
     await expect(page.locator('#product-note-modal-ok')).toBeVisible();
+    for (const selector of ['#product-note-view-edit', '#product-note-view-delete', '#product-note-modal-ok']) {
+      const box = await page.locator(selector).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(360);
+      expect(box.y + box.height).toBeLessThanOrEqual(760);
+    }
 
     // Cancel edit returns to view mode with original note
     await page.click('#product-note-view-edit');
@@ -5885,6 +5893,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await page.click('#product-note-modal-ok');
     await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
+    await page.setViewportSize({ width: 1280, height: 832 });
 
     let store = await readStore(page);
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
@@ -5936,5 +5945,20 @@ test.describe('Smoke: pediatric calorie goals', () => {
     });
     const parsed = await page.evaluate((json) => parseBackup(json), backupJson);
     expect(parsed.products[0].note).toBe('Saved in backup');
+
+    await itemWithoutNote.locator('[data-toggle-product]').click();
+    await itemWithoutNote.locator('[data-more-product]').click();
+    await itemWithoutNote.locator('[data-info-product]').click();
+    await page.click('#product-note-view-edit');
+    await page.fill('#product-note-modal-text', '');
+    await page.click('#product-note-modal-save');
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-view-section')).toBeVisible();
+    await expect(page.locator('#product-note-modal-view-text')).toBeEmpty();
+    await page.click('#product-note-modal-ok');
+    await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
+    store = await readStore(page);
+    expect(store.products.find(p => p.id === PROD_WITHOUT_NOTE).note).toBeUndefined();
+    await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
   });
 });
