@@ -559,7 +559,12 @@ test.describe('Smoke: product sharing', () => {
     await expect(bob.page.locator('#inbox-body')).toContainText('Alice');
     await expect(bob.page.locator('#inbox-body')).toContainText('Oats');
     await bob.page.click('[data-share-accept]');
-    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toContainText('Added shared product “Oats” to My products.');
+    await expect(bob.page.locator('#share-success-modal')).toHaveClass(/open/);
+    await expect(bob.page.locator('#share-success-title')).toHaveText('Product added');
+    await expect(bob.page.locator('#share-success-message')).toContainText('Added shared product “Oats” to My products.');
+    await expect(bob.page.locator('#share-success-ok')).toHaveText('OK');
+    await bob.page.click('#share-success-ok');
+    await expect(bob.page.locator('#share-success-modal')).not.toHaveClass(/open/);
     await expect.poll(async () => (await readStore(bob.page)).products.map((item) => item.name)).toEqual(['Oats']);
     expect(backend.tables.product_shares).toHaveLength(0);
     await bob.context.close();
@@ -779,6 +784,41 @@ test.describe('Smoke: data safety under slow uploads', () => {
 });
 
 test.describe('Smoke: dish ingredients sync', () => {
+  test('a composite diary entry survives a cloud error, reload and successful retry', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, products: [{ id: 'dish-oatmeal', name: 'Oatmeal bowl', grams: 160, kcal: 280, protein: 12, fat: 7, carbs: 65, components: [{ id: 'oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 }, { id: 'milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 }] }], foods: [], weights: [] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+    let failed = false;
+    const failOnce = async (route) => {
+      if (route.request().method() === 'POST' && !failed) {
+        failed = true;
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'temporary service error' }) });
+        return;
+      }
+      await route.fallback();
+    };
+    await page.route(/\/rest\/v1\/food_entries/, failOnce);
+    await page.evaluate(() => openMealPicker(state.products.find((product) => product.name === 'Oatmeal bowl')));
+    await page.click('#pick-add');
+    await expect.poll(() => readStore(page).then((store) => store.foods.some((food) => food.name === 'Oatmeal bowl'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => syncQueue.foods.length)).toBe(1);
+    await expect.poll(() => failed).toBe(true);
+
+    await page.unroute(/\/rest\/v1\/food_entries/, failOnce);
+    await autoConfirm(page, true);
+    await page.reload();
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.locator('#confirm-ok').click();
+    await expect.poll(() => backend.tables.food_entries.map((row) => row.name)).toContain('Oatmeal bowl');
+    expect(backend.tables.food_entries.find((row) => row.name === 'Oatmeal bowl').components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals')).toContainText('Oatmeal bowl');
+    expect((await readStore(page)).foods[0].components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
+  });
+
   test('a synced dish entry without saved ingredients gains the device ingredients and uploads them', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     const backend = createBackend();
