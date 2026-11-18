@@ -4635,6 +4635,61 @@ test.describe('Smoke: product add-ons', () => {
   const COFFEE = '11111111-1111-4111-8111-111111111111';
   const milk = { id: MILK, name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 };
 
+  test('additional products expand below product details with their nutrition on mobile and desktop', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    const plain = { id: 'plain-product', name: 'Plain product', grams: 100, kcal: 80, protein: 2, fat: 1, carbs: 12 };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, plain], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.setViewportSize({ width: 360, height: 760 });
+
+    const coffeeItem = page.locator(`.product-item[data-product-id="${COFFEE}"]`);
+    const plainItem = page.locator('.product-item', { hasText: 'Plain product' });
+    await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveCount(1);
+    await expect(plainItem.locator('[data-toggle-product-addons]')).toHaveCount(0);
+    await expect(coffeeItem.locator('[data-product-addons]')).toBeHidden();
+
+    await coffeeItem.locator('[data-toggle-product]').click();
+    const toggle = coffeeItem.locator('[data-toggle-product-addons]');
+    await expect(toggle).toHaveText('Show additional products');
+    const row = await coffeeItem.locator('.product-row').evaluate((el) => el.compareDocumentPosition(el.nextElementSibling) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(row).toBeTruthy();
+    const toggleBox = await toggle.boundingBox();
+    expect(toggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(360);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toContainText('Hide additional products');
+    const addon = coffeeItem.locator(`[data-product-addon="${MILK}"]`);
+    await expect(addon).toBeVisible();
+    await expect(addon.locator('.product-addon-name')).toHaveText('Milk');
+    await expect(addon.locator('.companion-nutrition')).toContainText('50 g');
+    await expect(addon.locator('.companion-nutrition')).toContainText('32 kcal');
+    await expect(addon.locator('.companion-nutrition')).toContainText('P 1.7');
+    await expect(addon.locator('.companion-nutrition')).toContainText('F 1.8');
+    await expect(addon.locator('.companion-nutrition')).toContainText('C 2.4');
+
+    await coffeeItem.locator('[data-toggle-product]').click();
+    await expect(coffeeItem.locator('[data-product-addons]')).toBeHidden();
+    await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveAttribute('aria-expanded', 'false');
+
+    await page.setViewportSize({ width: 1280, height: 832 });
+    await coffeeItem.locator('[data-toggle-product]').click();
+    await coffeeItem.locator('[data-toggle-product-addons]').click();
+    await expect(addon).toBeVisible();
+    const desktopToggleBox = await coffeeItem.locator('[data-toggle-product-addons]').boundingBox();
+    expect(desktopToggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(desktopToggleBox.x + desktopToggleBox.width).toBeLessThanOrEqual(1280);
+
+    await openView(page, 'settings');
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await openView(page, 'products');
+    await coffeeItem.locator('[data-toggle-product]').click();
+    await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveText('Показати додаткові продукти');
+    expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
+  });
+
   test('a usual add-on is saved on a product from the product editor', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [milk], foods: [], weights: [] });
     await openView(page, 'products');
