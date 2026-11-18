@@ -88,6 +88,7 @@ create table if not exists public.products (
 alter table public.products add column if not exists verified boolean not null default false;
 alter table public.products add column if not exists companions jsonb not null default '[]'::jsonb check (jsonb_typeof(companions) = 'array');
 alter table public.products add column if not exists components jsonb not null default '[]'::jsonb check (jsonb_typeof(components) = 'array');
+alter table public.products add column if not exists note text not null default '';
 
 create index if not exists products_user_name_idx on public.products (user_id, lower(name));
 
@@ -358,6 +359,7 @@ create table if not exists public.product_shares (
 );
 alter table public.product_shares add column if not exists verified boolean not null default false;
 alter table public.product_shares add column if not exists components jsonb not null default '[]'::jsonb check (jsonb_typeof(components) = 'array' and octet_length(components::text) <= 65536);
+alter table public.product_shares add column if not exists note text not null default '';
 
 create index if not exists product_shares_inbox_idx on public.product_shares (to_user, from_user, created_at);
 create index if not exists product_shares_sender_idx on public.product_shares (from_user, created_at);

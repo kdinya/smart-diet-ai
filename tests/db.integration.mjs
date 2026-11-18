@@ -196,6 +196,15 @@ async function run() {
   check('Recipe components are read back unchanged', Array.isArray(r.json) && r.json.length === 1 && r.json[0].components[0].grams === 150, describe(r));
   r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=components` });
   check('Products without recipe components default to an empty list', Array.isArray(r.json) && r.json.length === 1 && Array.isArray(r.json[0].components) && r.json[0].components.length === 0, describe(r));
+  r = await rest('products', {
+    as: 'a', method: 'POST',
+    body: { user_id: A, name: 'CI product with note', grams: 100, kcal: 200, protein: 10, fat: 5, carbs: 20, note: 'Special family note' },
+  });
+  check('Owner can save a product with a note', r.status === 201, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product with note')}&select=note` });
+  check('Product note is read back unchanged', r.json?.[0]?.note === 'Special family note', describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&name=${eq('CI product')}&select=note` });
+  check('Products without note default to empty string', r.json?.[0]?.note === '', describe(r));
   rAnon = await rest('products');
   check('Anonymous visitor cannot read user products when rows exist', emptyOrDenied(rAnon), describe(rAnon));
   rAnon = await rest('profiles');
@@ -285,13 +294,14 @@ async function run() {
 
   const recipeComponents = [{ id: 'component-oats', name: 'CI oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 }, { id: 'component-milk', name: 'CI milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 }];
   r = await rest('product_shares', {
-    as: 'a', method: 'POST', prefer: 'return=representation', body: { ...shareBody(A, B, 'CI shared 1'), components: recipeComponents },
+    as: 'a', method: 'POST', prefer: 'return=representation', body: { ...shareBody(A, B, 'CI shared 1'), components: recipeComponents, note: 'Family recipe note' },
   });
   const shareOne = r.json?.[0]?.id;
   check('Friend can receive a shared product', r.status === 201 && !!shareOne, describe(r));
-  r = await rest('product_shares', { as: 'b', query: `id=${eq(shareOne)}&select=components` });
+  r = await rest('product_shares', { as: 'b', query: `id=${eq(shareOne)}&select=components,note` });
   const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
   check('Recipient receives all shared recipe components', JSON.stringify(sortKeys(r.json?.[0]?.components)) === JSON.stringify(sortKeys(recipeComponents)), describe(r));
+  check('Recipient receives shared product note', r.json?.[0]?.note === 'Family recipe note', describe(r));
 
   r = await rest('product_shares', { as: 'a', method: 'POST', body: shareBody(A, C, 'CI to stranger') });
   check('Cannot share with a non-friend', denied(r), describe(r));
