@@ -1112,6 +1112,27 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect((await readStore(page)).products || []).toHaveLength(0);
   });
 
+  test('a failed local diary write keeps the add form open and rolls back the entry', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await page.fill('#food-name', 'Storage test meal');
+    await page.fill('#food-grams', '150');
+    await page.fill('#food-kcal', '250');
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'smartdiet-v1' && String(value).includes('Storage test meal')) throw new DOMException('quota exceeded', 'QuotaExceededError');
+        return original.call(this, key, value);
+      };
+    });
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#diary-meals')).not.toContainText('Storage test meal');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Browser storage is full');
+    expect((await readStore(page)).foods || []).toHaveLength(0);
+  });
+
   test('cancelling food deletion preserves the diary entry', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
@@ -5318,6 +5339,20 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
       { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
     ],
   };
+
+  test('a composite meal keeps its ingredient recipe after reloading the diary', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((product) => product.name === 'Oatmeal bowl')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.some((food) => food.name === 'Oatmeal bowl'))).toBe(true);
+    expect((await readStore(page)).foods[0].components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
+
+    await page.reload();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await openView(page, 'diary');
+    await expect(page.locator('#diary-meals')).toContainText('Oatmeal bowl');
+    expect((await readStore(page)).foods[0].components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
+  });
 
   test('the product list shows only the dish totals and keeps actions behind the more button', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
