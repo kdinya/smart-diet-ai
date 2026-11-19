@@ -5206,7 +5206,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(shawarmaItem.locator('.product-name .product-is-composite')).toBeVisible();
     await expect(pitaItem.locator('.product-name .product-is-composite')).toHaveCount(0);
 
-    await shawarmaItem.locator('.product-toggle').click();
+    await shawarmaItem.locator('[data-toggle-product]').first().click();
     await expect(shawarmaItem.locator('.product-components-preview')).toHaveCount(0);
     await shawarmaItem.locator('[data-more-product]').click();
     await expect(shawarmaItem.locator('[data-edit-product]')).toBeVisible();
@@ -5217,7 +5217,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#composite-modal-close');
 
     // Clicking edit on Pita opens traditional modal
-    await pitaItem.locator('.product-toggle').click();
+    await pitaItem.locator('[data-toggle-product]').first().click();
     await pitaItem.locator('[data-edit-product]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await page.click('#modal-close');
@@ -5954,11 +5954,28 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(compItem.locator('.product-has-note')).toHaveCount(1);
     await expect(compItem.locator('.product-has-note')).toHaveAttribute('title', 'Has additional information');
 
-    await itemWithNote.locator('[data-toggle-product]').click();
-    await itemWithNote.locator('[data-more-product]').click();
-    await expect(itemWithNote.locator('[data-info-product]')).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 832 });
+    await itemWithNote.locator('.product-note-badge').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Brand X, low fat');
+    await expect(itemWithNote).toHaveClass(/collapsed/);
+    await page.click('#product-note-modal-ok');
 
     await page.setViewportSize({ width: 360, height: 760 });
+    await compItem.locator('.product-note-badge').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-modal-title')).toHaveText('Fruit Bowl');
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Best served chilled');
+    await page.click('#product-note-modal-ok');
+
+    await itemWithNote.locator('[data-toggle-product]').first().click();
+    await expect(itemWithNote.locator('[data-toggle-product]').first()).toHaveAttribute('aria-expanded', 'true');
+    await itemWithNote.locator('[data-toggle-product]').last().click();
+    await expect(itemWithNote).toHaveClass(/collapsed/);
+    await itemWithNote.locator('[data-toggle-product]').first().click();
+    await itemWithNote.locator('[data-more-product]').click();
+    await expect(itemWithNote.locator('[data-info-product]')).toBeVisible();
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-modal-title')).toHaveText('Greek Yogurt');
