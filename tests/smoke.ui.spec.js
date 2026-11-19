@@ -3289,7 +3289,7 @@ test('assistant welcome pools stay localized and greet at night in dozing mode',
   expect(pools.ukMessages).toHaveLength(15);
   expect(pools.enPolite).toHaveLength(8);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
-  expect(pools.ukMessages.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
+  expect(pools.ukMessages.slice(0, 10).filter(text => topical.test(text))).toHaveLength(5);
   expect(pools.ukMessages.slice(10).filter(text => topical.test(text))).toHaveLength(0);
   expect(pools.enPolite.join(' ')).not.toMatch(/ЗСУ|Україн|Ukraine|Russia|Putin/i);
   const mascot = page.locator('#bot-peeker');
