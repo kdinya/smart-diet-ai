@@ -1633,7 +1633,7 @@ test.describe('Smoke: review fixes', () => {
       renderProducts();
       const product = state.products.find(item => item.name === 'Oat bowl');
       const card = document.querySelector(`#products-list [data-product-id="${product?.id}"]`);
-      return { sentComponents: sentProduct.components, inboxBeforeAccept, components: product?.components, productCardText: card?.textContent, hasAcceptedIcon: !!card?.querySelector('.product-is-composite') };
+      return { sentComponents: sentProduct.components, inboxBeforeAccept, components: product?.components, productComponentsHidden: !!card?.querySelector('[data-product-components].hidden'), hasAcceptedIcon: !!card?.querySelector('.product-is-composite') };
     });
     expect(result.sentComponents.map(item => item.name)).toEqual(['Oats', 'Milk']);
     expect(result.inboxBeforeAccept.names).toContain('Oats');
@@ -1641,8 +1641,7 @@ test.describe('Smoke: review fixes', () => {
     expect(result.inboxBeforeAccept.hasIcon).toBe(true);
     expect(result.components.map(item => item.name)).toEqual(['Oats', 'Milk']);
     expect(result.components.map(item => item.kcal)).toEqual([230, 50]);
-    expect(result.productCardText).not.toContain('Oats');
-    expect(result.productCardText).not.toContain('Milk');
+    expect(result.productComponentsHidden).toBe(true);
     expect(result.hasAcceptedIcon).toBe(true);
   });
 
@@ -5453,6 +5452,56 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
       { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
     ],
   };
+
+  test('composite ingredients expand under product details and collapse with their parent', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.setViewportSize({ width: 360, height: 760 });
+    const product = page.locator(`.product-item[data-product-id="${dish.id}"]`);
+    const toggle = product.locator('[data-toggle-product-components]');
+    const ingredients = product.locator('[data-product-components]');
+    await expect(toggle).toHaveText('Show ingredients');
+    await expect(ingredients).toBeHidden();
+
+    await product.locator('[data-toggle-product]').click();
+    const toggleBox = await toggle.boundingBox();
+    expect(toggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(360);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toContainText('Hide ingredients');
+    const oats = ingredients.locator('[data-product-component="c-oats"]');
+    await expect(oats).toBeVisible();
+    await expect(oats.locator('.product-addon-name')).toHaveText('Oats');
+    await expect(oats.locator('.companion-nutrition')).toContainText('60 g');
+    await expect(oats.locator('.companion-nutrition')).toContainText('230 kcal');
+    await expect(oats.locator('.companion-nutrition')).toContainText('P 8');
+    await expect(oats.locator('.companion-nutrition')).toContainText('F 4');
+    await expect(oats.locator('.companion-nutrition')).toContainText('C 40');
+    await expect(ingredients.locator('[data-product-component]')).toHaveCount(2);
+
+    await product.locator('[data-toggle-product]').click();
+    await expect(ingredients).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveText('Show ingredients');
+    await product.locator('[data-toggle-product]').click();
+    await expect(ingredients).toBeHidden();
+
+    await page.setViewportSize({ width: 1280, height: 832 });
+    await toggle.click();
+    await expect(ingredients).toBeVisible();
+    const desktopToggleBox = await toggle.boundingBox();
+    expect(desktopToggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(desktopToggleBox.x + desktopToggleBox.width).toBeLessThanOrEqual(1280);
+
+    await openView(page, 'settings');
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await openView(page, 'products');
+    await product.locator('[data-toggle-product]').click();
+    await expect(product.locator('[data-toggle-product-components]')).toHaveText('Показати складники');
+    expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
+  });
 
   test('a composite meal keeps its ingredient recipe after reloading the diary', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
