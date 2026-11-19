@@ -3279,21 +3279,19 @@ test('assistant celebrates nutrition goals and shows its target-overage and slee
 });
 
 
-test('assistant welcome pools are localized by tone and greet at night in dozing mode', async ({ page }) => {
+test('assistant welcome pools stay localized and greet at night in dozing mode', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   const pools = await page.evaluate(() => ({
     ukMessages: I.uk.botWelcomeMessages,
     enPolite: I.en.botWelcomePolite,
-    enPlayful: I.en.botWelcomePlayful,
   }));
   expect(pools.ukMessages).toHaveLength(30);
   expect(pools.enPolite).toHaveLength(8);
-  expect(pools.enPlayful).toHaveLength(7);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
   expect(pools.ukMessages.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
   expect(pools.ukMessages.slice(10).filter(text => topical.test(text))).toHaveLength(0);
-  expect(pools.enPolite.join(' ')+pools.enPlayful.join(' ')).not.toMatch(/ЗСУ|Україн|Ukraine|Russia|Putin/i);
+  expect(pools.enPolite.join(' ')).not.toMatch(/ЗСУ|Україн|Ukraine|Russia|Putin/i);
   const mascot = page.locator('#bot-peeker');
   await expect(mascot).toHaveAttribute('data-spine-ready', 'true', { timeout: 10000 });
   await page.clock.fastForward(4500);
@@ -3302,7 +3300,7 @@ test('assistant welcome pools are localized by tone and greet at night in dozing
 });
 
 test('assistant welcomes use profile names and match Ukrainian gender', async ({ page }) => {
-  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', sex: 'female', aiTone: 'playful' }, foods: [], weights: [] });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', sex: 'female' }, foods: [], weights: [] });
   const result = await page.evaluate(() => {
     const source = '💙 Привіт! Україна прекрасна, а ти вже зробив/-ла крок до турботи про себе.';
     const female = personalizeBotWelcome(source, true);
@@ -3316,20 +3314,20 @@ test('assistant welcomes use profile names and match Ukrainian gender', async ({
   });
   expect(result.female).toContain('Олена');
   expect(result.female).toContain('зробила крок');
-  expect(result.female).toContain('моя бусічко');
+  expect(result.female).toContain('моя квіточко');
   expect(result.male).toContain('зробив крок');
   expect(result.male).toContain('мій котику');
   expect(result.neutral).toContain('зробив/-ла крок');
   expect(result.english).toContain('👋 Hi, Олена!');
   const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
   expect(parity).toBe(true);
-  expect(await page.evaluate(() => I.uk.botWelcomeUniversalPlayful)).toHaveLength(4);
+  expect(await page.evaluate(() => I.uk.botWelcomeUniversalPolite)).toHaveLength(1);
 });
 
 
 test('Ukrainian assistant startup welcome uses one of the 30 approved messages and stays until touched', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
-  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена', aiTone: 'playful' }, foods: [], weights: [] });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена' }, foods: [], weights: [] });
   await page.clock.fastForward(1499);
   const bubble = page.locator('#bot-comic');
   await expect(bubble).not.toHaveClass(/is-visible/);
@@ -3611,14 +3609,14 @@ test('comic assistant cloud cleanly encloses multi-line messages with actions wi
 
 test('comic assistant message fits, stays until touch, and preview settings are temporary', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
-  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en', aiTone: 'playful' }, foods: [], weights: [] });
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
   await page.clock.fastForward(1499);
   const bubble = page.locator('#bot-comic');
   await expect(bubble).not.toHaveClass(/is-visible/);
   await page.clock.fastForward(501);
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
-  const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePlayful }));
-  expect(welcome.allowed).toHaveLength(7);
+  const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePolite }));
+  expect(welcome.allowed).toHaveLength(8);
   expect(welcome.allowed.some(message => welcome.text.startsWith(message))).toBe(true);
   const uaWelcome = await page.evaluate(() => I.uk.botWelcomeMessages);
   expect(uaWelcome).toHaveLength(30);
