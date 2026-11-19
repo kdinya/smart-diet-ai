@@ -5198,7 +5198,8 @@ test.describe('Smoke: product add-ons', () => {
   test('composite products display an indicator icon in My Products and show ingredients list when expanded', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
     const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
-    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
+    await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
+    await page.evaluate(() => setBotServiceState({ period: 'day', pajamas: false }));
 
     await openView(page, 'products');
     const shawarmaItem = page.locator(`.product-item[data-product-id="${SHAWARMA}"]`);
