@@ -3286,7 +3286,7 @@ test('assistant welcome pools stay localized and greet at night in dozing mode',
     ukMessages: I.uk.botWelcomePolite,
     enPolite: I.en.botWelcomePolite,
   }));
-  expect(pools.ukMessages).toHaveLength(30);
+  expect(pools.ukMessages).toHaveLength(15);
   expect(pools.enPolite).toHaveLength(8);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
   expect(pools.ukMessages.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
@@ -3325,7 +3325,7 @@ test('assistant welcomes use profile names and match Ukrainian gender', async ({
 });
 
 
-test('Ukrainian assistant startup welcome uses one of the 30 approved messages and stays until touched', async ({ page }) => {
+test('Ukrainian assistant startup welcome uses one of the 15 approved messages and stays until touched', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', name: 'Олена' }, foods: [], weights: [] });
   await page.clock.fastForward(1499);
@@ -3337,7 +3337,7 @@ test('Ukrainian assistant startup welcome uses one of the 30 approved messages a
     text: document.querySelector('#bot-comic .bot-comic-text').textContent,
     allowed: I.uk.botWelcomePolite,
   }));
-  expect(welcome.allowed).toHaveLength(30);
+  expect(welcome.allowed).toHaveLength(15);
   expect(welcome.allowed).toContain(welcome.text);
   await page.clock.fastForward(15000);
   await expect(bubble).toHaveClass(/is-visible/);
@@ -3619,10 +3619,10 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   expect(welcome.allowed).toHaveLength(8);
   expect(welcome.allowed.some(message => welcome.text.startsWith(message))).toBe(true);
   const uaWelcome = await page.evaluate(() => I.uk.botWelcomePolite);
-  expect(uaWelcome).toHaveLength(30);
+  expect(uaWelcome).toHaveLength(15);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
   expect(uaWelcome.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
-  expect(uaWelcome.slice(10).filter(text => topical.test(text))).toHaveLength(0);
+  expect(uaWelcome.slice(10).filter(text => topical.test(text))).toHaveLength(5);
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
     const path = el.querySelector('.bot-comic-shape path');

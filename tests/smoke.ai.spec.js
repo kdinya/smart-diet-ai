@@ -827,7 +827,7 @@ test.describe('Smoke: dietitian launcher', () => {
   await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
   await openView(page, 'settings');
   await expect(page.locator('#pref-tone, #save-tone')).toHaveCount(0);
-  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ-дієтолог');
+  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
   expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
   expect((await readStore(page)).prefs).not.toHaveProperty('aiTone');
 });
