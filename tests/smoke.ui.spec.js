@@ -1053,7 +1053,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'products');
-    await page.locator('#products-list [data-toggle-product]').nth(1).click();
+    await page.locator('#products-list .product-item').nth(1).locator('.product-toggle-main').click();
     await page.locator('#products-list [data-edit-product]').nth(1).click();
     await page.fill('#food-name', 'Buckwheat deluxe');
     await page.click('#food-save');
@@ -1344,7 +1344,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(card).toHaveClass(/collapsed/);
     await expect(card.locator('.product-name')).toHaveText('Oats');
     await expect(card.locator('.product-row')).toBeHidden();
-    await card.locator('[data-toggle-product]').click();
+    await card.locator('.product-toggle-main').click();
     await expect(card).not.toHaveClass(/collapsed/);
     await expect(card.locator('.product-row')).toBeVisible();
     await expect(card.locator('[data-share-product]')).toBeVisible();
