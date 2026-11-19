@@ -2207,16 +2207,16 @@ test.describe('Smoke: current date card', () => {
     const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
     expect(mobileWidth).toBeLessThanOrEqual(360 - 32);
     const mobileDateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
-    await expect(page.locator('.home-intro')).toBeVisible();
+    await expect(page.locator('.mobile-page-intro')).toBeVisible();
     await expect(hero).toBeHidden();
     const mobileBoxes = await page.evaluate(() => {
       const bell = document.querySelector('#notif-bell').getBoundingClientRect();
       const date = document.querySelector('#today-label').getBoundingClientRect();
       const weight = document.querySelector('#weight-badge').getBoundingClientRect();
       const title = document.querySelector('#greeting').getBoundingClientRect();
-      const intro = document.querySelector('.home-intro').getBoundingClientRect();
-      const tagline = document.querySelector('.home-intro-tagline').getBoundingClientRect();
-      const description = document.querySelector('.home-intro-desc');
+      const intro = document.querySelector('.mobile-page-intro').getBoundingClientRect();
+      const tagline = document.querySelector('.mobile-page-tagline').getBoundingClientRect();
+      const description = document.querySelector('.mobile-page-desc');
       const descBox = description.getBoundingClientRect();
       const header = document.querySelector('.topline').getBoundingClientRect();
       return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, weight: { left: weight.left, right: weight.right, top: weight.top, bottom: weight.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom }, intro: { left: intro.left, right: intro.right, top: intro.top, bottom: intro.bottom }, tagline: { left: tagline.left, right: tagline.right }, desc: { right: descBox.right, scrollWidth: description.scrollWidth, clientWidth: description.clientWidth }, headerLeft: header.left, headerBottom: header.bottom };
@@ -4085,38 +4085,71 @@ test('progress recommendation recalculates after each lower weigh-in and survive
   expect(afterReload.weights.map(item => item.value)).toContain(99.9);
 });
 
-test('mobile home title and description fit beside the date and weight in both languages', async ({ page }) => {
+test('mobile page titles and descriptions fit beside the date and weight at readable sizes in both languages', async ({ page }) => {
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   await page.setViewportSize({ width: 360, height: 780 });
 
-  const checkIntro = async (title, tagline, description) => {
-    const intro = page.locator('.home-intro');
+  const expectedUk = {
+    home: ['Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.'],
+    diary: ['Щоденник харчування 📖', 'Переглядай записи за датами й калорії для кожного прийому їжі.'],
+    products: ['Мої продукти 🛒', 'Збережи продукти, які їси часто, і додавай їх у раціон одним натисканням. 🛒'],
+    stats: ['Статистика 🍩', 'Дивись на прогрес у часі, а не лише за один день.'],
+    settings: ['Налаштування', 'Профіль, мова, ШІ та хмарна синхронізація.'],
+  };
+  const expectedEn = {
+    home: ['My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.'],
+    diary: ['Food diary 📖', 'Review meals by date and track calories for each meal.'],
+    products: ['My products 🛒', 'Save foods you eat often and add them to your diary in one tap. 🛒'],
+    stats: ['Statistics 🍩', 'Look at progress over time, not just one day.'],
+    settings: ['Settings', 'Profile, language, AI and cloud sync.'],
+  };
+
+  const checkView = async (view, expected) => {
+    await openView(page, view);
+    const intro = page.locator('.mobile-page-intro');
     await expect(intro).toBeVisible();
-    await expect(intro.locator('h2')).toHaveText(title);
-    await expect(intro.locator('.home-intro-tagline')).toHaveText(tagline);
-    await expect(intro.locator('.home-intro-desc')).toHaveText(description);
+    await expect(intro.locator('h2')).toHaveText(expected[0]);
+    if (view === 'home') {
+      await expect(intro.locator('.mobile-page-tagline')).toHaveText(expected[1]);
+      await expect(intro.locator('.mobile-page-desc')).toHaveText(expected[2]);
+    } else {
+      await expect(intro.locator('.mobile-page-tagline')).toBeHidden();
+      await expect(intro.locator('.mobile-page-desc')).toHaveText(expected[1]);
+    }
     const geometry = await page.evaluate(() => {
-      const intro = document.querySelector('.home-intro').getBoundingClientRect();
+      const introElement = document.querySelector('.mobile-page-intro');
+      const intro = introElement.getBoundingClientRect();
       const date = document.querySelector('#today-label').getBoundingClientRect();
       const weight = document.querySelector('#weight-badge').getBoundingClientRect();
-      const description = document.querySelector('.home-intro-desc');
-      return { introRight: intro.right, dateLeft: date.left, weightLeft: weight.left, overflow: description.scrollWidth - description.clientWidth };
+      const title = document.querySelector('#mobile-page-title');
+      const text = document.querySelector('#mobile-page-desc:not([hidden])');
+      const tagline = document.querySelector('#mobile-page-tagline:not([hidden])');
+      return { introRight: intro.right, dateLeft: date.left, weightLeft: weight.left, titleSize: parseFloat(getComputedStyle(title).fontSize), textSize: Math.min(...[text, tagline].filter(Boolean).map(el => parseFloat(getComputedStyle(el).fontSize))), artworkPosition: getComputedStyle(introElement, '::after').position, artworkContent: getComputedStyle(introElement, '::after').content, artworkZ: getComputedStyle(introElement, '::after').zIndex, artworkLeft: parseFloat(getComputedStyle(introElement, '::after').left), artworkTop: parseFloat(getComputedStyle(introElement, '::after').top), titleZ: getComputedStyle(title).zIndex, overflow: Array.from(introElement.querySelectorAll('h2,p:not([hidden])')).some(el => el.scrollWidth > el.clientWidth + 1) };
     });
     expect(geometry.introRight).toBeLessThanOrEqual(geometry.dateLeft);
     expect(geometry.introRight).toBeLessThanOrEqual(geometry.weightLeft);
-    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    expect(geometry.titleSize).toBeGreaterThanOrEqual(24);
+    if (view === 'home') {
+      expect(geometry.artworkPosition).toBe('absolute');
+      expect(geometry.artworkContent).toContain('🥑');
+      expect(Number(geometry.artworkZ)).toBeLessThan(Number(geometry.titleZ));
+      expect(geometry.artworkLeft).toBeGreaterThanOrEqual(0);
+      expect(geometry.artworkTop).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(geometry.artworkContent).toBe('none');
+    }
+    expect(geometry.textSize).toBeGreaterThanOrEqual(14);
+    expect(geometry.overflow).toBe(false);
   };
 
-  await checkIntro('Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.');
-  await openView(page, 'settings');
-  await expect(page.locator('#view-settings > .view-title')).toHaveText('Налаштування');
-  await expect(page.locator('.home-intro')).toBeHidden();
+  for (const view of Object.keys(expectedUk)) await checkView(view, expectedUk[view]);
   await page.selectOption('#pref-lang', 'en');
   await page.locator('#save-lang').click();
-  await expect(page.locator('#view-settings > .view-title')).toHaveText('Settings');
-  await openView(page, 'home');
+  for (const view of Object.keys(expectedEn)) await checkView(view, expectedEn[view]);
+  await page.selectOption('#pref-lang', 'uk');
+  await page.locator('#save-lang').click();
   await page.setViewportSize({ width: 430, height: 780 });
-  await checkIntro('My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.');
+  for (const view of Object.keys(expectedUk)) await checkView(view, expectedUk[view]);
 });
 
 test('home hero card contains avocado illustration cleanly within bounds', async ({ page }) => {
