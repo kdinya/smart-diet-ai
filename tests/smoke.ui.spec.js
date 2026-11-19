@@ -3283,7 +3283,7 @@ test('assistant welcome pools stay localized and greet at night in dozing mode',
   await page.clock.install({ time: new Date('2026-11-03T02:00:00') });
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
   const pools = await page.evaluate(() => ({
-    ukMessages: I.uk.botWelcomeMessages,
+    ukMessages: I.uk.botWelcomePolite,
     enPolite: I.en.botWelcomePolite,
   }));
   expect(pools.ukMessages).toHaveLength(30);
@@ -3335,7 +3335,7 @@ test('Ukrainian assistant startup welcome uses one of the 30 approved messages a
   await expect(bubble).toHaveClass(/is-visible/, { timeout: 5000 });
   const welcome = await page.evaluate(() => ({
     text: document.querySelector('#bot-comic .bot-comic-text').textContent,
-    allowed: I.uk.botWelcomeMessages,
+    allowed: I.uk.botWelcomePolite,
   }));
   expect(welcome.allowed).toHaveLength(30);
   expect(welcome.allowed).toContain(welcome.text);
@@ -3618,7 +3618,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   const welcome = await page.evaluate(() => ({ text: document.querySelector('#bot-comic .bot-comic-text').textContent, allowed: I.en.botWelcomePolite }));
   expect(welcome.allowed).toHaveLength(8);
   expect(welcome.allowed.some(message => welcome.text.startsWith(message))).toBe(true);
-  const uaWelcome = await page.evaluate(() => I.uk.botWelcomeMessages);
+  const uaWelcome = await page.evaluate(() => I.uk.botWelcomePolite);
   expect(uaWelcome).toHaveLength(30);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
   expect(uaWelcome.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
@@ -4567,10 +4567,10 @@ test('settings sections offer localized help dialogs in both languages', async (
   await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
   await openView(page, 'settings');
   const headings = page.locator('#view-settings h2[data-settings-help]');
-  await expect(headings).toHaveCount(10);
+  await expect(headings).toHaveCount(9);
   const parity = await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'));
   expect(parity).toBe(true);
-  await expect(page.locator('#view-settings .settings-info-btn')).toHaveCount(10);
+  await expect(page.locator('#view-settings .settings-info-btn')).toHaveCount(9);
   const iconStylesMatchStatistics = await page.evaluate(() => {
     const settings = getComputedStyle(document.querySelector('#view-settings .settings-info-btn'));
     const statisticsIcon = document.createElement('button');
