@@ -2207,16 +2207,16 @@ test.describe('Smoke: current date card', () => {
     const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
     expect(mobileWidth).toBeLessThanOrEqual(360 - 32);
     const mobileDateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
-    await expect(page.locator('.home-intro')).toBeVisible();
+    await expect(page.locator('.mobile-page-intro')).toBeVisible();
     await expect(hero).toBeHidden();
     const mobileBoxes = await page.evaluate(() => {
       const bell = document.querySelector('#notif-bell').getBoundingClientRect();
       const date = document.querySelector('#today-label').getBoundingClientRect();
       const weight = document.querySelector('#weight-badge').getBoundingClientRect();
       const title = document.querySelector('#greeting').getBoundingClientRect();
-      const intro = document.querySelector('.home-intro').getBoundingClientRect();
-      const tagline = document.querySelector('.home-intro-tagline').getBoundingClientRect();
-      const description = document.querySelector('.home-intro-desc');
+      const intro = document.querySelector('.mobile-page-intro').getBoundingClientRect();
+      const tagline = document.querySelector('.mobile-page-tagline').getBoundingClientRect();
+      const description = document.querySelector('.mobile-page-desc');
       const descBox = description.getBoundingClientRect();
       const header = document.querySelector('.topline').getBoundingClientRect();
       return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, weight: { left: weight.left, right: weight.right, top: weight.top, bottom: weight.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom }, intro: { left: intro.left, right: intro.right, top: intro.top, bottom: intro.bottom }, tagline: { left: tagline.left, right: tagline.right }, desc: { right: descBox.right, scrollWidth: description.scrollWidth, clientWidth: description.clientWidth }, headerLeft: header.left, headerBottom: header.bottom };
