@@ -2207,20 +2207,32 @@ test.describe('Smoke: current date card', () => {
     const mobileWidth = await date.evaluate((el) => el.getBoundingClientRect().width);
     expect(mobileWidth).toBeLessThanOrEqual(360 - 32);
     const mobileDateBottom = await date.evaluate((el) => el.getBoundingClientRect().bottom);
-    const mobileHeroTop = await hero.evaluate((el) => el.getBoundingClientRect().top);
+    await expect(page.locator('.home-intro')).toBeVisible();
+    await expect(hero).toBeHidden();
     const mobileBoxes = await page.evaluate(() => {
       const bell = document.querySelector('#notif-bell').getBoundingClientRect();
       const date = document.querySelector('#today-label').getBoundingClientRect();
+      const weight = document.querySelector('#weight-badge').getBoundingClientRect();
       const title = document.querySelector('#greeting').getBoundingClientRect();
+      const intro = document.querySelector('.home-intro').getBoundingClientRect();
+      const tagline = document.querySelector('.home-intro-tagline').getBoundingClientRect();
+      const description = document.querySelector('.home-intro-desc');
+      const descBox = description.getBoundingClientRect();
       const header = document.querySelector('.topline').getBoundingClientRect();
-      return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom }, headerLeft: header.left };
+      return { bell: { left: bell.left, right: bell.right, top: bell.top, bottom: bell.bottom }, date: { left: date.left, right: date.right, top: date.top, bottom: date.bottom }, weight: { left: weight.left, right: weight.right, top: weight.top, bottom: weight.bottom }, title: { left: title.left, right: title.right, top: title.top, bottom: title.bottom }, intro: { left: intro.left, right: intro.right, top: intro.top, bottom: intro.bottom }, tagline: { left: tagline.left, right: tagline.right }, desc: { right: descBox.right, scrollWidth: description.scrollWidth, clientWidth: description.clientWidth }, headerLeft: header.left, headerBottom: header.bottom };
     });
     expect(mobileBoxes.bell.right <= mobileBoxes.date.left || mobileBoxes.date.right <= mobileBoxes.bell.left || mobileBoxes.bell.bottom <= mobileBoxes.date.top || mobileBoxes.date.bottom <= mobileBoxes.bell.top).toBe(true);
     expect(mobileBoxes.date.top).toBeGreaterThanOrEqual(mobileBoxes.bell.bottom);
     expect(Math.abs(mobileBoxes.bell.right - mobileBoxes.date.right)).toBeLessThanOrEqual(1);
     expect(mobileBoxes.title.left).toBeCloseTo(mobileBoxes.headerLeft, 0);
     expect(mobileBoxes.title.right <= mobileBoxes.date.left || mobileBoxes.date.right <= mobileBoxes.title.left || mobileBoxes.title.bottom <= mobileBoxes.date.top || mobileBoxes.date.bottom <= mobileBoxes.title.top).toBe(true);
-    expect(mobileDateBottom).toBeLessThanOrEqual(mobileHeroTop);
+    expect(mobileBoxes.intro.top).toBeGreaterThanOrEqual(mobileBoxes.title.bottom);
+    expect(mobileBoxes.intro.right).toBeLessThanOrEqual(mobileBoxes.date.left);
+    expect(mobileBoxes.intro.right).toBeLessThanOrEqual(mobileBoxes.weight.left);
+    expect(mobileBoxes.tagline.right).toBeLessThanOrEqual(mobileBoxes.date.left);
+    expect(mobileBoxes.desc.right).toBeLessThanOrEqual(mobileBoxes.date.left);
+    expect(mobileBoxes.desc.scrollWidth).toBeLessThanOrEqual(mobileBoxes.desc.clientWidth + 1);
+    expect(mobileBoxes.headerBottom).toBeGreaterThan(mobileDateBottom);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 });
@@ -4072,8 +4084,44 @@ test('progress recommendation recalculates after each lower weigh-in and survive
   expect(afterReload.prefs.currentWeight).toBe(100);
   expect(afterReload.weights.map(item => item.value)).toContain(99.9);
 });
+
+test('mobile home title and description fit beside the date and weight in both languages', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  await page.setViewportSize({ width: 360, height: 780 });
+
+  const checkIntro = async (title, tagline, description) => {
+    const intro = page.locator('.home-intro');
+    await expect(intro).toBeVisible();
+    await expect(intro.locator('h2')).toHaveText(title);
+    await expect(intro.locator('.home-intro-tagline')).toHaveText(tagline);
+    await expect(intro.locator('.home-intro-desc')).toHaveText(description);
+    const geometry = await page.evaluate(() => {
+      const intro = document.querySelector('.home-intro').getBoundingClientRect();
+      const date = document.querySelector('#today-label').getBoundingClientRect();
+      const weight = document.querySelector('#weight-badge').getBoundingClientRect();
+      const description = document.querySelector('.home-intro-desc');
+      return { introRight: intro.right, dateLeft: date.left, weightLeft: weight.left, overflow: description.scrollWidth - description.clientWidth };
+    });
+    expect(geometry.introRight).toBeLessThanOrEqual(geometry.dateLeft);
+    expect(geometry.introRight).toBeLessThanOrEqual(geometry.weightLeft);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+  };
+
+  await checkIntro('Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.');
+  await openView(page, 'settings');
+  await expect(page.locator('#view-settings > .view-title')).toHaveText('Налаштування');
+  await expect(page.locator('.home-intro')).toBeHidden();
+  await page.selectOption('#pref-lang', 'en');
+  await page.locator('#save-lang').click();
+  await expect(page.locator('#view-settings > .view-title')).toHaveText('Settings');
+  await openView(page, 'home');
+  await page.setViewportSize({ width: 430, height: 780 });
+  await checkIntro('My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.');
+});
+
 test('home hero card contains avocado illustration cleanly within bounds', async ({ page }) => {
   await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await page.setViewportSize({ width: 1280, height: 800 });
   const hero = page.locator('#view-home .card.hero');
   await expect(hero).toBeVisible();
   const styles = await hero.evaluate((el) => {
