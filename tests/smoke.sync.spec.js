@@ -469,7 +469,7 @@ test.describe('Smoke: friends', () => {
     const notice = page.locator('#bot-comic');
     await expect(notice).toContainText('Bob wants to add you as a friend.');
     await notice.locator('.bot-comic-actions button').filter({ hasText: 'Accept' }).click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Request accepted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAccepted')));
     await expect(page.locator('#friends-list')).toContainText('Bob');
     expect(backend.tables.friendships[0].status).toBe('accepted');
     await bob.context.close();
@@ -493,7 +493,7 @@ test.describe('Smoke: friends', () => {
     await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAdded')));
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Request or friendship already exists.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAlready')));
     expect(backend.tables.friendships).toHaveLength(1);
   });
 
