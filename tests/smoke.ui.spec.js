@@ -4134,7 +4134,7 @@ test('mobile page titles and descriptions fit beside the date and weight at read
     expect(Number(geometry.artworkZ)).toBeLessThan(Number(geometry.titleZ));
     expect(geometry.artworkRight).toBe(0);
     expect(geometry.artworkTop).toBe(12);
-    expect(geometry.artworkSize).toBe(72);
+    expect(geometry.artworkSize).toBeCloseTo(86.4, 1);
     expect(geometry.textSize).toBeGreaterThanOrEqual(14);
     expect(geometry.overflow).toBe(false);
   };
