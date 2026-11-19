@@ -593,8 +593,7 @@ test.describe('Smoke: dietitian launcher', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
     await expect(page.locator('.chat-fab-label')).toHaveText('AI Dietitian');
     await openView(page, 'settings');
-    await page.locator('#pref-tone').selectOption('playful');
-    await page.locator('#save-tone').click();
+    await expect(page.locator('#pref-tone, #save-tone')).toHaveCount(0);
     await expect(page.locator('.chat-fab-label')).toHaveText('AI Dietitian');
   });
 
@@ -673,11 +672,12 @@ test.describe('Smoke: dietitian launcher', () => {
   });
   expect(await page.evaluate(() => window.verticalTouchValue)).toBe('60');
   expect(await page.evaluate(() => window.horizontalTouchValue)).toBe(await page.evaluate(() => window.expectedHorizontalTouchValue));
-  const orderedCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => ({ id: card.id, hasPersonality: Boolean(card.querySelector('#pref-tone')) })));
-  const personalityIndex = orderedCards.findIndex(card => card.hasPersonality);
-  const appearanceIndex = orderedCards.findIndex(card => card.id === 'bot-appearance-card');
-  const friendsIndex = orderedCards.findIndex(card => card.id === 'friends-card');
-  expect(appearanceIndex).toBeGreaterThan(personalityIndex);
+  const settingsCards = await page.locator('#view-settings .card').evaluateAll(cards => cards.map(card => card.id));
+  const appearanceIndex = settingsCards.indexOf('bot-appearance-card');
+  const friendsIndex = settingsCards.indexOf('friends-card');
+  await expect(page.locator('#pref-tone, #save-tone')).toHaveCount(0);
+  await expect(page.locator('#pref-verbosity')).toBeVisible();
+  expect(appearanceIndex).toBeGreaterThan(-1);
   expect(appearanceIndex).toBeLessThan(friendsIndex);
   await page.locator('#pref-bot-size').fill('30');
   await page.locator('#pref-bot-side').selectOption('left');
@@ -826,10 +826,10 @@ test.describe('Smoke: dietitian launcher', () => {
   await page.clock.runFor(1100);
   await expect(mascot).not.toHaveClass(/bot-overlay-hidden/);
   await openView(page, 'settings');
-  await page.locator('#pref-tone').selectOption('playful');
-  await page.locator('#save-tone').click();
-  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ-дієтолог');
-  expect((await readStore(page)).prefs).toMatchObject({ aiTone: 'playful', botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
+  await expect(page.locator('#pref-tone, #save-tone')).toHaveCount(0);
+  await expect(page.locator('.chat-fab-label')).toHaveText('ШІ - дієтолог');
+  expect((await readStore(page)).prefs).toMatchObject({ botSize: '0.3', botSide: 'left', botOffsetV: '100%', botOffsetH: '1.5rem' });
+  expect((await readStore(page)).prefs).not.toHaveProperty('aiTone');
 });
 
 test('single Spine assistant uses the new rig and keeps legacy appearance settings', async ({ page }) => {
@@ -926,20 +926,26 @@ test('disabled assistant restores the original one-click dietitian launcher', as
   });
 });
 
-test.describe('Smoke: AI character', () => {
-  test('the playful character changes app texts and the choice survives reload', async ({ page }) => {
-    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+test.describe('Smoke: standard assistant settings', () => {
+  test('legacy playful preferences migrate to the standard style while EcoBot and independent toasts remain', async ({ page }) => {
+    await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'en', aiTone: 'playful', botSize: '0.7' } });
+    await expect(page.locator('#pref-tone, #save-tone')).toHaveCount(0);
     await expect(page.locator('#chat-welcome')).not.toContainText('croissant');
-    await openView(page, 'settings');
-    await expect(page.locator('#pref-tone')).toHaveValue('polite');
-    await page.selectOption('#pref-tone', 'playful');
-    await page.click('#save-tone');
-    await expect(page.locator('#chat-welcome')).toContainText('just one more croissant');
+    await expect(page.locator('#bot-peeker')).toBeVisible();
+    const migrated = await readStore(page);
+    expect(migrated.prefs).not.toHaveProperty('aiTone');
+    expect(migrated.prefs.botSize).toBe('0.7');
+    const messages = await page.evaluate(async () => { AI_PROVIDERS.groq.run = async (_key, prompt) => { window.__tonePrompt = prompt; return 'OK'; }; await callAi('baseline prompt', false); return { standard: t('saved'), toast: toastT('saved'), prompt: askPrompt([], 'How much protein?'), sentPrompt: window.__tonePrompt }; });
+    expect(messages.standard).toBe('Food entry saved. 😎');
+    expect(messages.toast).toBe('Logged! One step closer to the perfect plate, or at least a braver one 😎');
+    expect(messages.prompt).not.toMatch(/playful|humou?r/i);
+    expect(messages.sentPrompt).toBe('baseline prompt');
     await page.reload();
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    expect((await readStore(page)).prefs).not.toHaveProperty('aiTone');
     await openView(page, 'settings');
-    await expect(page.locator('#pref-tone')).toHaveValue('playful');
-    expect((await readStore(page)).prefs.aiTone).toBe('playful');
+    await expect(page.locator('#pref-verbosity')).toBeVisible();
+    await expect(page.locator('#bot-appearance-card')).toBeVisible();
   });
 });
 
@@ -1047,15 +1053,16 @@ test.describe('Smoke: dietitian answer display and spacing', () => {
   test('response length can be chosen in Settings and the dietitian panel', async ({ page }) => {
     await openApp(page, { ...AI_STORE(['groq']), prefs: { ...BASE_PREFS, lang: 'en' } });
     await openView(page, 'settings');
+    await page.setViewportSize({ width: 360, height: 800 });
     const select = page.locator('#pref-verbosity');
     await select.locator('xpath=..').locator('.dd-btn').click();
     await select.locator('xpath=..').locator('.dd-opt[data-value="brief"]').click();
-    await page.locator('#save-tone').click();
+    await page.locator('#save-verbosity').click();
     await expect.poll(async () => (await readStore(page)).prefs.aiVerbosity).toBe('brief');
     expect(await page.evaluate(() => askPrompt([], 'How much protein?'))).toContain('very briefly');
     await select.locator('xpath=..').locator('.dd-btn').click();
     await select.locator('xpath=..').locator('.dd-opt[data-value="detailed"]').click();
-    await page.locator('#save-tone').click();
+    await page.locator('#save-verbosity').click();
     expect(await page.evaluate(() => askPrompt([], 'How much protein?'))).toContain('in detail');
   });
   test('saved JSON comparison replies render as readable text instead of raw JSON', async ({ page }) => {

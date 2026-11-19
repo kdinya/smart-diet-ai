@@ -12,7 +12,7 @@ test.describe('Smoke: food deletion', () => {
     await foodRow(page, 'Smoke rice').locator('[data-delete-food]').click();
     await expect.poll(() => dialogs.length).toBe(1);
     expect(dialogs[0]).toBe('Delete “Smoke rice” from the diary (lunch)?');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Entry deleted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('deleted')));
     await expect(foodRow(page, 'Smoke rice')).toHaveCount(0);
 
     await page.reload();
@@ -36,7 +36,7 @@ test.describe('Smoke: food deletion', () => {
 
     await autoConfirm(page, true);
     await foodRow(page, 'Smoke oats').locator('[data-delete-food]').click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Entry deleted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('deleted')));
     await expect.poll(() => backend.tables.food_entries.length).toBe(0);
 
     await page.reload();
@@ -58,7 +58,7 @@ test.describe('Smoke: food deletion', () => {
     await foodRow(page, 'Race condition oats').locator('[data-delete-food]').click();
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.locator('#confirm-ok').click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Entry deleted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('deleted')));
     backend.foodWriteRelease();
     await expect.poll(() => backend.tables.food_entries.length).toBe(0, { timeout: 10000 });
     await expect.poll(() => page.evaluate(() => syncQueue.delFoods.length)).toBe(0, { timeout: 10000 });
@@ -459,7 +459,7 @@ test.describe('Smoke: friends', () => {
     const bob = await openAsUser(browser, backend, 'bob@example.test', 'Bob');
     await bob.page.fill('#friend-code-input', 'aaaa2222');
     await bob.page.click('#friend-add');
-    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toContainText('Friend request sent.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toHaveText(await bob.page.evaluate(() => toastT('friendAdded')));
     await expect(bob.page.locator('#sent-requests')).toContainText('Alice');
     expect(backend.tables.friendships).toMatchObject([{ requester: 'user-bob', addressee: 'user-alice', status: 'pending' }]);
 
@@ -469,7 +469,7 @@ test.describe('Smoke: friends', () => {
     const notice = page.locator('#bot-comic');
     await expect(notice).toContainText('Bob wants to add you as a friend.');
     await notice.locator('.bot-comic-actions button').filter({ hasText: 'Accept' }).click();
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Request accepted.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAccepted')));
     await expect(page.locator('#friends-list')).toContainText('Bob');
     expect(backend.tables.friendships[0].status).toBe('accepted');
     await bob.context.close();
@@ -490,10 +490,10 @@ test.describe('Smoke: friends', () => {
 
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Friend request sent.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAdded')));
     await page.fill('#friend-code-input', 'BBBB3333');
     await page.click('#friend-add');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Request or friendship already exists.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('friendAlready')));
     expect(backend.tables.friendships).toHaveLength(1);
   });
 
@@ -615,7 +615,7 @@ test.describe('Smoke: product sharing', () => {
     await openView(bob.page, 'products');
     await bob.page.click('#inbox-open');
     await bob.page.click('[data-share-decline]');
-    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toContainText('Product declined.');
+    await expect(bob.page.locator('#notif-stack .toast-msg').last()).toHaveText(await bob.page.evaluate(() => toastT('shareRejected')));
     await expect(bob.page.locator('#inbox-body')).toContainText('No new products.');
     expect(backend.tables.product_shares).toHaveLength(0);
     expect((await readStore(bob.page)).products || []).toHaveLength(0);
@@ -634,7 +634,7 @@ test.describe('Smoke: product sharing', () => {
     await expect(page.locator('#sent-shares')).toContainText('Bob');
     await expect(page.locator('#sent-shares')).toContainText('Oats');
     await page.click('[data-share-recall]');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Product recalled.');
+    await expect(page.locator('#notif-stack .toast-msg').last()).toHaveText(await page.evaluate(() => toastT('shareRecalled')));
     await expect(page.locator('#sent-shares')).toContainText('No sent products.');
     expect(backend.tables.product_shares).toHaveLength(0);
 
