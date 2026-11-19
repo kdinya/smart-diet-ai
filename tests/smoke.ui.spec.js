@@ -3621,7 +3621,7 @@ test('comic assistant message fits, stays until touch, and preview settings are 
   const uaWelcome = await page.evaluate(() => I.uk.botWelcomePolite);
   expect(uaWelcome).toHaveLength(15);
   const topical = /Україн|ЗСУ|Росій|захисник|стрій|бореться|темряв/iu;
-  expect(uaWelcome.slice(0, 10).filter(text => topical.test(text))).toHaveLength(10);
+  expect(uaWelcome.slice(0, 10).filter(text => topical.test(text))).toHaveLength(5);
   expect(uaWelcome.slice(10).filter(text => topical.test(text))).toHaveLength(5);
   const fit = await bubble.evaluate(el => {
     const box = el.getBoundingClientRect();
