@@ -4090,18 +4090,18 @@ test('mobile page titles and descriptions fit beside the date and weight at read
   await page.setViewportSize({ width: 360, height: 780 });
 
   const expectedUk = {
-    home: ['Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.'],
-    diary: ['Щоденник харчування 📖', 'Переглядай записи за датами й калорії для кожного прийому їжі.'],
-    products: ['Мої продукти 🛒', 'Збережи продукти, які їси часто, і додавай їх у раціон одним натисканням. 🛒'],
-    stats: ['Статистика 🍩', 'Дивись на прогрес у часі, а не лише за один день.'],
-    settings: ['Налаштування', 'Профіль, мова, ШІ та хмарна синхронізація.'],
+    home: ['Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.', '🥑'],
+    diary: ['Щоденник харчування 📖', 'Переглядай записи за датами й калорії для кожного прийому їжі.', '🍎'],
+    products: ['Мої продукти 🛒', 'Збережи продукти, які їси часто, і додавай їх у раціон одним натисканням. 🛒', '🥕'],
+    stats: ['Статистика 🍩', 'Дивись на прогрес у часі, а не лише за один день.', '🫐'],
+    settings: ['Налаштування', 'Профіль, мова, ШІ та хмарна синхронізація.', '🍋'],
   };
   const expectedEn = {
-    home: ['My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.'],
-    diary: ['Food diary 📖', 'Review meals by date and track calories for each meal.'],
-    products: ['My products 🛒', 'Save foods you eat often and add them to your diary in one tap. 🛒'],
-    stats: ['Statistics 🍩', 'Look at progress over time, not just one day.'],
-    settings: ['Settings', 'Profile, language, AI and cloud sync.'],
+    home: ['My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.', '🥑'],
+    diary: ['Food diary 📖', 'Review meals by date and track calories for each meal.', '🍎'],
+    products: ['My products 🛒', 'Save foods you eat often and add them to your diary in one tap. 🛒', '🥕'],
+    stats: ['Statistics 🍩', 'Look at progress over time, not just one day.', '🫐'],
+    settings: ['Settings', 'Profile, language, AI and cloud sync.', '🍋'],
   };
 
   const checkView = async (view, expected) => {
@@ -4124,20 +4124,17 @@ test('mobile page titles and descriptions fit beside the date and weight at read
       const title = document.querySelector('#mobile-page-title');
       const text = document.querySelector('#mobile-page-desc:not([hidden])');
       const tagline = document.querySelector('#mobile-page-tagline:not([hidden])');
-      return { introRight: intro.right, dateLeft: date.left, weightLeft: weight.left, titleSize: parseFloat(getComputedStyle(title).fontSize), textSize: Math.min(...[text, tagline].filter(Boolean).map(el => parseFloat(getComputedStyle(el).fontSize))), artworkPosition: getComputedStyle(introElement, '::after').position, artworkContent: getComputedStyle(introElement, '::after').content, artworkZ: getComputedStyle(introElement, '::after').zIndex, artworkLeft: parseFloat(getComputedStyle(introElement, '::after').left), artworkTop: parseFloat(getComputedStyle(introElement, '::after').top), titleZ: getComputedStyle(title).zIndex, overflow: Array.from(introElement.querySelectorAll('h2,p:not([hidden])')).some(el => el.scrollWidth > el.clientWidth + 1) };
+      const artwork = getComputedStyle(introElement, '::after'); return { introRight: intro.right, dateLeft: date.left, weightLeft: weight.left, titleSize: parseFloat(getComputedStyle(title).fontSize), textSize: Math.min(...[text, tagline].filter(Boolean).map(el => parseFloat(getComputedStyle(el).fontSize))), artworkPosition: artwork.position, artworkContent: artwork.content, artworkZ: artwork.zIndex, artworkRight: parseFloat(artwork.right), artworkTop: parseFloat(artwork.top), artworkSize: parseFloat(artwork.fontSize), titleZ: getComputedStyle(title).zIndex, overflow: Array.from(introElement.querySelectorAll('h2,p:not([hidden])')).some(el => el.scrollWidth > el.clientWidth + 1) };
     });
     expect(geometry.introRight).toBeLessThanOrEqual(geometry.dateLeft);
     expect(geometry.introRight).toBeLessThanOrEqual(geometry.weightLeft);
     expect(geometry.titleSize).toBeGreaterThanOrEqual(24);
-    if (view === 'home') {
-      expect(geometry.artworkPosition).toBe('absolute');
-      expect(geometry.artworkContent).toContain('🥑');
-      expect(Number(geometry.artworkZ)).toBeLessThan(Number(geometry.titleZ));
-      expect(geometry.artworkLeft).toBeGreaterThanOrEqual(0);
-      expect(geometry.artworkTop).toBeGreaterThanOrEqual(0);
-    } else {
-      expect(geometry.artworkContent).toBe('none');
-    }
+    expect(geometry.artworkPosition).toBe('absolute');
+    expect(geometry.artworkContent).toContain(expected.at(-1));
+    expect(Number(geometry.artworkZ)).toBeLessThan(Number(geometry.titleZ));
+    expect(geometry.artworkRight).toBe(0);
+    expect(geometry.artworkTop).toBe(12);
+    expect(geometry.artworkSize).toBe(72);
     expect(geometry.textSize).toBeGreaterThanOrEqual(14);
     expect(geometry.overflow).toBe(false);
   };
