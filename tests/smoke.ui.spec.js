@@ -5939,7 +5939,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     const prodWithoutNote = { id: PROD_WITHOUT_NOTE, name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 };
     const compWithNote = { id: COMP_WITH_NOTE, name: 'Fruit Bowl', grams: 200, kcal: 111, protein: 10.3, fat: 0.2, carbs: 18, note: 'Best served chilled', components: [{ id: PROD_WITH_NOTE, name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10, fat: 0, carbs: 4 }, { id: PROD_WITHOUT_NOTE, name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }] };
 
-    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [prodWithNote, prodWithoutNote, compWithNote], foods: [], weights: [] });
+    await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'en' }, products: [prodWithNote, prodWithoutNote, compWithNote], foods: [], weights: [] });
 
     await openView(page, 'products');
     const itemWithNote = page.locator(`.product-item[data-product-id="${PROD_WITH_NOTE}"]`);
