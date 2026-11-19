@@ -129,7 +129,7 @@ test.describe('Smoke: product clipboard nutrition import', () => {
     await expect(page.locator('#food-carbs-previous')).toBeHidden();
 
     // Closing the clipboard review modal without confirming clears previous values
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     await page.locator('#products-list [data-edit-product]').first().click();
     await page.click('#product-import-clipboard');
     await expect(page.locator('#product-import-modal')).toHaveClass(/open/);
@@ -996,7 +996,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#diary-meals .meal-item', { hasText: 'Oats' })).toHaveClass(/saved/);
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Oats');
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     await page.locator('#products-list [data-add-product]').first().click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#pick-dates [data-pick-date="tomorrow"]')).toBeVisible();
@@ -1017,7 +1017,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.fill('#food-kcal', '110');
     await page.click('#food-save');
     await expect(page.locator('#products-list')).toContainText('Buckwheat');
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     const prodDialogs = [];
     await autoConfirm(page, true, prodDialogs);
     await page.locator('#products-list [data-delete-product]').first().click();
@@ -1061,7 +1061,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(stored.productHistory.map((entry) => entry.action)).toEqual(['renamed', 'created']);
     expect(stored.productHistory[0].previousName).toBe('Buckwheat copy');
 
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     await autoConfirm(page, true);
     await page.locator('#products-list [data-delete-product]').first().click();
     await expect.poll(async () => (await readStore(page)).productHistory[0].action).toBe('deleted');
@@ -1150,7 +1150,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
       products: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Keep oatmeal', grams: 100, kcal: 150, protein: 5, fat: 3, carbs: 25 }],
     });
     await openView(page, 'products');
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     await autoConfirm(page, false);
     await page.locator('#products-list [data-delete-product]').first().click();
     await expect(page.locator('#products-list')).toContainText('Keep oatmeal');
@@ -1900,7 +1900,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await openApp(page, store());
     await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
     await openView(page, 'products');
-    await page.locator('#products-list [data-toggle-product]').first().click();
+    await page.locator('#products-list .product-toggle-main').first().click();
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await page.locator('#products-list [data-add-product]').first().click();
     await page.clock.fastForward(20);
@@ -4647,7 +4647,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(plainItem.locator('[data-toggle-product-addons]')).toHaveCount(0);
     await expect(coffeeItem.locator('[data-product-addons]')).toBeHidden();
 
-    await coffeeItem.locator('[data-toggle-product]').click();
+    await coffeeItem.locator('.product-toggle-main').click();
     const toggle = coffeeItem.locator('[data-toggle-product-addons]');
     await expect(toggle).toHaveText('Show additional products');
     const row = await coffeeItem.locator('.product-row').evaluate((el) => el.compareDocumentPosition(el.nextElementSibling) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -4668,12 +4668,12 @@ test.describe('Smoke: product add-ons', () => {
     await expect(addon.locator('.companion-nutrition')).toContainText('F 1.8');
     await expect(addon.locator('.companion-nutrition')).toContainText('C 2.4');
 
-    await coffeeItem.locator('[data-toggle-product]').click();
+    await coffeeItem.locator('.product-toggle-main').click();
     await expect(coffeeItem.locator('[data-product-addons]')).toBeHidden();
     await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveAttribute('aria-expanded', 'false');
 
     await page.setViewportSize({ width: 1280, height: 832 });
-    await coffeeItem.locator('[data-toggle-product]').click();
+    await coffeeItem.locator('.product-toggle-main').click();
     await coffeeItem.locator('[data-toggle-product-addons]').click();
     await expect(addon).toBeVisible();
     const desktopToggleBox = await coffeeItem.locator('[data-toggle-product-addons]').boundingBox();
@@ -4684,7 +4684,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await openView(page, 'products');
-    await coffeeItem.locator('[data-toggle-product]').click();
+    await coffeeItem.locator('.product-toggle-main').click();
     await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveText('Показати додаткові продукти');
     expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
   });
@@ -5105,7 +5105,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.products.find((product) => product.name === 'Verified oats')?.verified)).toBe(true);
 
     const product = page.locator('.product-item', { hasText: 'Verified oats' });
-    await product.locator('[data-toggle-product]').click();
+    await product.locator('.product-toggle-main').click();
     await product.locator('[data-edit-product]').click();
     await expect(page.locator('#product-verified-label')).toBeVisible();
     await expect(page.locator('#product-verified')).toBeChecked();
@@ -5173,7 +5173,7 @@ test.describe('Smoke: product add-ons', () => {
 
     await expect.poll(() => page.evaluate(() => state.products.find((product) => product.name === 'Verified shawarma')?.verified)).toBe(true);
     const dish = page.locator('.product-item', { hasText: 'Verified shawarma' });
-    await dish.locator('[data-toggle-product]').click();
+    await dish.locator('.product-toggle-main').click();
     await dish.locator('[data-edit-product]').click();
     await expect(page.locator('#composite-verified')).toBeChecked();
     await page.locator('#composite-verified').uncheck();
@@ -5206,7 +5206,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(shawarmaItem.locator('.product-name .product-is-composite')).toBeVisible();
     await expect(pitaItem.locator('.product-name .product-is-composite')).toHaveCount(0);
 
-    await shawarmaItem.locator('[data-toggle-product]').first().click();
+    await shawarmaItem.locator('.product-toggle-main').first().click();
     await expect(shawarmaItem.locator('.product-components-preview')).toHaveCount(0);
     await shawarmaItem.locator('[data-more-product]').click();
     await expect(shawarmaItem.locator('[data-edit-product]')).toBeVisible();
@@ -5217,7 +5217,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#composite-modal-close');
 
     // Clicking edit on Pita opens traditional modal
-    await pitaItem.locator('[data-toggle-product]').first().click();
+    await pitaItem.locator('.product-toggle-main').first().click();
     await pitaItem.locator('[data-edit-product]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await page.click('#modal-close');
@@ -5463,7 +5463,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(toggle).toHaveText('Show ingredients');
     await expect(ingredients).toBeHidden();
 
-    await product.locator('[data-toggle-product]').click();
+    await product.locator('.product-toggle-main').click();
     const toggleBox = await toggle.boundingBox();
     expect(toggleBox.x).toBeGreaterThanOrEqual(0);
     expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(360);
@@ -5480,11 +5480,11 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(oats.locator('.companion-nutrition')).toContainText('C 40');
     await expect(ingredients.locator('[data-product-component]')).toHaveCount(2);
 
-    await product.locator('[data-toggle-product]').click();
+    await product.locator('.product-toggle-main').click();
     await expect(ingredients).toBeHidden();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(toggle).toHaveText('Show ingredients');
-    await product.locator('[data-toggle-product]').click();
+    await product.locator('.product-toggle-main').click();
     await expect(ingredients).toBeHidden();
 
     await page.setViewportSize({ width: 1280, height: 832 });
@@ -5498,7 +5498,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await openView(page, 'products');
-    await product.locator('[data-toggle-product]').click();
+    await product.locator('.product-toggle-main').click();
     await expect(product.locator('[data-toggle-product-components]')).toHaveText('Показати складники');
     expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
   });
@@ -5523,7 +5523,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('.product-components-preview')).toHaveCount(0);
     await expect(page.locator('[data-more-product]')).toHaveCount(1);
     await expect(page.locator('.product-actions')).not.toHaveClass(/is-open/);
-    await page.locator('[data-toggle-product]').first().click();
+    await page.locator('.product-toggle-main').first().click();
     await page.locator('[data-more-product]').first().click();
     await expect(page.locator('.product-actions')).toHaveClass(/is-open/);
     await expect(page.locator('[data-share-product]')).toBeVisible();
@@ -5542,7 +5542,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish, banana], foods: [], weights: [] });
     await openView(page, 'products');
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('[data-toggle-product]').first().click();
+    await page.locator('.product-toggle-main').first().click();
     const moreBtn = page.locator('[data-more-product]').first();
     await moreBtn.click();
     await expect(page.locator('.product-actions').first()).toHaveClass(/is-open/);
@@ -5949,10 +5949,10 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
     await expect(compItem.locator('[data-info-product]')).toHaveCount(1);
     await expect(itemWithNote.locator('.product-has-note')).toHaveCount(1);
-    await expect(itemWithNote.locator('.product-has-note')).toHaveAttribute('title', 'Has additional information');
+    await expect(itemWithNote.locator('.product-note-badge')).toHaveAttribute('title', 'Has additional information');
     await expect(itemWithoutNote.locator('.product-has-note')).toHaveCount(0);
     await expect(compItem.locator('.product-has-note')).toHaveCount(1);
-    await expect(compItem.locator('.product-has-note')).toHaveAttribute('title', 'Has additional information');
+    await expect(compItem.locator('.product-note-badge')).toHaveAttribute('title', 'Has additional information');
 
     await page.setViewportSize({ width: 1280, height: 832 });
     await itemWithNote.locator('.product-note-badge').click();
@@ -5969,11 +5969,11 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(page.locator('#product-note-modal-view-text')).toHaveText('Best served chilled');
     await page.click('#product-note-modal-ok');
 
-    await itemWithNote.locator('[data-toggle-product]').first().click();
-    await expect(itemWithNote.locator('[data-toggle-product]').first()).toHaveAttribute('aria-expanded', 'true');
-    await itemWithNote.locator('[data-toggle-product]').last().click();
+    await itemWithNote.locator('.product-toggle-main').first().click();
+    await expect(itemWithNote.locator('.product-toggle-main').first()).toHaveAttribute('aria-expanded', 'true');
+    await itemWithNote.locator('.product-toggle-expand').click();
     await expect(itemWithNote).toHaveClass(/collapsed/);
-    await itemWithNote.locator('[data-toggle-product]').first().click();
+    await itemWithNote.locator('.product-toggle-main').first().click();
     await itemWithNote.locator('[data-more-product]').click();
     await expect(itemWithNote.locator('[data-info-product]')).toBeVisible();
     await itemWithNote.locator('[data-info-product]').click();
@@ -6020,7 +6020,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
 
     // Reopen info to delete note with confirmation
-    await itemWithNote.locator('[data-toggle-product]').click();
+    await itemWithNote.locator('.product-toggle-main').click();
     await itemWithNote.locator('[data-more-product]').click();
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
@@ -6035,7 +6035,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(0);
     await expect(itemWithNote.locator('.product-has-note')).toHaveCount(0);
 
-    await itemWithoutNote.locator('[data-toggle-product]').click();
+    await itemWithoutNote.locator('.product-toggle-main').click();
     await itemWithoutNote.locator('[data-more-product]').click();
     await itemWithoutNote.locator('[data-edit-product]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
@@ -6057,7 +6057,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await openView(page, 'products');
-    await expect(itemWithoutNote.locator('.product-has-note')).toHaveAttribute('title', 'Має додаткову інформацію');
+    await expect(itemWithoutNote.locator('.product-note-badge')).toHaveAttribute('title', 'Має додаткову інформацію');
 
     const backupJson = JSON.stringify({
       foods: [], weights: [],
@@ -6067,7 +6067,7 @@ test.describe('Smoke: pediatric calorie goals', () => {
     const parsed = await page.evaluate((json) => parseBackup(json), backupJson);
     expect(parsed.products[0].note).toBe('Saved in backup');
 
-    await itemWithoutNote.locator('[data-toggle-product]').click();
+    await itemWithoutNote.locator('.product-toggle-main').click();
     await itemWithoutNote.locator('[data-more-product]').click();
     await itemWithoutNote.locator('[data-info-product]').click();
     await page.click('#product-note-view-edit');
