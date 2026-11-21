@@ -3093,6 +3093,31 @@ test.describe('Smoke: calorie deficit fills goals and keeps pace', () => {
     expect(stored.prefs.pace).toBe(25);
   });
 
+  test('maintenance keeps the desired weight through reload and uses it when weight loss is selected again', async ({ page }) => {
+    await openApp(page, { prefs: profileWithTarget, foods: [], weights: [] });
+    await openView(page, 'settings');
+    const choosePace = async (index) => {
+      await page.locator('#profile-pace').locator('xpath=..').locator('.dd-btn').click();
+      await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt').nth(index).click();
+    };
+
+    await choosePace(0);
+    await expect.poll(async () => (await readStore(page)).prefs.pace).toBe(0);
+    expect((await readStore(page)).prefs.targetWeight).toBe(60);
+    const maintenanceKcal = Number(await page.locator('#pref-kcal').inputValue());
+    await page.reload();
+    await openView(page, 'settings');
+    await expect(page.locator('#profile-target-field')).toHaveClass(/hidden/);
+    await expect(page.locator('#profile-target')).toHaveValue('60');
+
+    await choosePace(2);
+    await expect.poll(async () => (await readStore(page)).prefs.pace).toBe(20);
+    const restored = (await readStore(page)).prefs;
+    expect(restored.targetWeight).toBe(60);
+    expect(restored.kcal).toBeLessThan(maintenanceKcal);
+    await expect(page.locator('#profile-target')).toHaveValue('60');
+  });
+
   test('a deficit without a target weight explains what is missing and leaves goals unchanged', async ({ page }) => {
     await openApp(page, { prefs: { ...profileWithTarget, targetWeight: null }, foods: [], weights: [] });
     await openView(page, 'settings');
@@ -3890,7 +3915,7 @@ test('a lower weigh-in offers the recalculated target and can be declined withou
   expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
   expect(saved.weights.map(item => item.value)).toContain(90);
 });
-test('weigh-in goal dialog updates all targets only after confirmation', async ({ page }) => {
+test('weigh-in goal dialog edits calories and shows calculated macros only after confirmation', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
@@ -3901,9 +3926,13 @@ test('weigh-in goal dialog updates all targets only after confirmation', async (
   await page.locator('#weight-save').click();
   await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
   await expect(page.locator('#weight-goal-message')).toContainText('1781 kcal/day');
-  await expect(page.locator('#weight-goal-protein')).toHaveValue('162');
-  await expect(page.locator('#weight-goal-fat')).toHaveValue('53');
-  await expect(page.locator('#weight-goal-carbs')).toHaveValue('164');
+  await expect(page.locator('#weight-goal-protein')).toHaveText('162');
+  await expect(page.locator('#weight-goal-fat')).toHaveText('53');
+  await expect(page.locator('#weight-goal-carbs')).toHaveText('164');
+  await expect(page.locator('input#weight-goal-protein, input#weight-goal-fat, input#weight-goal-carbs')).toHaveCount(0);
+  const layout = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, macros: document.querySelector('.weight-goal-macros').getBoundingClientRect().width, modal: document.querySelector('#weight-goal-modal .modal').getBoundingClientRect().width }));
+  expect(layout.width).toBeLessThanOrEqual(360);
+  expect(layout.macros).toBeLessThanOrEqual(layout.modal - 28);
   const before = await readStore(page);
   expect(before.prefs.kcal).toBe(2236);
   expect(before.prefs.protein).toBe(160);
@@ -3921,7 +3950,7 @@ test('weigh-in goal dialog updates all targets only after confirmation', async (
   await expect(page.locator('#pref-carbs')).toHaveValue('164');
 });
 
-test('the weight goal dialog accepts custom calorie and macro values and keeps weight history', async ({ page }) => {
+test('the weight goal dialog recalculates macros from a custom calorie target and keeps weight history', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
   await openApp(page, { prefs, foods: [], weights: [] });
@@ -3931,15 +3960,15 @@ test('the weight goal dialog accepts custom calorie and macro values and keeps w
   await page.locator('#weight-save').click();
   await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
   await page.fill('#weight-goal-kcal', '1900');
-  await page.fill('#weight-goal-protein', '150');
-  await page.fill('#weight-goal-carbs', '190');
-  await page.fill('#weight-goal-fat', '60');
+  await expect(page.locator('#weight-goal-protein')).toHaveText('162');
+  await expect(page.locator('#weight-goal-fat')).toHaveText('57');
+  await expect(page.locator('#weight-goal-carbs')).toHaveText('185');
   await page.locator('#weight-goal-apply').click();
   const saved = await readStore(page);
   expect(saved.prefs.kcal).toBe(1900);
-  expect(saved.prefs.protein).toBe(150);
-  expect(saved.prefs.carbs).toBe(190);
-  expect(saved.prefs.fat).toBe(60);
+  expect(saved.prefs.protein).toBe(162);
+  expect(saved.prefs.carbs).toBe(185);
+  expect(saved.prefs.fat).toBe(57);
   expect(saved.prefs.currentWeight).toBe(100);
   expect(saved.prefs.currentWeightDate).toBe('2026-10-01');
   expect(saved.weights.map(item => item.value)).toContain(90);
