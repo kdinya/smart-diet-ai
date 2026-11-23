@@ -5252,6 +5252,75 @@ test.describe('Smoke: product add-ons', () => {
     });
   });
 
+
+  test('selected composite ingredients persist, determine totals, and show all diary ingredients', async ({ page }) => {
+    const SAUCE = '66666666-6666-4666-8666-666666666666';
+    const dish = { id: '77777777-7777-4777-8777-777777777777', name: 'Beet salad', grams: 100, kcal: 130, protein: 4, fat: 6, carbs: 14, components: [
+      { id: CHICKEN, name: 'Mayonnaise', grams: 40, kcal: 100, protein: 1, fat: 10, carbs: 2, enabled: true },
+      { id: SAUCE, name: 'Sour cream', grams: 60, kcal: 30, protein: 3, fat: 2, carbs: 4, enabled: false },
+    ] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    const card = page.locator(`.product-item[data-product-id="${dish.id}"]`);
+    await card.locator('[data-toggle-product-components]').click();
+    const mayo = card.locator(`[data-product-component-enabled="${CHICKEN}"]`);
+    const cream = card.locator(`[data-product-component-enabled="${SAUCE}"]`);
+    await expect(mayo).toBeChecked();
+    await expect(cream).not.toBeChecked();
+    await mayo.uncheck();
+    await cream.check();
+    await expect.poll(() => page.evaluate((id) => {
+      const product = state.products.find((item) => item.id === id);
+      return { grams: product.grams, kcal: product.kcal, protein: product.protein, fat: product.fat, carbs: product.carbs, selected: product.components.filter((item) => item.enabled !== false).map((item) => item.name) };
+    }, dish.id)).toEqual({ grams: 60, kcal: 30, protein: 3, fat: 2, carbs: 4, selected: ['Sour cream'] });
+
+    await page.reload();
+    await openView(page, 'products');
+    const reloadedCard = page.locator(`.product-item[data-product-id="${dish.id}"]`);
+    await reloadedCard.locator('[data-toggle-product-components]').click();
+    await expect(reloadedCard.locator(`[data-product-component-enabled="${CHICKEN}"]`)).not.toBeChecked();
+    await expect(reloadedCard.locator(`[data-product-component-enabled="${SAUCE}"]`)).toBeChecked();
+
+    await page.evaluate((id) => openMealPicker(state.products.find((item) => item.id === id)), dish.id);
+    await expect(page.locator('#pick-components-list [data-component-toggle]')).toHaveCount(2);
+    await expect(page.locator(`#pick-components-list [data-component-toggle="${CHICKEN}"]`)).not.toBeChecked();
+    await expect(page.locator(`#pick-components-list [data-component-toggle="${SAUCE}"]`)).toBeChecked();
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate((name) => {
+      const food = state.foods.find((item) => item.name === name);
+      return food ? { grams: food.grams, kcal: food.kcal, count: food.components?.length, ingredients: food.components?.map((item) => item.name) } : null;
+    }, dish.name)).toEqual({ grams: 60, kcal: 30, count: 2, ingredients: ['Mayonnaise', 'Sour cream'] });
+
+    const entry = page.locator('.meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: dish.name }) });
+    await entry.locator('[data-toggle-food]').click();
+    await expect(entry.locator('.food-components-detail')).toContainText('Sour cream');
+    await expect(entry.locator('.food-components-detail')).toContainText('30');
+    await expect(entry.locator('.food-components-detail')).toContainText('Mayonnaise');
+    await expect(entry.locator('.food-components-detail .product-addon-item').filter({ hasText: 'Mayonnaise' })).toHaveClass(/is-disabled/);
+  });
+
+  test('author support modal is localized and links to the Monobank jar', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.click('#author-support-open');
+    await expect(page.locator('#author-support-modal')).toHaveClass(/open/);
+    await expect(page.locator('#author-support-modal')).toContainText('Тепла підтримка');
+    await expect(page.locator('#author-support-modal')).toContainText('Кава для автора?');
+    await expect(page.locator('#author-support-modal a[data-i18n="authorSupportDonate"]')).toHaveAttribute('href', 'https://send.monobank.ua/jar/e9Z2mHngN');
+    await page.click('#author-support-later');
+    await expect(page.locator('#author-support-modal')).not.toHaveClass(/open/);
+
+    await page.selectOption('#pref-lang', 'en');
+    await page.locator('#save-lang').click();
+    await page.click('#author-support-open');
+    await expect(page.locator('#author-support-modal')).toContainText('Coffee for the author?');
+    await expect(page.locator('#author-support-later')).toHaveText('Maybe later');
+    const modal = await page.locator('#author-support-modal .modal').boundingBox();
+    expect(modal.width).toBeLessThanOrEqual(360);
+  });
+
   test('verified checkbox stays available for simple-product creation and editing', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
     await openView(page, 'products');
@@ -5296,14 +5365,15 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#food-save');
     await expect(page.locator('#composite-ingredients-list')).toContainText('New ingredient');
     const newIngredientCard = page.locator('#composite-ingredients-list [data-ingredient-id]');
-    await expect(newIngredientCard).toHaveClass(/collapsed/);
-    await expect(newIngredientCard.locator('.product-name')).toHaveText('New ingredient');
-    await expect(newIngredientCard.locator('[data-edit-ingredient]')).toBeHidden();
-    expect(await newIngredientCard.evaluate((card) => getComputedStyle(card).borderTopWidth)).toBe('1px');
-    expect(await newIngredientCard.locator('.product-row').evaluate((row) => getComputedStyle(row).borderTopWidth)).toBe('0px');
-    await newIngredientCard.locator('[data-toggle-ingredient]').click();
+    await expect(newIngredientCard).toHaveClass(/component-card/);
+    await expect(newIngredientCard.locator('.companion-name')).toHaveText('New ingredient');
     await expect(newIngredientCard.locator('[data-edit-ingredient]')).toBeVisible();
-    await expect(newIngredientCard.locator('.product-row')).toContainText('120');
+    await expect(newIngredientCard.locator('[data-composite-ingredient-enabled]')).toBeChecked();
+    await expect(newIngredientCard.locator('.companion-nutrition')).toContainText('120');
+    await expect(page.locator('#composite-summary')).toContainText('120');
+    await newIngredientCard.locator('[data-composite-ingredient-enabled]').uncheck();
+    await expect(page.locator('#composite-summary')).toContainText('0');
+    await newIngredientCard.locator('[data-composite-ingredient-enabled]').check();
     await expect.poll(() => page.evaluate(() => state.products.some((product) => product.name === 'New ingredient'))).toBe(true);
 
     await page.click('#composite-add-ingredient');
@@ -5393,9 +5463,7 @@ test.describe('Smoke: product add-ons', () => {
 
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
     const pitaCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${PITA}"]`);
-    await expect(pitaCard).toHaveClass(/collapsed/);
-    await expect(pitaCard.locator('[data-edit-ingredient]')).toBeHidden();
-    await pitaCard.locator('[data-toggle-ingredient]').click();
+    await expect(pitaCard).toHaveClass(/component-card/);
     await expect(pitaCard.locator('[data-edit-ingredient]')).toBeVisible();
     await pitaCard.locator('[data-edit-ingredient]').click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
@@ -5424,8 +5492,7 @@ test.describe('Smoke: product add-ons', () => {
 
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
     const chickenCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${CHICKEN}"]`);
-    await expect(chickenCard).toHaveClass(/collapsed/);
-    await chickenCard.locator('[data-toggle-ingredient]').click();
+    await expect(chickenCard).toHaveClass(/component-card/);
     await chickenCard.locator('[data-delete-ingredient]').click();
     await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
     await page.click('#confirm-ok');
