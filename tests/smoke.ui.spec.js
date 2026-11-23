@@ -974,10 +974,13 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const protein = Number(await page.locator('#pref-protein').inputValue());
     const carbs = Number(await page.locator('#pref-carbs').inputValue());
     expect(Math.abs(4 * protein + 4 * carbs + 9 * 12 - 400)).toBeLessThanOrEqual(5);
+    await expect(page.locator('#save-prefs')).toBeDisabled();
+    await expect(page.locator('#goal-min-hint')).toContainText('1200');
+    await page.fill('#pref-kcal', '1300');
+    await expect(page.locator('#save-prefs')).toBeEnabled();
     await page.click('#save-prefs');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('1200');
     const st = await readStore(page);
-    expect(st.prefs.kcal).toBe(2000);
+    expect(st.prefs.kcal).toBe(1300);
   });
 
   test('editing the weight recalculates calories and macros proportionally', async ({ page }) => {
@@ -1465,8 +1468,12 @@ test.describe('Smoke: review fixes', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'settings');
     await page.fill('#pref-kcal', '500');
-    await page.click('#save-prefs');
-    await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('1500');
+    await expect(page.locator('#save-prefs')).toBeDisabled();
+    await expect(page.locator('#goal-min-hint')).toContainText('1500');
+    await page.fill('#pref-kcal', '1600');
+    await expect(page.locator('#save-prefs')).toBeEnabled();
+    await expect(page.locator('#goal-min-hint')).toBeHidden();
+    await page.fill('#pref-kcal', '2000');
     await page.fill('#pref-kcal', '2000');
     await page.evaluate(() => {
       document.getElementById('pref-protein').value = '200';
