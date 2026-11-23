@@ -183,8 +183,8 @@ test.describe('Smoke: goals', () => {
     await openView(page, 'settings');
     await page.fill('#pref-kcal', '1800');
     await page.fill('#pref-protein', '120');
-    await page.fill('#pref-carbs', '200');
     await page.fill('#pref-fat', '60');
+    await page.fill('#pref-carbs', '195');
     await page.click('#save-prefs');
     await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Goals saved.');
 
@@ -193,7 +193,7 @@ test.describe('Smoke: goals', () => {
     await openView(page, 'settings');
     await expect(page.locator('#pref-kcal')).toHaveValue('1800');
     await expect(page.locator('#pref-protein')).toHaveValue('120');
-    await expect(page.locator('#pref-carbs')).toHaveValue('200');
+    await expect(page.locator('#pref-carbs')).toHaveValue('195');
     await expect(page.locator('#pref-fat')).toHaveValue('60');
 
     await openView(page, 'home');
@@ -1454,7 +1454,11 @@ test.describe('Smoke: review fixes', () => {
     await page.click('#save-prefs');
     await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('1000');
     await page.fill('#pref-kcal', '2000');
-    await page.fill('#pref-protein', '200');
+    await page.evaluate(() => {
+      document.getElementById('pref-protein').value = '200';
+      document.getElementById('pref-carbs').value = '300';
+      document.getElementById('pref-fat').value = '70';
+    });
     await page.click('#save-prefs');
     await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('do not match');
     await page.fill('#pref-protein', '100');
@@ -3948,6 +3952,26 @@ test('weigh-in goal dialog edits calories and shows calculated macros only after
   await expect(page.locator('#pref-protein')).toHaveValue('162');
   await expect(page.locator('#pref-fat')).toHaveValue('53');
   await expect(page.locator('#pref-carbs')).toHaveValue('164');
+  await expect(page.locator('#profile-pace')).toHaveValue('custom_90.0');
+  const customOpt = page.locator('#profile-pace option[value="custom_90.0"]');
+  await expect(customOpt).toHaveCount(1);
+  expect(await customOpt.textContent()).toContain('90.0');
+
+  // Change pace to 10%
+  await page.locator('#profile-pace').locator('xpath=..').locator('.dd-btn').click();
+  await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt[data-value="10"]').click();
+  await expect(page.locator('#profile-pace')).toHaveValue('10');
+  // Custom option remains in dropdown
+  await expect(page.locator('#profile-pace option[value="custom_90.0"]')).toHaveCount(1);
+
+  // Return to custom pace
+  await page.locator('#profile-pace').locator('xpath=..').locator('.dd-btn').click();
+  await page.locator('#profile-pace').locator('xpath=..').locator('.dd-opt[data-value="custom_90.0"]').click();
+  await expect(page.locator('#profile-pace')).toHaveValue('custom_90.0');
+  await expect(page.locator('#pref-kcal')).toHaveValue('1781');
+  await expect(page.locator('#pref-protein')).toHaveValue('162');
+  await expect(page.locator('#pref-fat')).toHaveValue('53');
+  await expect(page.locator('#pref-carbs')).toHaveValue('164');
 });
 
 test('the weight goal dialog recalculates macros from a custom calorie target and keeps weight history', async ({ page }) => {
@@ -6188,4 +6212,72 @@ test.describe('Smoke: pediatric calorie goals', () => {
     expect(store.products.find(p => p.id === PROD_WITHOUT_NOTE).note).toBeUndefined();
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
   });
+});
+
+test('Settings goal inputs automatically recalculate the remaining fields upon manual edits', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+  await openView(page, 'settings');
+  await page.setViewportSize({ width: 360, height: 780 });
+
+  // 1. Changing calories recalculates protein, fat, and carbs
+  await page.fill('#pref-kcal', '1600');
+  const p1 = Number(await page.locator('#pref-protein').inputValue());
+  const f1 = Number(await page.locator('#pref-fat').inputValue());
+  const c1 = Number(await page.locator('#pref-carbs').inputValue());
+  expect(p1).toBeGreaterThan(0);
+  expect(f1).toBeGreaterThan(0);
+  expect(c1).toBeGreaterThan(0);
+  const sum1 = p1 * 4 + c1 * 4 + f1 * 9;
+  expect(Math.abs(sum1 - 1600)).toBeLessThanOrEqual(5);
+
+  // 2. Changing protein adjusts carbs to maintain calories
+  await page.fill('#pref-protein', String(p1 + 20));
+  const c2 = Number(await page.locator('#pref-carbs').inputValue());
+  expect(c2).toBeLessThan(c1);
+  const sum2 = (p1 + 20) * 4 + c2 * 4 + f1 * 9;
+  expect(Math.abs(sum2 - 1600)).toBeLessThanOrEqual(5);
+
+  // 3. Changing carbs updates calories
+  await page.fill('#pref-carbs', '180');
+  const k3 = Number(await page.locator('#pref-kcal').inputValue());
+  const expectedKcal = (p1 + 20) * 4 + 180 * 4 + f1 * 9;
+  expect(k3).toBe(expectedKcal);
+
+  // 4. Save and verify reload persistence
+  await page.click('#save-prefs');
+  await expect(page.locator('#notif-stack .toast-msg').last()).toContainText('Goals saved.');
+  await page.reload();
+  await openView(page, 'settings');
+  await expect(page.locator('#pref-kcal')).toHaveValue(String(expectedKcal));
+  await expect(page.locator('#pref-protein')).toHaveValue(String(p1 + 20));
+  await expect(page.locator('#pref-carbs')).toHaveValue('180');
+});
+
+test('accepted weigh-in recommendation persists custom pace in Settings and updates on language toggle', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '92');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+  await page.locator('#weight-goal-apply').click();
+
+  await openView(page, 'settings');
+  const customPaceOpt = page.locator('#profile-pace option[value="custom_92.0"]');
+  await expect(customPaceOpt).toHaveCount(1);
+  expect(await customPaceOpt.textContent()).toContain('Custom (92.0 kg)');
+  await expect(page.locator('#profile-pace')).toHaveValue('custom_92.0');
+
+  // Switch to Ukrainian and verify custom pace label translated
+  await page.selectOption('#pref-lang', 'uk');
+  await page.locator('#save-lang').click();
+  expect(await customPaceOpt.textContent()).toContain('Користувацький (92.0 кг)');
+
+  // Responsive check
+  const bounds = await page.locator('#profile-pace').locator('xpath=..').boundingBox();
+  expect(bounds.width).toBeLessThanOrEqual(360);
 });
