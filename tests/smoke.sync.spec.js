@@ -855,6 +855,31 @@ test.describe('Smoke: dish ingredients sync', () => {
     await other.close();
   });
 
+  test('selected product add-ons persist in Supabase and on another device', async ({ page, browser }) => {
+    const milkId = 'milk-companion-sync';
+    const coffee = { id: 'coffee-companion-sync', name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: milkId, grams: 50 }] };
+    const milk = { id: milkId, name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 };
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, products: [coffee, milk], foods: [], weights: [] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+    await expect.poll(() => backend.tables.products.find((item) => item.id === coffee.id)?.companions?.[0]?.on).toBe(true);
+    await openView(page, 'products');
+    const card = page.locator(`.product-item[data-product-id="${coffee.id}"]`);
+    await card.locator('[data-toggle-product-addons]').click();
+    await card.locator(`[data-product-companion-enabled="${milkId}"]`).uncheck();
+    await expect.poll(() => backend.tables.products.find((item) => item.id === coffee.id)?.companions).toEqual([{ id: milkId, grams: 50, on: false }]);
+    const other = await browser.newContext({ serviceWorkers: 'block' });
+    const second = await other.newPage();
+    await mockSupabase(second, backend);
+    await openApp(second, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await connectSupabase(second);
+    await signIn(second, 'alice@example.test');
+    await expect.poll(async () => (await readStore(second)).products.find((item) => item.id === coffee.id)?.companions).toEqual([{ id: milkId, grams: 50, on: false }]);
+    await other.close();
+  });
   test('a synced dish entry without saved ingredients gains the device ingredients and uploads them', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     const backend = createBackend();
