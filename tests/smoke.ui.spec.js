@@ -4981,6 +4981,47 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate((id) => state.foods.find((f) => f.name === 'Coffee')?.components?.find((c) => c.id === id)?.grams, MILK)).toBe(75);
     expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50 }]);
   });
+  test('meal product list shows add-on totals and lets add-ons be expanded and selected', async ({ page }) => {
+    const plain = { id: 'plain-product', name: 'Plain product', grams: 100, kcal: 80, protein: 2, fat: 1, carbs: 12 };
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, plain], foods: [], weights: [] });
+    await page.setViewportSize({ width: 360, height: 760 });
+    await page.evaluate(() => openProductPicker());
+
+    const group = page.locator(`#pick-body [data-pick-group="${COFFEE}"]`);
+    await expect(group.locator('.pick-item .muted')).toContainText('150 g · 34 kcal');
+    await expect(page.locator('#pick-body [data-toggle-pick-addons]')).toHaveCount(1);
+    await expect(group.locator('[data-pick-addons]')).toBeHidden();
+    await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'false');
+
+    await group.locator('[data-toggle-pick-addons]').click();
+    await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'true');
+    const addon = group.locator(`[data-product-addon="${MILK}"]`);
+    await expect(addon.locator('.product-addon-name')).toHaveText('Milk');
+    await expect(addon.locator('.companion-nutrition')).toContainText('50 g');
+    await expect(addon.locator('.companion-nutrition')).toContainText('32 kcal');
+    const checkbox = addon.locator(`input[data-product-companion-enabled="${MILK}"]`);
+    await expect(checkbox).toBeChecked();
+    expect(await page.evaluate(() => {
+      const body = document.querySelector('#pick-body');
+      return body.scrollWidth <= body.clientWidth + 1 && document.documentElement.scrollWidth <= window.innerWidth;
+    })).toBe(true);
+
+    await checkbox.uncheck();
+    await expect(group.locator('.pick-item .muted')).toContainText('100 g · 2 kcal');
+    await expect(addon).toHaveClass(/is-disabled/);
+    await expect.poll(() => page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50, on: false }]);
+
+    await page.fill('#pick-search', 'coffee');
+    await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'true');
+    await expect(group.locator(`input[data-product-companion-enabled="${MILK}"]`)).not.toBeChecked();
+
+    await page.click(`#pick-body [data-pick-product="${COFFEE}"]`);
+    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#food-name')).toHaveValue('Coffee');
+    await expect(page.locator('#food-grams')).toHaveValue('100');
+  });
+
   test('product with multiple add-ons displays and edits like composite dishes in diary', async ({ page }) => {
     const SUGAR = '88888888-8888-4888-8888-888888888888';
     const sugar = { id: SUGAR, name: 'Sugar', grams: 10, kcal: 40, protein: 0, fat: 0, carbs: 10 };
