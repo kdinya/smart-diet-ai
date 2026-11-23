@@ -5292,7 +5292,8 @@ test.describe('Smoke: product add-ons', () => {
       return food ? { grams: food.grams, kcal: food.kcal, count: food.components?.length, ingredients: food.components?.map((item) => item.name) } : null;
     }, dish.name)).toEqual({ grams: 60, kcal: 30, count: 2, ingredients: ['Mayonnaise', 'Sour cream'] });
 
-    const entry = page.locator('.meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: dish.name }) });
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: dish.name }) });
     await entry.locator('[data-toggle-food]').click();
     await expect(entry.locator('.food-components-detail')).toContainText('Sour cream');
     await expect(entry.locator('.food-components-detail')).toContainText('30');
