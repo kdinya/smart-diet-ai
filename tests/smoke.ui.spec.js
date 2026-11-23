@@ -5297,8 +5297,27 @@ test.describe('Smoke: product add-ons', () => {
     await entry.locator('[data-toggle-food]').click();
     await expect(entry.locator('.food-components-detail')).toContainText('Sour cream');
     await expect(entry.locator('.food-components-detail')).toContainText('30');
+    await expect(entry.locator('.food-components-detail')).not.toContainText('Mayonnaise');
+    await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
+
+    await entry.locator('[data-edit-food]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
+    await expect(page.locator(`#food-components-list [data-component-toggle="${CHICKEN}"]`)).not.toBeChecked();
+    await expect(page.locator(`#food-components-list [data-component-toggle="${SAUCE}"]`)).toBeChecked();
+    await page.locator(`#food-components-list [data-component-toggle="${SAUCE}"]`).uncheck();
+    await page.locator(`#food-components-list [data-component-toggle="${CHICKEN}"]`).check();
+    await expect(page.locator('#food-grams')).toHaveValue('40');
+    await expect(page.locator('#food-kcal')).toHaveValue('100');
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+
+    await expect(entry.locator('.meal-info')).toContainText('40');
+    await expect(entry.locator('.meal-info')).toContainText('100');
     await expect(entry.locator('.food-components-detail')).toContainText('Mayonnaise');
-    await expect(entry.locator('.food-components-detail .product-addon-item').filter({ hasText: 'Mayonnaise' })).toHaveClass(/is-disabled/);
+    await expect(entry.locator('.food-components-detail')).toContainText('100');
+    await expect(entry.locator('.food-components-detail')).not.toContainText('Sour cream');
+    await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
   });
 
   test('author support modal is localized and links to the Monobank jar', async ({ page }) => {
