@@ -983,6 +983,18 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(st.prefs.kcal).toBe(1300);
   });
 
+  test('goal buttons explain the recommended and custom targets at 360px', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', sex: 'female' }, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await expect(page.locator('#save-prefs')).toHaveText('Зберегти власні цілі 🚀');
+    await expect(page.locator('#refresh-recommendation')).toHaveText('Перерахувати рекомендовану добову ціль за темпом 🔄');
+    await expect(page.locator('[data-i18n="saveGoalsHint"]')).toBeVisible();
+    await expect(page.locator('[data-i18n="recalcGoalsHint"]')).toBeVisible();
+    const recalcBox = await page.locator('#refresh-recommendation').boundingBox();
+    expect(recalcBox.x + recalcBox.width).toBeLessThanOrEqual(360);
+  });
+
   test('editing the weight recalculates calories and macros proportionally', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, {
