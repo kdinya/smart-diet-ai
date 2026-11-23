@@ -819,6 +819,42 @@ test.describe('Smoke: dish ingredients sync', () => {
     expect((await readStore(page)).foods[0].components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
   });
 
+  test('selected composite ingredients remain selected after cloud sync and on another device', async ({ page, browser }) => {
+    const dish = {
+      id: 'dish-selection-sync', name: 'Beet salad', grams: 100, kcal: 130, protein: 4, fat: 12, carbs: 6,
+      components: [
+        { id: 'mayo-sync', name: 'Mayonnaise', grams: 40, kcal: 100, protein: 1, fat: 10, carbs: 2 },
+        { id: 'cream-sync', name: 'Sour cream', grams: 60, kcal: 30, protein: 3, fat: 2, carbs: 4 },
+      ],
+    };
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, products: [dish], foods: [], weights: [] });
+    await connectSupabase(page);
+    await autoConfirm(page, true);
+    await signIn(page, 'alice@example.test');
+    await expect.poll(() => backend.tables.products.find((item) => item.id === dish.id)?.components?.length ?? 0).toBe(2);
+
+    await openView(page, 'products');
+    const card = page.locator(`.product-item[data-product-id="${dish.id}"]`);
+    await card.locator('[data-toggle-product-components]').click();
+    await card.locator('[data-product-component-enabled="mayo-sync"]').uncheck();
+    await expect.poll(() => backend.tables.products.find((item) => item.id === dish.id)?.components?.map((item) => item.enabled)).toEqual([false, true]);
+
+    const other = await browser.newContext({ serviceWorkers: 'block' });
+    const second = await other.newPage();
+    await mockSupabase(second, backend);
+    await openApp(second, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await connectSupabase(second);
+    await signIn(second, 'alice@example.test');
+    await expect.poll(async () => (await readStore(second)).products.find((item) => item.id === dish.id)?.components?.map((item) => item.enabled)).toEqual([false, true]);
+    await expect.poll(async () => {
+      const product = (await readStore(second)).products.find((item) => item.id === dish.id);
+      return product && [product.grams, product.kcal, product.protein, product.fat, product.carbs];
+    }).toEqual([60, 30, 3, 2, 4]);
+    await other.close();
+  });
+
   test('a synced dish entry without saved ingredients gains the device ingredients and uploads them', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     const backend = createBackend();
