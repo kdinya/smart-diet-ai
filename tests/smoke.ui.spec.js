@@ -6314,3 +6314,31 @@ test('accepted weigh-in recommendation persists custom pace in Settings and upda
   const bounds = await page.locator('#profile-pace').locator('xpath=..').boundingBox();
   expect(bounds.width).toBeLessThanOrEqual(360);
 });
+
+test('weigh-in goal review blocks saving below the profile minimum and explains why at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
+  const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await page.clock.fastForward(2200);
+
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '92');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).toHaveClass(/open/);
+
+  await page.fill('#weight-goal-kcal', '1200');
+  await expect(page.locator('#weight-goal-apply')).toBeDisabled();
+  await expect(page.locator('#weight-goal-min-hint')).toContainText('1500');
+  await expect(page.locator('#weight-goal-min-hint')).toBeVisible();
+
+  await page.fill('#weight-goal-kcal', '1600');
+  await expect(page.locator('#weight-goal-apply')).toBeEnabled();
+  await expect(page.locator('#weight-goal-min-hint')).toBeHidden();
+  const box = await page.locator('#weight-goal-modal .modal').boundingBox();
+  expect(box.width).toBeLessThanOrEqual(360);
+
+  await page.locator('#weight-goal-apply').click();
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+  expect((await readStore(page)).prefs.kcal).toBe(1600);
+});
