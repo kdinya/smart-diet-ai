@@ -45,7 +45,7 @@
 - Settings and goals are backed up on this device even before any food, weight or product is logged. The three most recent archives of other accounts are kept; to keep a new archive, the oldest one is removed only after you confirm.
 - **Activity log:** the app keeps a log of recent actions on this device: diary entries, weight, goals, profile, product changes, shared products and backups. Open it from the Activity log block in Settings, just above Data & privacy.
 - **Automatic saving in Settings:** if you move from a settings block with unsaved changes to another block, the app saves the previous block.
-- **Goal pace:** choosing a calorie deficit in Settings fills calories and macros in the daily recommendation. Enter a target weight first.
+- **Goal pace:** choosing a calorie deficit in Settings fills calories and macros in the daily recommendation. Enter a target weight first. When accepting a recommended target after weighing in, that plan is added to the pace options with your weight so you can easily switch back to it at any time. Editing calories or any macro parameter in Settings automatically recalculates the remaining values to keep your targets balanced.
 - **Goal changes:** new calorie and macro targets apply from the day you save them. Earlier days keep the targets that applied then.
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
