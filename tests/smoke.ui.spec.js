@@ -3928,6 +3928,204 @@ test('legacy profile initialization migrates the birth date without blocking app
   expect((await readStore(page)).prefs.birthDate).toBeTruthy();
 });
 
+test('adult recommendations use the newest dated weigh-in, preferring the newest same-day creation time', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'en', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [
+    { id: 'weight-1', date: '2026-11-20', value: 92, createdAt: 100 },
+    { id: 'weight-2', date: '2026-11-23', value: 94, createdAt: 200 },
+    { id: 'weight-3', date: '2026-11-23', value: 88, createdAt: 300 },
+  ] });
+  await expect(page.locator('#daily-rec-weight')).toHaveText('Recommendation uses your latest weigh-in: 88.0 kg (entered 23.11).');
+  const expected = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 88 }));
+  await expect(page.locator('#daily-rec-result')).toContainText(`${expected.kcal} kcal`);
+  expect(await page.evaluate(() => currentWeightInfo().value)).toBe(88);
+});
+
+test('profile weight is used when no active weigh-in exists', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'en', age: 35, sex: 'male', height: 180, currentWeight: 95, currentWeightDate: '2026-11-23', targetWeight: 80, activity: 'low', pace: 20 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  await expect(page.locator('#daily-rec-weight')).toHaveText('Recommendation uses profile weight: 95.0 kg.');
+  const expected = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 95 }));
+  await expect(page.locator('#daily-rec-result')).toContainText(`${expected.kcal} kcal`);
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('smartdiet-v1'));
+    data.weights = [{ id: 'old-baseline', date: '2026-11-20', value: 88 }];
+    data.prefs.currentWeightDate = '2026-11-23';
+    data.prefs.currentWeight = 95;
+    localStorage.setItem('smartdiet-v1', JSON.stringify(data));
+  });
+  await page.reload();
+  await expect(page.locator('#daily-rec-weight')).toHaveText('Recommendation uses profile weight: 95.0 kg.');
+});
+
+for (const [weighIn, shouldReach] of [[70.3, true], [70.4, false], [69, true]]) {
+  test(`a target of 70 kg ${shouldReach ? 'accepts' : 'does not accept'} a new weigh-in of ${weighIn} kg`, async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+    const prefs = { ...BASE_PREFS, age: 35, sex: 'male', height: 180, currentWeight: 70.8, currentWeightDate: '2026-10-01', targetWeight: 70, activity: 'low', pace: 20, kcal: 1500, protein: 100, carbs: 150, fat: 50 };
+    await openApp(page, { prefs, foods: [], weights: [{ date: '2026-11-20', value: 70.8, createdAt: 10 }] });
+    await page.locator('[data-action="add-weight"]').first().click();
+    await page.fill('#weight-value', String(weighIn));
+    await page.locator('#weight-save').click();
+    if (shouldReach) {
+      await expect(page.locator('#weight-goal-title')).toHaveText('Goal reached');
+      await page.locator('#weight-goal-cancel').click();
+      const saved = await readStore(page);
+      expect(saved.prefs.pace).toBe(20);
+      expect(saved.prefs.goalReachedFor).toBe('70.0');
+    } else {
+      await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+      expect((await readStore(page)).prefs.goalReachedFor).toBeUndefined();
+    }
+  });
+}
+
+test('a pediatric profile does not receive the adult goal-transition dialog', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, age: 15, sex: 'male', height: 170, currentWeight: 70.8, currentWeightDate: '2026-10-01', targetWeight: 70, activity: 'low', pace: 20, pediatricTargetKcal: 2100 };
+  await openApp(page, { prefs, foods: [], weights: [{ date: '2026-11-20', value: 70.8, createdAt: 10 }] });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '69');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+  expect((await readStore(page)).prefs.pace).toBe(20);
+});
+
+test('a new lower weigh-in automatically refreshes formula-owned goals but leaves manual goals intact', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
+  await openApp(page, { prefs, foods: [], weights: [] });
+  const initial = await page.evaluate(() => {
+    const recommendation = formulaRecommendation({ ...state.prefs, currentWeight: 100 });
+    state.prefs = { ...state.prefs, ...recommendation, recommendation };
+    save();
+    return recommendation.kcal;
+  });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '90');
+  await page.locator('#weight-save').click();
+  const automatic = await readStore(page);
+  const expected = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 90 }));
+  expect(automatic.prefs.kcal).not.toBe(initial);
+  expect(automatic.prefs.kcal).toBe(expected.kcal);
+  expect(automatic.prefs.recommendation.kcal).toBe(expected.kcal);
+  await openView(page, 'settings');
+  await expect(page.locator('#daily-rec-result')).toContainText(`${expected.kcal} kcal`);
+  await expect(page.locator('#daily-rec-weight')).toContainText('90.0 kg (entered 24.11)');
+
+  await page.fill('#pref-protein', '130');
+  await page.fill('#pref-fat', '60');
+  await page.fill('#pref-carbs', '135');
+  await page.locator('#save-prefs').click();
+  const manuallySaved = await readStore(page);
+  await openView(page, 'home');
+  await page.clock.fastForward(86_400_000);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '89');
+  await page.locator('#weight-save').click();
+  const afterManual = await readStore(page);
+  expect(afterManual.prefs.kcal).toBe(manuallySaved.prefs.kcal);
+  expect(afterManual.prefs.protein).toBe(manuallySaved.prefs.protein);
+  expect(afterManual.prefs.kcal).toBe(1600);
+});
+
+test('deleting the newest active weigh-in restores the prior formula-based recommendation', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20 };
+  await openApp(page, { prefs, foods: [], weights: [
+    { id: '88888888-8888-4888-8888-888888888888', date: '2026-11-22', value: 85, createdAt: 1 },
+    { id: '99999999-9999-4999-8999-999999999999', date: '2026-11-23', value: 90, createdAt: 2 },
+  ] });
+  const latestRecommendation = await page.evaluate(() => {
+    const recommendation = formulaRecommendation({ ...state.prefs, currentWeight: 90 });
+    state.prefs = { ...state.prefs, ...recommendation, recommendation, goalPlans: [
+      { from: '2026-11-20', kcal: 1800, protein: 120, carbs: 180, fat: 60 },
+    ] };
+    save();
+    return recommendation.kcal;
+  });
+  await openView(page, 'stats');
+  await autoConfirm(page, true);
+  await page.locator('#weight-history [data-delete-weight="2026-11-23"]').click();
+  const restored = await readStore(page);
+  const previousRecommendation = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 85 }));
+  expect(restored.prefs.kcal).not.toBe(latestRecommendation);
+  expect(restored.prefs.kcal).toBe(previousRecommendation.kcal);
+  expect(await page.evaluate(() => currentWeightInfo().value)).toBe(85);
+  expect(restored.prefs.goalPlans.find(plan => plan.from === '2026-11-20')).toEqual({ from: '2026-11-20', kcal: 1800, protein: 120, carbs: 180, fat: 60 });
+});
+
+test('reaching a target offers a one-time, optional transition to maintenance', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'en', age: 35, sex: 'male', height: 180, currentWeight: 86, currentWeightDate: '2026-10-01', targetWeight: 85, activity: 'low', pace: 20, kcal: 1500, protein: 100, carbs: 150, fat: 50 };
+  await openApp(page, { prefs, foods: [], weights: [{ date: '2026-11-20', value: 86, createdAt: 10 }] });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '85.2');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-title')).toHaveText('Goal reached');
+  await expect(page.locator('#weight-goal-message')).toContainText('at or below your 85.0 kg target');
+  await expect(page.locator('#weight-goal-message')).toContainText('0.8 kg below your earliest saved weigh-in');
+  await expect(page.locator('#weight-goal-apply')).toHaveText('Switch to maintenance');
+  const layout = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, modal: document.querySelector('#weight-goal-modal .modal').getBoundingClientRect().width }));
+  expect(layout.width).toBeLessThanOrEqual(360);
+  expect(layout.modal).toBeLessThanOrEqual(360);
+  await page.locator('#weight-goal-apply').click();
+  const saved = await readStore(page);
+  expect(saved.prefs.pace).toBe(0);
+  expect(saved.prefs.maintenanceGoalsCustom).toBe(false);
+  expect(saved.prefs.targetWeight).toBe(85);
+  expect(saved.prefs.goalReachedFor).toBe('85.0');
+
+  await page.clock.fastForward(86_400_000);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '84.8');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+  const afterAcceptedMaintenance = await readStore(page);
+  const trackedRecommendation = await page.evaluate(() => formulaRecommendation({ ...state.prefs, currentWeight: 84.8 }));
+  expect(afterAcceptedMaintenance.prefs.kcal).toBe(trackedRecommendation.kcal);
+  expect(afterAcceptedMaintenance.prefs.maintenanceGoalsCustom).toBe(false);
+  await page.clock.fastForward(86_400_000);
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '85.1');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-modal')).not.toHaveClass(/open/);
+});
+
+test('rising maintenance trend offers a modest, confirmed calorie adjustment', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-24T12:00:00') });
+  const prefs = { ...BASE_PREFS, lang: 'en', age: 35, sex: 'male', height: 180, currentWeight: 80, currentWeightDate: '2026-10-25', targetWeight: 80, activity: 'low', pace: 0, kcal: 2200, protein: 120, carbs: 250, fat: 75 };
+  await openApp(page, { prefs, foods: [], weights: [
+    { date: '2026-10-31', value: 80.1, createdAt: 1 },
+    { date: '2026-11-07', value: 80.3, createdAt: 2 },
+    { date: '2026-11-14', value: 80.6, createdAt: 3 },
+    { date: '2026-11-21', value: 80.8, createdAt: 4 },
+  ] });
+  await page.locator('[data-action="add-weight"]').first().click();
+  await page.fill('#weight-value', '81.0');
+  await page.locator('#weight-save').click();
+  await expect(page.locator('#weight-goal-title')).toHaveText('Review your maintenance target');
+  await expect(page.locator('#weight-goal-message')).toContainText('upward trend');
+  const suggested = Number(await page.locator('#weight-goal-kcal').inputValue());
+  const before = await readStore(page);
+  expect(suggested).toBeLessThan(before.prefs.kcal);
+  expect((await readStore(page)).prefs.kcal).toBe(before.prefs.kcal);
+  await page.fill('#weight-goal-kcal', '1000');
+  await expect(page.locator('#weight-goal-min-hint')).toBeVisible();
+  await expect(page.locator('#weight-goal-apply')).toBeDisabled();
+  const customCalories = Math.max(1501, suggested - 50);
+  await page.fill('#weight-goal-kcal', String(customCalories));
+  await expect(page.locator('#weight-goal-apply')).toBeEnabled();
+  await page.locator('#weight-goal-apply').click();
+  const adjusted = await readStore(page);
+  expect(adjusted.prefs.kcal).toBe(customCalories);
+  expect(adjusted.prefs.pace).toBe(0);
+  expect(adjusted.prefs.maintenanceGoalsCustom).toBe(true);
+  expect(adjusted.prefs.maintenanceTrendReviewDate).toBe('2026-11-24');
+});
+
 test('a lower weigh-in offers the recalculated target and can be declined without changing the profile', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T12:00:00') });
   const prefs = { ...BASE_PREFS, botMode: 'mascot', age: 35, sex: 'male', height: 180, currentWeight: 100, currentWeightDate: '2026-10-01', targetWeight: 80, activity: 'low', pace: 20, kcal: 2236, protein: 160, carbs: 200, fat: 70 };
