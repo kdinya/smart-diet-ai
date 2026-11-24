@@ -5229,9 +5229,10 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
     await expect(page.locator(`#pick-companions-list input[data-companion-on="${MILK}"]`)).toBeChecked();
     await expect(page.locator(`#pick-companions-list input[data-companion-on="${SUGAR}"]`)).toBeChecked();
+    await page.selectOption('#pick-portions', '2');
     await page.click('#pick-add');
 
-    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 160, 74]]);
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 320, 148]]);
 
     await openView(page, 'diary');
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
@@ -5244,17 +5245,30 @@ test.describe('Smoke: product add-ons', () => {
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
+    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
+    await expect(page.locator(`#food-components-list [data-component-grams="${SUGAR}"]`)).toHaveValue('10');
     const sugarToggle = page.locator(`#food-components-list [data-component-toggle="${SUGAR}"]`);
     await expect(sugarToggle).toBeChecked();
 
     await sugarToggle.uncheck();
-    await expect(page.locator('#food-grams')).toHaveValue('150');
-    await expect(page.locator('#food-kcal')).toHaveValue('34');
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await expect(page.locator('#food-kcal')).toHaveValue('68');
+    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
+    await expect(page.locator(`#food-components-list [data-component-grams="${SUGAR}"]`)).toHaveValue('10');
+    await page.selectOption('#food-portions', '3');
+    await expect(page.locator('#food-grams')).toHaveValue('450');
+    await expect(page.locator('#food-kcal')).toHaveValue('102');
+    await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
+    await page.selectOption('#food-portions', '2');
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await expect(page.locator('#food-kcal')).toHaveValue('68');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('150');
-    await expect(entry.locator('.meal-info')).toContainText('34');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 300 g');
+    await expect(entry.locator('.meal-info')).toContainText('68');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).not.toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
@@ -5266,13 +5280,15 @@ test.describe('Smoke: product add-ons', () => {
     await expect(sugarToggle).not.toBeChecked();
 
     await sugarToggle.check();
-    await expect(page.locator('#food-grams')).toHaveValue('160');
-    await expect(page.locator('#food-kcal')).toHaveValue('74');
+    await expect(page.locator('#food-grams')).toHaveValue('320');
+    await expect(page.locator('#food-kcal')).toHaveValue('148');
+    await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
+    await expect(page.locator(`#food-components-list [data-component-grams="${SUGAR}"]`)).toHaveValue('10');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('160');
-    await expect(entry.locator('.meal-info')).toContainText('74');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 320 g');
+    await expect(entry.locator('.meal-info')).toContainText('148');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(2);
@@ -6190,16 +6206,16 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
         id: 'food-composite-1',
         name: 'Oatmeal bowl',
         meal: 'breakfast',
-        grams: 160,
-        kcal: 280,
-        protein: 12,
+        grams: 320,
+        kcal: 560,
+        protein: 24,
         fat: 7,
         carbs: 65,
         date: today,
         createdAt: Date.now(),
         components: [
-          { id: 'c-oats', name: 'Oats', grams: 60, kcal: 230, protein: 8, fat: 4, carbs: 40 },
-          { id: 'c-milk', name: 'Milk', grams: 100, kcal: 50, protein: 3, fat: 2, carbs: 5 },
+          { id: 'c-oats', name: 'Oats', grams: 120, kcal: 460, protein: 16, fat: 8, carbs: 80, portion: 2, baseGrams: 60 },
+          { id: 'c-milk', name: 'Milk', grams: 200, kcal: 100, protein: 6, fat: 4, carbs: 10, portion: 2, baseGrams: 100 },
         ]
       }],
       weights: []
@@ -6212,21 +6228,26 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
 
+    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await expect(page.locator('#food-components-list [data-component-grams="c-oats"]')).toHaveValue('60');
+    await expect(page.locator('#food-components-list [data-component-grams="c-milk"]')).toHaveValue('100');
     await page.locator('#food-components-list [data-component-grams="c-oats"]').fill('30');
-    await expect(page.locator('#food-grams')).toHaveValue('130');
-    await expect(page.locator('#food-kcal')).toHaveValue('165');
+    await expect(page.locator('#food-grams')).toHaveValue('260');
+    await expect(page.locator('#food-kcal')).toHaveValue('330');
+    await expect(page.locator('#food-portions')).toHaveValue('2');
 
     await page.click('#food-component-add');
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await page.locator('[data-pick-product="p-banana"]').click();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(3);
-    await expect(page.locator('#food-grams')).toHaveValue('230');
-    await expect(page.locator('#food-kcal')).toHaveValue('254');
+    await expect(page.locator('#food-grams')).toHaveValue('460');
+    await expect(page.locator('#food-kcal')).toHaveValue('508');
+    await expect(page.locator('#food-portions')).toHaveValue('2');
 
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect.poll(() => page.evaluate(() => state.foods.map(f => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 230, 254]]);
+    await expect.poll(() => page.evaluate(() => state.foods.map(f => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 460, 508]]);
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').components.length)).toBe(2);
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').grams)).toBe(160);
   });
