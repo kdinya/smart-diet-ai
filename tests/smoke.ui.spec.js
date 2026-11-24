@@ -5229,9 +5229,10 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
     await expect(page.locator(`#pick-companions-list input[data-companion-on="${MILK}"]`)).toBeChecked();
     await expect(page.locator(`#pick-companions-list input[data-companion-on="${SUGAR}"]`)).toBeChecked();
+    await page.selectOption('#pick-portions', '2');
     await page.click('#pick-add');
 
-    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 160, 74]]);
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 260, 76]]);
 
     await openView(page, 'diary');
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
@@ -5244,17 +5245,25 @@ test.describe('Smoke: product add-ons', () => {
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
+    await expect(page.locator('#food-portions')).toHaveValue('2');
     const sugarToggle = page.locator(`#food-components-list [data-component-toggle="${SUGAR}"]`);
     await expect(sugarToggle).toBeChecked();
 
     await sugarToggle.uncheck();
-    await expect(page.locator('#food-grams')).toHaveValue('150');
-    await expect(page.locator('#food-kcal')).toHaveValue('34');
+    await expect(page.locator('#food-grams')).toHaveValue('250');
+    await expect(page.locator('#food-kcal')).toHaveValue('36');
+    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await page.selectOption('#food-portions', '3');
+    await expect(page.locator('#food-grams')).toHaveValue('375');
+    await expect(page.locator('#food-kcal')).toHaveValue('54');
+    await page.selectOption('#food-portions', '2');
+    await expect(page.locator('#food-grams')).toHaveValue('250');
+    await expect(page.locator('#food-kcal')).toHaveValue('36');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('150');
-    await expect(entry.locator('.meal-info')).toContainText('34');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 250 g');
+    await expect(entry.locator('.meal-info')).toContainText('36');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).not.toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
@@ -5266,13 +5275,13 @@ test.describe('Smoke: product add-ons', () => {
     await expect(sugarToggle).not.toBeChecked();
 
     await sugarToggle.check();
-    await expect(page.locator('#food-grams')).toHaveValue('160');
-    await expect(page.locator('#food-kcal')).toHaveValue('74');
+    await expect(page.locator('#food-grams')).toHaveValue('260');
+    await expect(page.locator('#food-kcal')).toHaveValue('76');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('160');
-    await expect(entry.locator('.meal-info')).toContainText('74');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 260 g');
+    await expect(entry.locator('.meal-info')).toContainText('76');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(2);
@@ -6212,9 +6221,11 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
 
+    await expect(page.locator('#food-portions')).toHaveValue('1');
     await page.locator('#food-components-list [data-component-grams="c-oats"]').fill('30');
     await expect(page.locator('#food-grams')).toHaveValue('130');
     await expect(page.locator('#food-kcal')).toHaveValue('165');
+    await expect(page.locator('#food-portions')).toHaveValue('1');
 
     await page.click('#food-component-add');
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
@@ -6222,6 +6233,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(3);
     await expect(page.locator('#food-grams')).toHaveValue('230');
     await expect(page.locator('#food-kcal')).toHaveValue('254');
+    await expect(page.locator('#food-portions')).toHaveValue('1');
 
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
