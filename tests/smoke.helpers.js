@@ -431,6 +431,10 @@ async function autoConfirm(page, answers = true, log = null) {
 
 async function addFood(page, name, meal = 'lunch') {
   await page.locator(`#diary-meals [data-action="add-food"][data-meal="${meal}"]`).click();
+  const manualBtn = page.locator('#food-add-manual');
+  if (await manualBtn.isVisible()) {
+    await manualBtn.click();
+  }
   await page.fill('#food-name', name);
   await page.fill('#food-grams', '150');
   await page.fill('#food-kcal', '250');

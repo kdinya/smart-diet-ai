@@ -218,6 +218,7 @@ test.describe('Smoke: input limits and resilience', () => {
   test('values above the database limits are rejected in the forms', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Huge portion');
     await page.fill('#food-kcal', '99999999');
     await page.click('#food-save');
@@ -236,6 +237,7 @@ test.describe('Smoke: input limits and resilience', () => {
   test('a long food name is cut to the database limit', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.locator('#food-add-manual').click();
     await page.locator('#food-name').evaluate((el) => { el.removeAttribute('maxlength'); });
     await page.fill('#food-name', 'x'.repeat(300));
     await page.fill('#food-kcal', '100');
@@ -461,10 +463,12 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
     await first.locator('[data-action="add-food"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Snack 1' })).toHaveCount(1);
@@ -675,6 +679,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(labels.indexOf('Сніданок')).toBeLessThan(labels.indexOf('Обід'));
     expect(labels.indexOf('Обід')).toBeLessThan(labels.indexOf('Вечеря'));
     await page.locator('#diary-meals [data-meal="snack"]').first().click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Snack food'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
     await expect(page.locator('#diary-meals .meal-title').filter({ hasText: 'Перекус 1' })).toHaveCount(1);
@@ -692,6 +697,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
     await page.evaluate(() => window.__advanceTestClock(59 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
     let foods=(await readStore(page)).foods.filter(f=>f.meal==='snack');
@@ -700,6 +706,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(foods[1].snackId).toBe(firstId);
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
     foods=(await readStore(page)).foods.filter(f=>f.meal==='snack');
@@ -717,6 +724,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await addFood(page, 'Lunch', 'lunch');
     await page.evaluate(() => window.__advanceTestClock(10 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
     let snacks=(await readStore(page)).foods.filter(f=>f.meal==='snack');
@@ -725,6 +733,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(snacks[1].snackId).not.toBe(firstId);
     const firstCard=page.locator(`#diary-meals [data-meal-key*="|snack|${firstId}"]`).first();
     await firstCard.locator('[data-action="add-food"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Orange'],['#food-grams','100'],['#food-kcal','45'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','11']]) await page.fill(id,value);
     await page.click('#food-save');
     snacks=(await readStore(page)).foods.filter(f=>f.meal==='snack');
@@ -1145,6 +1154,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
     await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Storage test meal');
     await page.fill('#food-grams', '150');
     await page.fill('#food-kcal', '250');
@@ -1316,10 +1326,11 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
     await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
     await expect(page.locator('#food-form > #pick-product')).toHaveCount(1);
+    await page.locator('#food-add-manual').click();
     await expect(page.locator('#food-date').locator('xpath=..')).toBeVisible();
   });
 
-  test('reopened dialogs return to the top without changing product pickers', async ({ page }) => {
+  test('reopened dialogs reset scroll without changing product pickers', async ({ page }) => {
     const products = Array.from({ length: 28 }, (_, i) => ({
       id: `scroll-product-${i}`,
       name: `Scroll product ${String(i).padStart(2, '0')}`,
@@ -1349,6 +1360,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const addEntry = page.locator('#view-diary .toolbar [data-action="add-food"]');
     const entryModal = page.locator('#modal .modal');
     await addEntry.click();
+    await page.locator('#food-add-manual').click();
     await entryModal.evaluate((el) => { el.scrollTop = el.scrollHeight; });
     expect(await entryModal.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     await page.locator('#modal-close').click();
@@ -2992,6 +3004,7 @@ test('adding food defaults to today even when a past diary date was viewed, and 
   await page.locator('#home-meals [data-action="add-food"][data-meal="snack"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await expect(page.locator('#food-date')).toHaveValue('2026-11-02');
+  if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
 
   // 3. Fill and save food
   await page.fill('#food-name', 'Яблуко');
@@ -3025,6 +3038,7 @@ test('adding food directly from diary retains historical date and announces meal
   await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').first().click();
   await expect(page.locator('#modal')).toHaveClass(/open/);
   await expect(page.locator('#food-date')).toHaveValue('2026-10-25');
+  if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
 
   await page.fill('#food-name', 'Гречка');
   await page.fill('#food-grams', '200');
@@ -5138,6 +5152,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeVisible();
@@ -5153,6 +5168,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'lunch'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator(`input[data-companion-on="${MILK}"]`)).toBeVisible();
@@ -5166,6 +5182,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     const card = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
@@ -5301,6 +5318,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // In diary modal, Borsch has no add-ons -> companions field and add button are hidden
     await page.evaluate(() => openModal('food', 'dinner'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeHidden();
@@ -5325,6 +5343,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // Now adding Borsch in diary modal displays its saved add-on without add button, and allows editing grams without mutating saved product
     await page.evaluate(() => openModal('food', 'dinner'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeVisible();
@@ -5345,6 +5364,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 1. Food modal in diary: delete button is NOT rendered
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5391,6 +5411,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5430,6 +5451,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 1. Food modal (diary entry) - collapsed by default, no delete button
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     const foodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
@@ -5475,6 +5497,7 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, sugar], foods: [], weights: [] });
 
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5548,6 +5571,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 4. In Food modal next to Food/dish field
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#food-companion-badge .product-has-companions')).toBeVisible();
@@ -6911,5 +6935,121 @@ test.describe('Smoke: assistant quiet mode', () => {
     await page.evaluate(() => { window.nutritionBot.ask('Need your answer', [{ label: 'Yes', value: 'yes' }]); });
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Need your answer');
+  });
+});
+
+test.describe('Smoke: food entry choice modal', () => {
+  test('shows choose from products and manual entry buttons in both Ukrainian and English', async ({ page }) => {
+    const products = [
+      { id: 'p-apple', name: 'Яблуко', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }
+    ];
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [], products });
+
+    // Open Add Entry from diary
+    await openView(page, 'diary');
+    await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+
+    const pickBtn = page.locator('#pick-product');
+    const manualBtn = page.locator('#food-add-manual');
+    const fields = page.locator('#food-fields');
+    const backBtn = page.locator('#food-back-choices');
+
+    // Initial state: choice cards visible, fields hidden, back hidden
+    await expect(pickBtn).toBeVisible();
+    await expect(manualBtn).toBeVisible();
+    await expect(fields).toBeHidden();
+    await expect(backBtn).toBeHidden();
+
+    // Ukrainian texts
+    await expect(pickBtn).toContainText('Вибрати з моїх продуктів');
+    await expect(manualBtn).toContainText('Додати вручну');
+
+    // Check 360px viewport responsiveness
+    await page.setViewportSize({ width: 360, height: 640 });
+    const modalBox = await page.locator('#modal .modal').boundingBox();
+    const pickBox = await pickBtn.boundingBox();
+    const manualBox = await manualBtn.boundingBox();
+    expect(pickBox.width).toBeLessThanOrEqual(modalBox.width);
+    expect(manualBox.width).toBeLessThanOrEqual(modalBox.width);
+
+    // Switch to English and verify labels
+    await page.locator('#modal-close').click();
+    await openView(page, 'settings');
+    await page.selectOption('#pref-lang', 'en');
+    await page.locator('#save-lang').click();
+
+    await openView(page, 'diary');
+    await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
+    await expect(pickBtn).toContainText('Choose from my products');
+    await expect(manualBtn).toContainText('Add manually');
+  });
+
+  test('choose from products opens product picker, populates form, and allows back navigation', async ({ page }) => {
+    const products = [
+      { id: 'p-buckwheat', name: 'Гречка відварена', grams: 150, kcal: 180, protein: 6, fat: 2, carbs: 36 }
+    ];
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [], products });
+
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+
+    // Click pick from products
+    await page.locator('#pick-product').click();
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.locator('#pick-body [data-pick-product="p-buckwheat"]').click();
+
+    // Now food-fields should be visible and filled
+    await expect(page.locator('#food-fields')).toBeVisible();
+    await expect(page.locator('#pick-product')).toBeHidden();
+    await expect(page.locator('#food-add-manual')).toBeHidden();
+    await expect(page.locator('#food-back-choices')).toBeVisible();
+    await expect(page.locator('#food-name')).toHaveValue('Гречка відварена');
+
+    // Click back to choices
+    await page.locator('#food-back-choices').click();
+    await expect(page.locator('#food-fields')).toBeHidden();
+    await expect(page.locator('#pick-product')).toBeVisible();
+    await expect(page.locator('#food-add-manual')).toBeVisible();
+    await expect(page.locator('#food-back-choices')).toBeHidden();
+  });
+
+  test('manual entry opens form with calorie search, clipboard, and option to save to products', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [], products: [] });
+
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await page.locator('#food-add-manual').click();
+
+    await expect(page.locator('#food-fields')).toBeVisible();
+    await expect(page.locator('#product-calc-field')).toBeVisible();
+    await expect(page.locator('#product-calc-search')).toBeVisible();
+    await expect(page.locator('#product-import-clipboard')).toBeVisible();
+
+    // Type a new product name and check "Also save to My products" option
+    await page.fill('#food-name', 'Омлет із зеленню');
+    await page.dispatchEvent('#food-name', 'input');
+
+    const saveProdLabel = page.locator('#food-save-product-label');
+    await expect(saveProdLabel).toBeVisible();
+    await expect(saveProdLabel).toContainText('Також зберегти в Мої продукти');
+
+    await page.locator('#food-save-product').check();
+    await page.fill('#food-grams', '180');
+    await page.fill('#food-kcal', '240');
+    await page.fill('#food-protein', '14');
+    await page.fill('#food-fat', '18');
+    await page.fill('#food-carbs', '3');
+
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+
+    // Verify it is saved in diary
+    await expect(page.locator('#diary-meals')).toContainText('Омлет із зеленню');
+
+    // Verify it was also saved to My Products
+    await openView(page, 'products');
+    await expect(page.locator('#products-list')).toContainText('Омлет із зеленню');
   });
 });
