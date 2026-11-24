@@ -6646,14 +6646,20 @@ test.describe('Smoke: assistant quiet mode', () => {
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
   });
 
-  test('an early-hour visit uses the same meal times and greets only once', async ({ page }) => {
+  test('during the night period the assistant does not greet and breakfast starts at 05:00', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-24T02:00:00') });
     await openApp(page, quietStore());
     await silenceStartup(page);
     await reopen(page);
     await page.clock.fastForward(3000);
+    await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
+    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
+
+    await page.clock.setSystemTime(new Date('2026-11-24T05:00:00'));
+    await reopen(page);
+    await page.clock.fastForward(3000);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
-    await page.clock.setSystemTime(new Date('2026-11-24T03:00:00'));
+    await page.clock.setSystemTime(new Date('2026-11-24T08:00:00'));
     await reopen(page);
     await page.clock.fastForward(3000);
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
