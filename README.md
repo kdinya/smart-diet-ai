@@ -50,6 +50,7 @@
 - Export your data to a file and import it on another device.
 - Share the app with friends from **Settings**.
 - Invite a friend with a one-time link from the Friends section; they confirm the request in the assistant's bubble.
+- Turn on "Only important messages" in the assistant settings to hide welcome bubbles and food reminders; dialogs that need your answer and one greeting per meal time (breakfast, lunch, dinner) still appear.
 - See your current weight under the date; tap it to open your weight-loss achievements.
 - Save usual add-ons for a product (for example, milk for coffee); they are added with it in the same meal, each with its own grams. In My products and in the meal product list, expand a product to tick which add-ons are included.
 - Create simple products or composite dishes made of multiple ingredients. In composite dishes, add unlimited ingredients with full nutrition controls (calorie search, clipboard, macros), edit or remove ingredients, and see live auto-calculated totals with a recipe badge in My products.
