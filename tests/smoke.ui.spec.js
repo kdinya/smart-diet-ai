@@ -4010,15 +4010,16 @@ test('a new lower weigh-in automatically refreshes formula-owned goals but leave
   expect(automatic.prefs.kcal).not.toBe(initial);
   expect(automatic.prefs.kcal).toBe(expected.kcal);
   expect(automatic.prefs.recommendation.kcal).toBe(expected.kcal);
+  await openView(page, 'settings');
   await expect(page.locator('#daily-rec-result')).toContainText(`${expected.kcal} kcal`);
   await expect(page.locator('#daily-rec-weight')).toContainText('90.0 kg (entered 24.11)');
 
-  await page.fill('#pref-kcal', '1600');
   await page.fill('#pref-protein', '130');
-  await page.fill('#pref-carbs', '140');
   await page.fill('#pref-fat', '60');
+  await page.fill('#pref-carbs', '135');
   await page.locator('#save-prefs').click();
   const manuallySaved = await readStore(page);
+  await openView(page, 'home');
   await page.clock.fastForward(86_400_000);
   await page.locator('[data-action="add-weight"]').first().click();
   await page.fill('#weight-value', '89');
