@@ -6977,6 +6977,7 @@ test.describe('Smoke: food entry choice modal', () => {
     await page.locator('#modal-close').click();
     await openView(page, 'settings');
     await page.selectOption('#pref-lang', 'en');
+    await page.locator('#save-lang').click();
 
     await openView(page, 'diary');
     await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
