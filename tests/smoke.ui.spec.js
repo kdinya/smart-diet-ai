@@ -6584,6 +6584,12 @@ test.describe('Smoke: assistant quiet mode', () => {
     foods: [],
     weights: [],
   });
+  const silenceStartup = (page) => page.evaluate(() => {
+    clearTimeout(botWelcomeTimer);
+    botWelcomeTimer = null;
+    hideBotComic(true);
+    localStorage.removeItem('smartdiet-bot-meal-greeting');
+  });
   const reopen = (page) => page.evaluate(() => {
     hideBotComic(true);
     botComicTouched = false;
@@ -6612,7 +6618,7 @@ test.describe('Smoke: assistant quiet mode', () => {
   test('the welcome shows once per meal time and again only when the next meal time starts', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-24T13:00:00') });
     await openApp(page, quietStore());
-    await page.evaluate(() => localStorage.removeItem('smartdiet-bot-meal-greeting'));
+    await silenceStartup(page);
     await reopen(page);
     await page.clock.fastForward(3000);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
@@ -6640,19 +6646,25 @@ test.describe('Smoke: assistant quiet mode', () => {
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
   });
 
-  test('a sleeping assistant stays quiet at night and does not greet', async ({ page }) => {
+  test('an early-hour visit uses the same meal times and greets only once', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-24T02:00:00') });
     await openApp(page, quietStore());
-    await page.evaluate(() => localStorage.removeItem('smartdiet-bot-meal-greeting'));
-    await page.clock.fastForward(4000);
+    await silenceStartup(page);
+    await reopen(page);
+    await page.clock.fastForward(3000);
+    await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
+    await page.clock.setSystemTime(new Date('2026-11-24T03:00:00'));
+    await reopen(page);
+    await page.clock.fastForward(3000);
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
-    await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
   });
 
   test('adding food while the assistant sleeps shows no reminder and opens the form', async ({ page }) => {
     await openApp(page, { ...quietStore(), products: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 }] });
     await page.evaluate(() => {
       localStorage.removeItem('smartdiet-sleep-food-reminder');
+      clearTimeout(botWelcomeTimer);
+      botWelcomeTimer = null;
       botWelcomeShown = true;
       hideBotComic(true);
       setBotServiceState({ period: 'night', pajamas: true });
@@ -6667,7 +6679,8 @@ test.describe('Smoke: assistant quiet mode', () => {
 
   test('plain tips are hidden but dialogs that need an answer still appear', async ({ page }) => {
     await openApp(page, quietStore());
-    await page.evaluate(() => { botWelcomeShown = true; hideBotComic(true); });
+    await silenceStartup(page);
+    await page.evaluate(() => { botWelcomeShown = true; });
     await page.evaluate(() => window.nutritionBot.say('Just a tip'));
     await expect(page.locator('#bot-comic')).not.toHaveClass(/is-visible/);
     await page.evaluate(() => { window.nutritionBot.ask('Need your answer', [{ label: 'Yes', value: 'yes' }]); });
