@@ -5401,6 +5401,50 @@ test.describe('Smoke: product add-ons', () => {
     expect(overflow).toBe(true);
   });
 
+  test('add-on portions and grams sit side by side in the edit modal at 360px, like in the add dialog', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    const HONEY = '33333333-3333-4333-8333-333333333333';
+    const honey = { id: HONEY, name: 'Honey with a very long product name that has to be shortened', grams: 20, kcal: 60, protein: 0, fat: 0, carbs: 16 };
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }, { id: HONEY, grams: 20 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, honey], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+
+    await openView(page, 'diary');
+    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    for (const id of [MILK, HONEY]) {
+      const card = page.locator(`#food-components-list [data-component-item="${id}"]`);
+      await expect(card).toBeVisible();
+      const layout = await card.evaluate((el) => {
+        const box = (sel) => el.querySelector(sel).getBoundingClientRect();
+        const c = el.getBoundingClientRect();
+        const p = box('[data-component-portions]');
+        const g = box('[data-component-grams]');
+        return {
+          sameRow: Math.abs(p.top - g.top) < 2 && Math.abs(p.height - g.height) < 2,
+          portionsBeforeGrams: p.right <= g.left,
+          inside: p.left >= c.left && g.right <= c.right,
+          comparableWidth: Math.abs(p.width - g.width) < 4,
+          height: Math.round(g.height),
+          labels: [...el.querySelectorAll('.companion-field-label')].map((n) => n.textContent.trim()),
+        };
+      });
+      expect(layout).toEqual({ sameRow: true, portionsBeforeGrams: true, inside: true, comparableWidth: true, height: 44, labels: ['Portions', 'Amount, g'] });
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    const milkPortions = page.locator(`#food-components-list [data-component-portions="${MILK}"]`);
+    const milkGrams = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
+    await milkPortions.selectOption('2');
+    await expect(milkGrams).toHaveValue('200');
+    await milkGrams.fill('50');
+    await expect(milkPortions).toHaveValue('0.5');
+    await page.locator(`#food-components-list [data-component-toggle="${HONEY}"]`).uncheck();
+    await expect(page.locator(`#food-components-list [data-component-grams="${HONEY}"]`)).toBeDisabled();
+    await expect(page.locator(`#food-components-list [data-component-portions="${HONEY}"]`)).toBeDisabled();
+  });
+
   test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     const today = new Date().toLocaleDateString('en-CA');
