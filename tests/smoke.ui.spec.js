@@ -5249,7 +5249,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.selectOption('#pick-portions', '2');
     await page.click('#pick-add');
 
-    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 320, 148]]);
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 260, 76]]);
 
     await openView(page, 'diary');
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
@@ -5269,23 +5269,23 @@ test.describe('Smoke: product add-ons', () => {
     await expect(sugarToggle).toBeChecked();
 
     await sugarToggle.uncheck();
-    await expect(page.locator('#food-grams')).toHaveValue('300');
-    await expect(page.locator('#food-kcal')).toHaveValue('68');
+    await expect(page.locator('#food-grams')).toHaveValue('250');
+    await expect(page.locator('#food-kcal')).toHaveValue('36');
     await expect(page.locator('#food-portions')).toHaveValue('2');
     await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
     await expect(page.locator(`#food-components-list [data-component-grams="${SUGAR}"]`)).toHaveValue('10');
     await page.selectOption('#food-portions', '3');
-    await expect(page.locator('#food-grams')).toHaveValue('450');
-    await expect(page.locator('#food-kcal')).toHaveValue('102');
+    await expect(page.locator('#food-grams')).toHaveValue('350');
+    await expect(page.locator('#food-kcal')).toHaveValue('38');
     await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
     await page.selectOption('#food-portions', '2');
-    await expect(page.locator('#food-grams')).toHaveValue('300');
-    await expect(page.locator('#food-kcal')).toHaveValue('68');
+    await expect(page.locator('#food-grams')).toHaveValue('250');
+    await expect(page.locator('#food-kcal')).toHaveValue('36');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 300 g');
-    await expect(entry.locator('.meal-info')).toContainText('68');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 250 g');
+    await expect(entry.locator('.meal-info')).toContainText('36');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).not.toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
@@ -5297,20 +5297,109 @@ test.describe('Smoke: product add-ons', () => {
     await expect(sugarToggle).not.toBeChecked();
 
     await sugarToggle.check();
-    await expect(page.locator('#food-grams')).toHaveValue('320');
-    await expect(page.locator('#food-kcal')).toHaveValue('148');
+    await expect(page.locator('#food-grams')).toHaveValue('260');
+    await expect(page.locator('#food-kcal')).toHaveValue('76');
     await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('50');
     await expect(page.locator(`#food-components-list [data-component-grams="${SUGAR}"]`)).toHaveValue('10');
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 320 g');
-    await expect(entry.locator('.meal-info')).toContainText('148');
+    await expect(entry.locator('.meal-info')).toContainText('2 serv. · 260 g');
+    await expect(entry.locator('.meal-info')).toContainText('76');
     await expect(entry.locator('.food-components-detail')).toContainText('Milk');
     await expect(entry.locator('.food-components-detail')).toContainText('Sugar');
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(2);
   });
 
+  test('add-ons keep the entered amount no matter how many portions of the main product are added', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await expect(page.locator('#pick-companions-field .companion-portion-note')).toContainText('do not depend on the number of portions');
+    await page.selectOption('#pick-portions', '3');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 350, 38]]);
+    const comps = await page.evaluate(() => state.foods[0].components.map((c) => [c.id, c.grams, c.kcal]));
+    expect(comps).toEqual([['__base__', 300, 6], [MILK, 50, 32]]);
+
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.selectOption('#pick-portions', '0.5');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.grams, f.kcal]))).toEqual([[350, 38], [100, 33]]);
+  });
+
+  test('editing an entry with add-ons edits the main product and the add-ons separately', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.selectOption('#pick-portions', '2');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
+    await entry.locator('[data-toggle-food]').click();
+    await entry.locator('[data-edit-food]').click();
+    await expect(page.locator('#food-components-field .companion-portion-note')).toContainText('do not depend on the number of portions');
+    const milkInput = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
+    await expect(milkInput).toHaveValue('50');
+    await expect(page.locator('#food-grams')).toHaveValue('250');
+
+    await milkInput.fill('80');
+    await expect(page.locator('#food-grams')).toHaveValue('280');
+    await expect(page.locator('#food-kcal')).toHaveValue('55');
+
+    await page.selectOption('#food-portions', '3');
+    await expect(page.locator('#food-grams')).toHaveValue('380');
+    await expect(milkInput).toHaveValue('80');
+
+    await page.fill('#food-grams', '480');
+    await expect(page.locator('#food-portions')).toHaveValue('4');
+    await expect(milkInput).toHaveValue('80');
+
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    const saved = await page.evaluate(() => state.foods[0]);
+    expect(saved.grams).toBe(480);
+    expect(saved.portions).toBe(4);
+    expect(saved.components.find((c) => c.id === MILK).grams).toBe(80);
+    expect(saved.components.find((c) => c.id === '__base__').grams).toBe(400);
+  });
+
+  test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    const today = new Date().toLocaleDateString('en-CA');
+    const legacy = { id: '55555555-5555-4555-8555-555555555555', name: 'Coffee', meal: 'breakfast', grams: 300, kcal: 68, protein: 6.9, fat: 3.6, carbs: 4.8, date: today, createdAt: Date.now(), portions: 2,
+      components: [
+        { id: '__base__', name: 'Coffee', grams: 200, kcal: 4, protein: 0.6, fat: 0, carbs: 0, enabled: true, isBase: true, portion: 2, baseGrams: 100 },
+        { id: MILK, name: 'Milk', grams: 100, kcal: 64, protein: 6.6, fat: 3.6, carbs: 4.8, enabled: true, portion: 2, baseGrams: 50 },
+      ] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [legacy], weights: [] });
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
+    await entry.locator('[data-toggle-food]').click();
+    await entry.locator('[data-edit-food]').click();
+    await expect(page.locator(`#food-components-list [data-component-grams="${MILK}"]`)).toHaveValue('100');
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await expect(page.locator('#food-kcal')).toHaveValue('68');
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    const saved = await page.evaluate(() => state.foods[0]);
+    expect([saved.grams, saved.kcal, saved.portions]).toEqual([300, 68, 2]);
+    expect(saved.components.find((c) => c.id === MILK).grams).toBe(100);
+  });
+
+  test('a composite dish keeps scaling its ingredients with portions and its original hint', async ({ page }) => {
+    const soup = { id: '44444444-4444-4444-8444-444444444444', name: 'Soup', grams: 200, kcal: 100, protein: 5, fat: 3, carbs: 10, components: [{ id: MILK, grams: 100 }, { id: COFFEE, grams: 100 }] };
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0 };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [soup, milk, coffee], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Soup')));
+    await expect(page.locator('#pick-components-field .companion-portion-note')).toContainText('per single portion');
+    await page.selectOption('#pick-portions', '2');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods[0]?.grams)).toBe(400);
+    expect(await page.evaluate(() => state.foods[0].components.map((c) => c.grams))).toEqual([200, 200]);
+  });
 
   test('an empty add-ons list in main diary modal hides the field without add button, adding add-ons is only in product editor', async ({ page }) => {
     const borsch = { id: '33333333-3333-4333-8333-333333333333', name: 'Borsch', grams: 300, kcal: 180, protein: 6, fat: 8, carbs: 20 };
