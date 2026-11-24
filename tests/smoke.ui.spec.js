@@ -218,6 +218,7 @@ test.describe('Smoke: input limits and resilience', () => {
   test('values above the database limits are rejected in the forms', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Huge portion');
     await page.fill('#food-kcal', '99999999');
     await page.click('#food-save');
@@ -236,6 +237,7 @@ test.describe('Smoke: input limits and resilience', () => {
   test('a long food name is cut to the database limit', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    await page.locator('#food-add-manual').click();
     await page.locator('#food-name').evaluate((el) => { el.removeAttribute('maxlength'); });
     await page.fill('#food-name', 'x'.repeat(300));
     await page.fill('#food-kcal', '100');
@@ -1324,10 +1326,11 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
     await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
     await expect(page.locator('#food-form > #pick-product')).toHaveCount(1);
+    await page.locator('#food-add-manual').click();
     await expect(page.locator('#food-date').locator('xpath=..')).toBeVisible();
   });
 
-  test('reopened dialogs return to the top without changing product pickers', async ({ page }) => {
+  test('reopened dialogs reset scroll without changing product pickers', async ({ page }) => {
     const products = Array.from({ length: 28 }, (_, i) => ({
       id: `scroll-product-${i}`,
       name: `Scroll product ${String(i).padStart(2, '0')}`,
@@ -1357,6 +1360,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const addEntry = page.locator('#view-diary .toolbar [data-action="add-food"]');
     const entryModal = page.locator('#modal .modal');
     await addEntry.click();
+    await page.locator('#food-add-manual').click();
     await entryModal.evaluate((el) => { el.scrollTop = el.scrollHeight; });
     expect(await entryModal.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     await page.locator('#modal-close').click();
