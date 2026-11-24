@@ -38,6 +38,7 @@
 - Log your weight by date and see the chart and the trend. Open the trend chart directly from the latest weight card on the Overview screen, and browse all weigh-ins in a scrollable history dialog.
 - A BMI gauge shows where you are and what a healthy weight range looks like for your height.
 - Enter your details and get a daily calorie and protein target. You can choose a gentle pace of 0.25, 0.5 or 0.75 kg per week.
+- Daily recommendations use your latest active weigh-in, falling back to profile weight. When a new weigh-in reaches your loss target, you can review an optional maintenance plan; future maintenance changes are only applied after confirmation.
 
 **Calendar and backup**
 - Pick any date in the calendar. The food diary highlights days with meals, and the weight-entry calendar highlights days with recorded weigh-ins.
