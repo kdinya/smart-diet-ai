@@ -5366,6 +5366,41 @@ test.describe('Smoke: product add-ons', () => {
     expect(saved.components.find((c) => c.id === '__base__').grams).toBe(400);
   });
 
+  test('add-on portions and grams stay in sync in the edit modal, and main product and total are shown', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.selectOption('#pick-portions', '2');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
+    await entry.locator('[data-toggle-food]').click();
+    await expect(entry.locator('.food-components-detail .product-main-block')).toHaveCount(2);
+    await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
+    await entry.locator('[data-edit-food]').click();
+
+    const main = page.locator('#food-components-list [data-food-main]');
+    await expect(main).toContainText('200 g');
+    await expect(main).toContainText('4 kcal');
+    const portions = page.locator(`#food-components-list [data-component-portions="${MILK}"]`);
+    const grams = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
+    await expect(portions).toHaveValue('0.5');
+    await portions.selectOption('1');
+    await expect(grams).toHaveValue('100');
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await expect(page.locator('#food-kcal')).toHaveValue('68');
+    await expect(page.locator('#food-components-list [data-food-total]')).toContainText('68');
+    await grams.fill('150');
+    await expect(portions).toHaveValue('1.5');
+    await expect(page.locator('#food-grams')).toHaveValue('350');
+    await expect(main).toContainText('200 g');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(overflow).toBe(true);
+  });
+
   test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     const today = new Date().toLocaleDateString('en-CA');
