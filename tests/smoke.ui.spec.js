@@ -5152,6 +5152,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeVisible();
@@ -5167,6 +5168,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'lunch'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator(`input[data-companion-on="${MILK}"]`)).toBeVisible();
@@ -5180,6 +5182,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     const card = page.locator(`#product-companions-list [data-companion-card="${MILK}"]`);
@@ -5315,6 +5318,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // In diary modal, Borsch has no add-ons -> companions field and add button are hidden
     await page.evaluate(() => openModal('food', 'dinner'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeHidden();
@@ -5339,6 +5343,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // Now adding Borsch in diary modal displays its saved add-on without add button, and allows editing grams without mutating saved product
     await page.evaluate(() => openModal('food', 'dinner'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Borsch');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#product-companions-field')).toBeVisible();
@@ -5359,6 +5364,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 1. Food modal in diary: delete button is NOT rendered
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5405,6 +5411,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 100 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5444,6 +5451,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 1. Food modal (diary entry) - collapsed by default, no delete button
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     const foodCard = page.locator('#product-companions-list [data-companion-card="' + MILK + '"]');
@@ -5489,6 +5497,7 @@ test.describe('Smoke: product add-ons', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, sugar], foods: [], weights: [] });
 
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
 
@@ -5562,6 +5571,7 @@ test.describe('Smoke: product add-ons', () => {
 
     // 4. In Food modal next to Food/dish field
     await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Coffee');
     await page.dispatchEvent('#food-name', 'change');
     await expect(page.locator('#food-companion-badge .product-has-companions')).toBeVisible();
