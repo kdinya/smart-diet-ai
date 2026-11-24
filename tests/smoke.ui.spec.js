@@ -7052,4 +7052,66 @@ test.describe('Smoke: food entry choice modal', () => {
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Омлет із зеленню');
   });
+
+  test("shows Today shortcut button only when viewing another date in diary", async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: "uk" }, foods: [], weights: [] });
+    await openView(page, "diary");
+
+    const todayBtn = page.locator("#diary-today");
+    // On today, button must be hidden
+    await expect(todayBtn).toHaveClass(/hidden/);
+
+    // Navigate to another day via calendar
+    await selectDiaryDate(page, "2026-11-01");
+    await expect(todayBtn).not.toHaveClass(/hidden/);
+    await expect(todayBtn).toBeVisible();
+    await expect(todayBtn).toHaveText("Сьогодні");
+
+    // Click Today shortcut button
+    await todayBtn.click();
+    await expect(todayBtn).toHaveClass(/hidden/);
+  });
+
+  test("shows single-portion explanation note before ingredients and add-ons in meal picker and food edit", async ({ page }) => {
+    const COMPOSITE = {
+      id: "prod-comp-1",
+      name: "Буряк з часником",
+      grams: 150,
+      kcal: 180,
+      protein: 4,
+      fat: 10,
+      carbs: 18,
+      components: [
+        { id: "comp-1", name: "Буряк варений", grams: 120, kcal: 54, protein: 2, fat: 0.2, carbs: 12, enabled: true },
+        { id: "comp-2", name: "Часник", grams: 10, kcal: 15, protein: 0.6, fat: 0.1, carbs: 3, enabled: true },
+        { id: "comp-3", name: "Майонез", grams: 20, kcal: 136, protein: 0.2, fat: 15, carbs: 0.6, enabled: true }
+      ]
+    };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: "uk" }, foods: [], weights: [], products: [COMPOSITE] });
+
+    // 1. In meal picker when selecting a composite dish
+    await page.evaluate((comp) => {
+      openMealPicker(state.products.find((p) => p.id === comp.id), "lunch");
+    }, COMPOSITE);
+
+    await expect(page.locator("#pick-modal")).toHaveClass(/open/);
+    await expect(page.locator("#pick-components-field")).toBeVisible();
+    const pickNote = page.locator("#pick-components-field .companion-portion-note");
+    await expect(pickNote).toBeVisible();
+    await expect(pickNote).toContainText("на одну порцію");
+
+    // Add to lunch
+    await page.click("#pick-add");
+    await expect(page.locator("#pick-modal")).not.toHaveClass(/open/);
+    await openView(page, "diary");
+    await expect(page.locator("#diary-meals")).toContainText("Буряк з часником");
+
+    // 2. In edit modal for the logged composite dish
+    await page.locator("#diary-meals [data-edit-food]").first().click();
+    await expect(page.locator("#modal")).toHaveClass(/open/);
+    await expect(page.locator("#food-components-field")).toBeVisible();
+    const editNote = page.locator("#food-components-field .companion-portion-note");
+    await expect(editNote).toBeVisible();
+    await expect(editNote).toContainText("на одну порцію");
+  });
 });
