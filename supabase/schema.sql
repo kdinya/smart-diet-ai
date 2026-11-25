@@ -458,3 +458,65 @@ as $$
 $$;
 revoke all on function public.app_user_names() from public, anon;
 grant execute on function public.app_user_names() to authenticated;
+
+-- App administrators authorized to manage the shared product catalog.
+create table if not exists public.app_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.app_admins enable row level security;
+revoke all on public.app_admins from public, anon, authenticated;
+grant select on public.app_admins to authenticated;
+
+drop policy if exists "Users check own admin status" on public.app_admins;
+create policy "Users check own admin status" on public.app_admins
+  for select to authenticated
+  using (user_id = auth.uid());
+
+-- Shared product catalog accessible to all users for reading and copying.
+create table if not exists public.catalog_products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 120),
+  grams numeric(9,2) not null default 100 check (grams between 0 and 10000),
+  kcal numeric(9,2) not null default 0 check (kcal between 0 and 10000),
+  protein numeric(9,2) not null default 0 check (protein between 0 and 10000),
+  fat numeric(9,2) not null default 0 check (fat between 0 and 10000),
+  carbs numeric(9,2) not null default 0 check (carbs between 0 and 10000),
+  verified boolean not null default false,
+  companions jsonb not null default '[]'::jsonb check (jsonb_typeof(companions) = 'array' and octet_length(companions::text) <= 65536),
+  components jsonb not null default '[]'::jsonb check (jsonb_typeof(components) = 'array' and octet_length(components::text) <= 65536),
+  note text not null default '' check (octet_length(note) <= 2048),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists catalog_products_name_idx on public.catalog_products (lower(name));
+create index if not exists catalog_products_created_at_idx on public.catalog_products (created_at desc);
+
+alter table public.catalog_products enable row level security;
+
+revoke all on public.catalog_products from public, anon, authenticated;
+grant select on public.catalog_products to anon, authenticated;
+grant insert, update, delete on public.catalog_products to authenticated;
+
+drop policy if exists "Anyone can read catalog products" on public.catalog_products;
+create policy "Anyone can read catalog products" on public.catalog_products
+  for select to anon, authenticated
+  using (true);
+
+drop policy if exists "Admins insert catalog products" on public.catalog_products;
+create policy "Admins insert catalog products" on public.catalog_products
+  for insert to authenticated
+  with check (exists (select 1 from public.app_admins where user_id = auth.uid()));
+
+drop policy if exists "Admins update catalog products" on public.catalog_products;
+create policy "Admins update catalog products" on public.catalog_products
+  for update to authenticated
+  using (exists (select 1 from public.app_admins where user_id = auth.uid()))
+  with check (exists (select 1 from public.app_admins where user_id = auth.uid()));
+
+drop policy if exists "Admins delete catalog products" on public.catalog_products;
+create policy "Admins delete catalog products" on public.catalog_products
+  for delete to authenticated
+  using (exists (select 1 from public.app_admins where user_id = auth.uid()));
+

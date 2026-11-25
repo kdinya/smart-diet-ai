@@ -7500,3 +7500,125 @@ test.describe('Smoke: phone back button', () => {
     expect(stuck).toEqual([]);
   });
 });
+
+
+test.describe('Smoke: shared product catalog', () => {
+  test('toggles between my products and catalog view and updates header and buttons', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    const toggleBtn = page.locator('#catalog-toggle-btn');
+    await expect(toggleBtn).toBeVisible();
+    await expect(toggleBtn).toHaveText('Каталог');
+
+    await toggleBtn.click();
+    await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
+    await expect(page.locator('#view-products .view-title')).toHaveText('Спільний каталог');
+    await expect(toggleBtn).toHaveText('← Мої продукти');
+    await expect(page.locator('#product-new')).toBeHidden();
+
+    await toggleBtn.click();
+    await expect(page.locator('#view-products')).not.toHaveClass(/in-catalog-view/);
+    await expect(page.locator('#view-products .view-title')).toHaveText('Мої продукти');
+    await expect(toggleBtn).toHaveText('Каталог');
+    await expect(page.locator('#product-new')).toBeVisible();
+  });
+
+  test('unauthenticated user clicking copy shows registration prompt', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-test-1',
+      name: 'Greek Yogurt',
+      grams: 100,
+      kcal: 59,
+      protein: 10,
+      fat: 0.4,
+      carbs: 3.6,
+      verified: true,
+      companions: [],
+      components: [],
+      note: 'Rich in protein',
+    });
+
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Greek Yogurt');
+
+    const copyBtn = page.locator('#products-list [data-copy-catalog-product]').first();
+    await expect(copyBtn).toBeVisible();
+    await copyBtn.click();
+
+    await expect(page.locator('.toast-msg').last()).toContainText('Будь ласка, зареєструйтеся або увійдіть');
+  });
+
+  test('authenticated user copies product to personal products', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-test-2',
+      name: 'Blueberries',
+      grams: 100,
+      kcal: 57,
+      protein: 0.7,
+      fat: 0.3,
+      carbs: 14.5,
+      verified: true,
+      companions: [],
+      components: [],
+      note: 'Fresh wild berries',
+    });
+
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await openView(page, 'products');
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Blueberries');
+
+    const copyBtn = page.locator('#products-list [data-copy-catalog-product]').first();
+    await copyBtn.click();
+
+    await expect(page.locator('.toast-msg').last()).toContainText('«Blueberries» додано до ваших продуктів');
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Blueberries');
+
+    const stored = await readStore(page);
+    const copied = stored.products.find((p) => p.name === 'Blueberries');
+    expect(copied).toBeDefined();
+    expect(copied.kcal).toBe(57);
+    expect(copied.note).toBe('Fresh wild berries');
+  });
+
+  test('admin user sees publish button and can manage catalog entries', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+
+    await mockSupabase(page, backend);
+    const oatmeal = { id: 'oat-1', name: 'Oatmeal', grams: 100, kcal: 360, protein: 13, fat: 6, carbs: 65 };
+    await startAlice(page, backend);
+    await page.evaluate((item) => putProduct(item), oatmeal);
+    await openView(page, 'products');
+
+    await expect(page.locator('#products-list')).toContainText('Oatmeal');
+    await page.locator('#products-list .product-toggle-main').first().click();
+
+    const pubBtn = page.locator('#products-list [data-publish-catalog]');
+    await expect(pubBtn).toBeVisible();
+    await pubBtn.click();
+
+    await expect(page.locator('.toast-msg').last()).toContainText('успішно опубліковано в каталозі');
+    expect(backend.tables.catalog_products.some((p) => p.name === 'Oatmeal')).toBe(true);
+
+    // Switch to catalog view and check admin edit/delete controls
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Oatmeal');
+
+    const editBtn = page.locator('#products-list [data-edit-catalog-product]').first();
+    const delBtn = page.locator('#products-list [data-delete-catalog-product]').first();
+    await expect(editBtn).toBeVisible();
+    await expect(delBtn).toBeVisible();
+  });
+});
