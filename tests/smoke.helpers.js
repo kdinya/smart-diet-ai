@@ -429,13 +429,20 @@ async function autoConfirm(page, answers = true, log = null) {
   await page.evaluate(setupConfirmWatch, plan);
 }
 
-async function addFood(page, name, meal = 'lunch') {
-  await page.locator(`#diary-meals [data-action="add-food"][data-meal="${meal}"]`).click();
+async function openManualFoodForm(page) {
   await page.locator('#modal.open').waitFor();
   const manualBtn = page.locator('#food-add-manual');
+  const foodFields = page.locator('#food-fields');
+  await expect(manualBtn.or(foodFields)).toBeVisible();
   if (await manualBtn.isVisible()) {
     await manualBtn.click();
+    await expect(foodFields).toBeVisible();
   }
+}
+
+async function addFood(page, name, meal = 'lunch') {
+  await page.locator(`#diary-meals [data-action="add-food"][data-meal="${meal}"]`).click();
+  await openManualFoodForm(page);
   await page.fill('#food-name', name);
   await page.fill('#food-grams', '150');
   await page.fill('#food-kcal', '250');
@@ -580,5 +587,5 @@ async function selectDiaryDate(page, date) {
   await page.click('#cal-done');
 }
 
-module.exports = { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
+module.exports = { openManualFoodForm, test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
 
