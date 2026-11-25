@@ -433,9 +433,16 @@ async function openManualFoodForm(page) {
   await page.locator('#modal.open').waitFor();
   const manualBtn = page.locator('#food-add-manual');
   const foodFields = page.locator('#food-fields');
-  await expect(manualBtn.or(foodFields)).toBeVisible();
+  await page.waitForFunction(() => {
+    const btn = document.getElementById('food-add-manual');
+    const fields = document.getElementById('food-fields');
+    const isVis = el => Boolean(el && el.offsetParent !== null && !el.classList.contains('hidden'));
+    return isVis(btn) || isVis(fields);
+  });
   if (await manualBtn.isVisible()) {
     await manualBtn.click();
+    await expect(foodFields).toBeVisible();
+  } else {
     await expect(foodFields).toBeVisible();
   }
 }
