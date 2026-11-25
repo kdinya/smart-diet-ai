@@ -808,10 +808,9 @@ test.describe('Smoke: dish ingredients sync', () => {
     await expect.poll(() => failed).toBe(true);
 
     await page.unroute(/\/rest\/v1\/food_entries/, failOnce);
-    await autoConfirm(page, true);
     await page.reload();
-    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
-    await page.locator('#confirm-ok').click();
+    await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
+    await expect.poll(() => readStore(page).then((store) => store.foods.some((food) => food.name === 'Oatmeal bowl' && food.components?.length === 2))).toBe(true);
     await expect.poll(() => backend.tables.food_entries.map((row) => row.name)).toContain('Oatmeal bowl');
     expect(backend.tables.food_entries.find((row) => row.name === 'Oatmeal bowl').components.map((component) => component.name)).toEqual(['Oats', 'Milk']);
     await openView(page, 'diary');

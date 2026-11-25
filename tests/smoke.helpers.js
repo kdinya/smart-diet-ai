@@ -83,6 +83,8 @@ function createBackend() {
       ],
       friendships: [],
       product_shares: [],
+      app_admins: [],
+      catalog_products: [],
     },
     friendAttempts: {},
     foodWriteStarted: false,
@@ -285,6 +287,58 @@ async function handleRest(route, req, url, backend, json) {
   if (table === 'user_profiles' && backend.failProfiles) {
     return json(404, { code: 'PGRST205', message: "Could not find the table 'public.user_profiles' in the schema cache" });
   }
+  if (table === 'catalog_products') {
+    const params = [...url.searchParams.entries()];
+    if (req.method() === 'GET') {
+      const found = rows.filter((row) => matchesFilters(row, params));
+      return json(200, found);
+    }
+    const isAdmin = uid && backend.tables.app_admins.some((a) => a.user_id === uid);
+    if (!isAdmin) {
+      return json(403, { code: '42501', message: 'permission denied for table catalog_products' });
+    }
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON();
+      const items = Array.isArray(body) ? body : [body];
+      for (const item of items) {
+        rows.push({ id: item.id || `cat-${Date.now()}-${Math.random()}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...item });
+      }
+      return route.fulfill({ status: 201, headers: CORS, body: '' });
+    }
+    if (req.method() === 'PATCH' || req.method() === 'PUT') {
+      const body = req.postDataJSON();
+      for (let i = 0; i < rows.length; i += 1) {
+        if (matchesFilters(rows[i], params)) {
+          rows[i] = { ...rows[i], ...body, updated_at: new Date().toISOString() };
+        }
+      }
+      return route.fulfill({ status: 200, headers: CORS, body: '' });
+    }
+    if (req.method() === 'DELETE') {
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (matchesFilters(rows[i], params)) {
+          rows.splice(i, 1);
+        }
+      }
+      return route.fulfill({ status: 200, headers: CORS, body: '' });
+    }
+    return json(405, { message: 'Method not mocked' });
+  }
+
+  if (table === 'app_admins') {
+    if (!uid) return json(401, { message: 'JWT required' });
+    const params = [...url.searchParams.entries()];
+    if (req.method() === 'GET') {
+      const found = rows.filter((row) => row.user_id === uid && matchesFilters(row, params));
+      if ((req.headers()['accept'] || '').includes('vnd.pgrst.object+json')) {
+        if (found.length === 1) return json(200, found[0]);
+        return json(406, { code: 'PGRST116', details: null, hint: null, message: 'JSON object requested, multiple (or no) rows returned' });
+      }
+      return json(200, found);
+    }
+    return json(403, { code: '42501', message: 'permission denied for table app_admins' });
+  }
+
   if (!uid) return json(401, { message: 'JWT required' });
   if (SOCIAL_TABLES.includes(table)) return handleSocial(route, req, url, backend, json, table, uid);
 
@@ -543,8 +597,9 @@ async function shareFirstProductWith(page, friend) {
   await openView(page, 'settings');
   await expect(page.locator('#friends-list')).toContainText(friend);
   await openView(page, 'products');
-  await page.locator('#products-list [data-toggle-product]').first().click();
-  await page.locator('#products-list [data-share-product]').first().click();
+  const item = page.locator('#products-list .product-item').first();
+  if (await item.evaluate((element) => element.classList.contains('collapsed'))) await item.locator('.product-toggle-main').click();
+  await item.locator('[data-share-product]').click();
   await expect(page.locator('#share-modal')).toHaveClass(/open/);
   await page.locator('#share-body label', { hasText: friend }).locator('input').check();
   await page.click('#share-confirm');
@@ -554,8 +609,9 @@ async function shareFirstProductWithMany(page, friends) {
   await openView(page, 'settings');
   for (const friend of friends) await expect(page.locator('#friends-list')).toContainText(friend);
   await openView(page, 'products');
-  await page.locator('#products-list [data-toggle-product]').first().click();
-  await page.locator('#products-list [data-share-product]').first().click();
+  const item = page.locator('#products-list .product-item').first();
+  if (await item.evaluate((element) => element.classList.contains('collapsed'))) await item.locator('.product-toggle-main').click();
+  await item.locator('[data-share-product]').click();
   await expect(page.locator('#share-modal')).toHaveClass(/open/);
   for (const friend of friends) await page.locator('#share-body label', { hasText: friend }).locator('input').check();
   await page.click('#share-confirm');
@@ -580,4 +636,3 @@ async function selectDiaryDate(page, date) {
 }
 
 module.exports = { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
-

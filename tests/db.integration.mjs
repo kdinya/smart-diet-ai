@@ -362,6 +362,91 @@ async function run() {
   r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: expiredToken } });
   check('Expired invite is rejected', r.json === 'expired', JSON.stringify(r.json));
 
+  // Shared Catalog and Admin Checks
+  // 1. Promote user A to admin via service role
+  r = await rest('app_admins', { as: 'service', method: 'POST', body: { user_id: A } });
+  check('Service role can add user A to app_admins', r.status === 201, describe(r));
+
+  // 2. User A can check their own admin status
+  r = await rest('app_admins', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
+  check('Admin user A can verify own admin status', rows(r) === 1, describe(r));
+
+  // 3. User B cannot see user A in app_admins
+  r = await rest('app_admins', { as: 'b', query: `user_id=${eq(A)}&select=user_id` });
+  check('Non-admin user B cannot see user A in app_admins', rows(r) === 0, describe(r));
+
+  // 4. User B cannot insert into app_admins
+  r = await rest('app_admins', { as: 'b', method: 'POST', body: { user_id: B } });
+  check('Non-admin user B cannot insert into app_admins', denied(r), describe(r));
+
+  // 5. Anonymous visitor cannot insert into app_admins
+  rAnon = await rest('app_admins', { method: 'POST', body: { user_id: B } });
+  check('Anonymous visitor cannot insert into app_admins', denied(rAnon), describe(rAnon));
+
+  // 6. Anonymous visitor CAN read catalog_products
+  rAnon = await rest('catalog_products', { query: 'select=id' });
+  check('Anonymous visitor can read catalog_products', !denied(rAnon) && Array.isArray(rAnon.json), describe(rAnon));
+
+  // 7. Anonymous visitor cannot insert into catalog_products
+  rAnon = await rest('catalog_products', { method: 'POST', body: { name: 'Anon spam', grams: 100 } });
+  check('Anonymous visitor cannot insert into catalog_products', denied(rAnon), describe(rAnon));
+
+  // 8. Non-admin user B cannot insert into catalog_products
+  r = await rest('catalog_products', { as: 'b', method: 'POST', body: { name: 'User B product', grams: 100 } });
+  check('Non-admin user B cannot insert into catalog_products', denied(r), describe(r));
+
+  // 9. Admin user A can insert into catalog_products
+  r = await rest('catalog_products', {
+    as: 'a', method: 'POST', prefer: 'return=representation',
+    body: {
+      name: 'CI Catalog Beet Salad',
+      grams: 200,
+      kcal: 180,
+      protein: 4,
+      fat: 10,
+      carbs: 18,
+      verified: true,
+      note: 'Delicious beet salad with garlic',
+      companions: [{ id: '22222222-2222-4222-8222-222222222222', grams: 30, on: true }],
+      components: [
+        { id: 'c-beet', name: 'Beetroot', grams: 150, kcal: 65, protein: 2.5, fat: 0.2, carbs: 14, enabled: true },
+        { id: 'c-garlic', name: 'Garlic', grams: 10, kcal: 15, protein: 0.6, fat: 0.1, carbs: 3.3, enabled: true },
+        { id: 'c-mayo', name: 'Mayonnaise', grams: 40, kcal: 100, protein: 0.9, fat: 9.7, carbs: 0.7, enabled: true }
+      ]
+    }
+  });
+  const catalogItemId = r.json?.[0]?.id;
+  check('Admin user A can insert into catalog_products', r.status === 201 && !!catalogItemId, describe(r));
+
+  // 10. Non-admin user B reads the catalog product and sees all fields
+  r = await rest('catalog_products', { as: 'b', query: `id=${eq(catalogItemId)}&select=*` });
+  const catItem = r.json?.[0];
+  check('Non-admin user B can read full catalog product details', catItem?.name === 'CI Catalog Beet Salad' && catItem?.verified === true && catItem?.components?.length === 3, describe(r));
+
+  // 11. Non-admin user B cannot update catalog product
+  r = await rest('catalog_products', { as: 'b', method: 'PATCH', query: `id=${eq(catalogItemId)}`, body: { name: 'Hacked name' } });
+  check('Non-admin user B cannot update catalog product', emptyOrDenied(r), describe(r));
+  r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=name` });
+  check('Catalog product name remained unchanged after unauthorized update attempt', r.json?.[0]?.name === 'CI Catalog Beet Salad', describe(r));
+
+  // 12. Non-admin user B cannot delete catalog product
+  r = await rest('catalog_products', { as: 'b', method: 'DELETE', query: `id=${eq(catalogItemId)}` });
+  check('Non-admin user B cannot delete catalog product', emptyOrDenied(r), describe(r));
+  r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=id` });
+  check('Catalog product exists after unauthorized delete attempt', rows(r) === 1, describe(r));
+
+  // 13. Admin user A can update catalog product
+  r = await rest('catalog_products', { as: 'a', method: 'PATCH', query: `id=${eq(catalogItemId)}`, body: { name: 'CI Catalog Beet Salad Updated', kcal: 190 } });
+  check('Admin user A can update catalog product', r.status < 300, describe(r));
+  r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=name,kcal` });
+  check('Catalog product was updated successfully', r.json?.[0]?.name === 'CI Catalog Beet Salad Updated' && +r.json?.[0]?.kcal === 190, describe(r));
+
+  // 14. Admin user A can delete catalog product
+  r = await rest('catalog_products', { as: 'a', method: 'DELETE', query: `id=${eq(catalogItemId)}` });
+  check('Admin user A can delete catalog product', r.status < 300, describe(r));
+  r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=id` });
+  check('Catalog product is deleted', rows(r) === 0, describe(r));
+
   // Deleting an account removes its data
   r = await admin('DELETE', `/users/${A}`);
   check('Test account can be deleted', r.status < 300, describe(r));
