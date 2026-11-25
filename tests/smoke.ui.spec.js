@@ -16,6 +16,10 @@ test.describe('Smoke: app version', () => {
       latest: APP_RELEASES[APP_RELEASES.length - 1],
     }));
     expect(release.newestFirst[0]).toBe(release.version);
+    expect(release.latest.fixed.en).toContain('Restored catalog copy, edit and delete actions on mobile, with success feedback only after a row changes.');
+    expect(release.latest.fixed.uk).toContain('Відновлено копіювання, редагування й видалення в каталозі на мобільних екранах; успіх показується лише після фактичної зміни запису.');
+    expect(release.latest.improved.en).toContain('Guest copy actions are clearly marked unavailable and explain that sign-in is required.');
+    expect(release.latest.improved.uk).toContain('Кнопка копіювання для гостей має чіткий неактивний стан і пояснює, що потрібно увійти.');
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
 
     await openView(page, 'settings');
@@ -7537,64 +7541,64 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#product-new')).toBeVisible();
   });
 
-  test('unauthenticated user clicking copy shows registration prompt', async ({ page }) => {
+  test('guest can browse and gets an authorization warning from the visibly inactive copy button', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
     const backend = createBackend();
     backend.tables.catalog_products.push({
-      id: 'cat-test-1',
-      name: 'Greek Yogurt',
-      grams: 100,
-      kcal: 59,
-      protein: 10,
-      fat: 0.4,
-      carbs: 3.6,
-      verified: true,
-      companions: [],
-      components: [],
-      note: 'Rich in protein',
+      id: 'cat-test-1', name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10,
+      fat: 0.4, carbs: 3.6, verified: true, companions: [], components: [], note: 'Rich in protein',
     });
 
     await mockSupabase(page, backend);
-    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
     await openView(page, 'products');
-
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Greek Yogurt');
 
-    const copyBtn = page.locator('#products-list [data-copy-catalog-product]').first();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    const moreBtn = card.locator('[data-more-product]');
+    await expect(moreBtn).toBeVisible();
+    await moreBtn.click();
+    const copyBtn = card.locator('[data-copy-catalog-product]');
     await expect(copyBtn).toBeVisible();
-    await copyBtn.click();
+    await expect(copyBtn).toHaveClass(/is-guest/);
+    await expect(copyBtn).toHaveAttribute('aria-disabled', 'true');
+    await expect(copyBtn).toHaveCSS('cursor', 'not-allowed');
+    await expect(copyBtn).not.toHaveAttribute('disabled');
+    const copyBox = await copyBtn.boundingBox();
+    expect(copyBox).not.toBeNull();
+    await page.mouse.click(copyBox.x + copyBox.width / 2, copyBox.y + copyBox.height / 2);
 
     await expect(page.locator('.toast-msg').last()).toContainText('Будь ласка, зареєструйтеся або увійдіть');
+    expect((await readStore(page)).products || []).toHaveLength(0);
   });
 
-  test('authenticated user copies product to personal products', async ({ page }) => {
+  test('authenticated non-admin can copy from the mobile catalog and the open menu survives rerender', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     const backend = createBackend();
     backend.tables.catalog_products.push({
-      id: 'cat-test-2',
-      name: 'Blueberries',
-      grams: 100,
-      kcal: 57,
-      protein: 0.7,
-      fat: 0.3,
-      carbs: 14.5,
-      verified: true,
-      companions: [],
-      components: [],
-      note: 'Fresh wild berries',
+      id: 'cat-test-2', name: 'Blueberries', grams: 100, kcal: 57, protein: 0.7,
+      fat: 0.3, carbs: 14.5, verified: true, companions: [], components: [], note: 'Fresh wild berries',
     });
 
     await mockSupabase(page, backend);
     await startAlice(page, backend);
     await openView(page, 'products');
-
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Blueberries');
 
-    const copyBtn = page.locator('#products-list [data-copy-catalog-product]').first();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    const moreBtn = card.locator('[data-more-product]');
+    await moreBtn.click();
+    await expect(moreBtn).toHaveAttribute('aria-expanded', 'true');
+    await expect(card.locator('[data-edit-catalog-product], [data-delete-catalog-product]')).toHaveCount(0);
+    await page.evaluate(() => renderProducts());
+    await expect(card.locator('[data-more-product]')).toHaveAttribute('aria-expanded', 'true');
+    const copyBtn = card.locator('[data-copy-catalog-product]');
+    await expect(copyBtn).toBeVisible();
     await copyBtn.click();
 
     await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('productAddedToMine').replace('{name}', 'Blueberries')));
-
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Blueberries');
 
@@ -7605,33 +7609,103 @@ test.describe('Smoke: shared product catalog', () => {
     expect(copied.note).toBe('Fresh wild berries');
   });
 
-  test('admin user sees publish button and can manage catalog entries', async ({ page }) => {
+  test('admin can publish, edit, copy and delete catalog products from a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     const backend = createBackend();
     backend.tables.app_admins.push({ user_id: 'user-alice' });
 
     await mockSupabase(page, backend);
     const oatmeal = { id: 'oat-1', name: 'Oatmeal', grams: 100, kcal: 360, protein: 13, fat: 6, carbs: 65 };
     await startAlice(page, backend);
+    await autoConfirm(page, true);
     await page.evaluate((item) => putProduct(item), oatmeal);
     await openView(page, 'products');
 
-    await expect(page.locator('#products-list')).toContainText('Oatmeal');
-    await page.locator('#products-list .product-toggle-main').first().click();
-
-    const pubBtn = page.locator('#products-list [data-publish-catalog]');
-    await expect(pubBtn).toBeVisible();
-    await pubBtn.click();
-
+    const ownCard = page.locator('#products-list .product-item').filter({ hasText: 'Oatmeal' });
+    await expect(ownCard).toBeVisible();
+    await ownCard.locator('.product-toggle-main').click();
+    await ownCard.locator('[data-more-product]').click();
+    await ownCard.locator('[data-publish-catalog]').click();
     await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('catalogPublishedSuccess').replace('{name}', 'Oatmeal')));
-    expect(backend.tables.catalog_products.some((p) => p.name === 'Oatmeal')).toBe(true);
+    expect(backend.tables.catalog_products.some((product) => product.name === 'Oatmeal')).toBe(true);
 
-    // Switch to catalog view and check admin edit/delete controls
     await page.locator('#catalog-toggle-btn').click();
-    await expect(page.locator('#products-list')).toContainText('Oatmeal');
+    const card = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Oatmeal' });
+    await expect(card).toContainText('Oatmeal');
+    const moreBtn = card.locator('[data-more-product]');
+    await moreBtn.click();
+    await expect(card.locator('[data-edit-catalog-product]')).toBeVisible();
+    await expect(card.locator('[data-delete-catalog-product]')).toBeVisible();
+    await page.evaluate(() => renderProducts());
+    await expect(card.locator('[data-more-product]')).toHaveAttribute('aria-expanded', 'true');
 
-    const editBtn = page.locator('#products-list [data-edit-catalog-product]').first();
-    const delBtn = page.locator('#products-list [data-delete-catalog-product]').first();
-    await expect(editBtn).toBeVisible();
-    await expect(delBtn).toBeVisible();
+    await card.locator('[data-edit-catalog-product]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.fill('#food-name', 'Oatmeal edited');
+    await page.fill('#food-kcal', '375');
+    await page.locator('#food-save').click();
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('catalogUpdatedSuccess').replace('{name}', 'Oatmeal edited')));
+    await expect.poll(() => backend.tables.catalog_products.find((product) => product.name === 'Oatmeal edited')?.kcal).toBe(375);
+
+    const editedCard = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Oatmeal edited' });
+    await editedCard.locator('[data-more-product]').click();
+    await editedCard.locator('[data-copy-catalog-product]').click();
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('productAddedToMine').replace('{name}', 'Oatmeal edited')));
+    expect((await readStore(page)).products.some((product) => product.name === 'Oatmeal edited' && product.kcal === 375)).toBe(true);
+
+    await editedCard.locator('[data-more-product]').click();
+    await editedCard.locator('[data-delete-catalog-product]').click();
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('catalogDeletedSuccess').replace('{name}', 'Oatmeal edited')));
+    await expect(editedCard).toHaveCount(0);
+    expect(backend.tables.catalog_products.some((product) => product.name === 'Oatmeal edited')).toBe(false);
+  });
+
+  test('admin update does not report success when RLS returns no changed row', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+    backend.tables.catalog_products.push({
+      id: 'cat-noop-update', name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10,
+      fat: 0.4, carbs: 3.6, verified: true, companions: [], components: [], note: '',
+    });
+    backend.silentCatalogMutations = true;
+
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('[data-more-product]').click();
+    await card.locator('[data-edit-catalog-product]').click();
+    await page.fill('#food-kcal', '80');
+    await page.locator('#food-save').click();
+
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => t('catalogUpdateFailed')));
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    expect(backend.tables.catalog_products[0].kcal).toBe(59);
+  });
+
+  test('admin delete does not report success when RLS returns no deleted row', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+    backend.tables.catalog_products.push({
+      id: 'cat-noop-delete', name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10,
+      fat: 0.4, carbs: 3.6, verified: true, companions: [], components: [], note: '',
+    });
+    backend.silentCatalogMutations = true;
+
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await autoConfirm(page, true);
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('[data-more-product]').click();
+    await card.locator('[data-delete-catalog-product]').click();
+
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => t('catalogDeleteFailed')));
+    await expect(card).toHaveCount(1);
+    expect(backend.tables.catalog_products).toHaveLength(1);
   });
 });

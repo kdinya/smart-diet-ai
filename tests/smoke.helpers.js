@@ -90,6 +90,7 @@ function createBackend() {
     foodWriteStarted: false,
     foodWriteRelease: null,
     failDeletes: false,
+    silentCatalogMutations: false,
     failProfiles: false,
     rlsProfiles: false,
     deniedTables: [],
@@ -307,19 +308,29 @@ async function handleRest(route, req, url, backend, json) {
     }
     if (req.method() === 'PATCH' || req.method() === 'PUT') {
       const body = req.postDataJSON();
-      for (let i = 0; i < rows.length; i += 1) {
-        if (matchesFilters(rows[i], params)) {
-          rows[i] = { ...rows[i], ...body, updated_at: new Date().toISOString() };
+      const changed = [];
+      if (!backend.silentCatalogMutations) {
+        for (let i = 0; i < rows.length; i += 1) {
+          if (matchesFilters(rows[i], params)) {
+            rows[i] = { ...rows[i], ...body, updated_at: new Date().toISOString() };
+            changed.push(rows[i]);
+          }
         }
       }
+      if ((req.headers()['prefer'] || '').includes('return=representation')) return json(200, changed);
       return route.fulfill({ status: 200, headers: CORS, body: '' });
     }
     if (req.method() === 'DELETE') {
-      for (let i = rows.length - 1; i >= 0; i -= 1) {
-        if (matchesFilters(rows[i], params)) {
-          rows.splice(i, 1);
+      const removed = [];
+      if (!backend.silentCatalogMutations) {
+        for (let i = rows.length - 1; i >= 0; i -= 1) {
+          if (matchesFilters(rows[i], params)) {
+            removed.push(rows[i]);
+            rows.splice(i, 1);
+          }
         }
       }
+      if ((req.headers()['prefer'] || '').includes('return=representation')) return json(200, removed);
       return route.fulfill({ status: 200, headers: CORS, body: '' });
     }
     return json(405, { message: 'Method not mocked' });
