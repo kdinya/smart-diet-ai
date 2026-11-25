@@ -7646,6 +7646,38 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#view-products')).toHaveCSS('background-image', /linear-gradient/);
   });
 
+  test('catalog product note opens from the badge and actions menu only when present', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push(
+      { id: 'cat-note-1', name: 'Product with note', grams: 100, kcal: 100, protein: 10, fat: 2, carbs: 5, verified: true, companions: [], components: [], note: 'Use the cooked weight.' },
+      { id: 'cat-note-2', name: 'Product without note', grams: 100, kcal: 80, protein: 8, fat: 1, carbs: 4, verified: true, companions: [], components: [], note: '' },
+    );
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+
+    const noted = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Product with note' });
+    const plain = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Product without note' });
+    await expect(noted.locator('[data-note-product]')).toHaveCount(1);
+    await expect(plain.locator('[data-note-product]')).toHaveCount(0);
+    await noted.locator('[data-note-product]').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-modal-title')).toHaveText('Product with note');
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Use the cooked weight.');
+    await page.locator('#product-note-modal-ok').click();
+    await noted.locator('.product-toggle-main').click();
+
+    await noted.locator('[data-more-product]').click();
+    await expect(noted.locator('[data-info-product]')).toHaveCount(1);
+    await plain.locator('.product-toggle-main').click();
+    await expect(plain.locator('[data-more-product]')).toBeVisible();
+    await plain.locator('[data-more-product]').click({ force: true });
+    await expect(plain.locator('[data-info-product]')).toHaveCount(0);
+    await noted.locator('[data-info-product]').click();
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-note-modal-view-text')).toHaveText('Use the cooked weight.');
+  });
   test('authenticated non-admin can copy from the mobile catalog and the open menu survives rerender', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const backend = createBackend();
