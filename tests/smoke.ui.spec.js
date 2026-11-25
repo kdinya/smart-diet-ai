@@ -4390,14 +4390,14 @@ test('mobile page titles and descriptions fit beside the date and weight at read
   const expectedUk = {
     home: ['Мій день', 'Їж усвідомлено, без складних підрахунків', 'Вкажи продукти. ШІ оцінить порції, а перед додаванням ти вибереш дату й прийом їжі.', '🥑'],
     diary: ['Щоденник харчування 📖', 'Переглядай записи за датами й калорії для кожного прийому їжі.', '🍎'],
-    products: ['Мої продукти 🛒', 'Збережи продукти, які їси часто, і додавай їх у раціон одним натисканням. 🛒', '🥕'],
+    products: ['Мої продукти', 'Збережи продукти, які їси часто, і додавай їх у раціон одним натисканням. 🛒', '🥕'],
     stats: ['Статистика 🍩', 'Дивись на прогрес у часі, а не лише за один день.', '🫐'],
     settings: ['Налаштування', 'Профіль, мова, ШІ та хмарна синхронізація.', '🍋'],
   };
   const expectedEn = {
     home: ['My day', 'Eat mindfully, without complex math', 'Name the foods. AI estimates portions; choose a date and meal before adding.', '🥑'],
     diary: ['Food diary 📖', 'Review meals by date and track calories for each meal.', '🍎'],
-    products: ['My products 🛒', 'Save foods you eat often and add them to your diary in one tap. 🛒', '🥕'],
+    products: ['My products', 'Save foods you eat often and add them to your diary in one tap. 🛒', '🥕'],
     stats: ['Statistics 🍩', 'Look at progress over time, not just one day.', '🫐'],
     settings: ['Settings', 'Profile, language, AI and cloud sync.', '🍋'],
   };
