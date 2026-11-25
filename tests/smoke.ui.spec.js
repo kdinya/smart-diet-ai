@@ -5421,7 +5421,8 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
 
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.evaluate((el) => el.click());
     for (const id of [MILK, HONEY]) {
       const card = page.locator(`#food-components-list [data-component-item="${id}"]`);
       await expect(card).toBeVisible();
@@ -5462,7 +5463,8 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.evaluate((el) => el.click());
 
     const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
     const dd = card.locator('.dd');
@@ -5499,7 +5501,8 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.evaluate((el) => el.click());
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.scrollIntoViewIfNeeded();
@@ -5534,7 +5537,8 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.evaluate((el) => el.click());
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.evaluate((el) => el.scrollIntoView({ block: 'end' }));
@@ -7298,6 +7302,7 @@ test.describe('Smoke: food entry choice modal', () => {
 
     await openView(page, 'diary');
     await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
     await page.locator('#food-add-manual').click();
 
     await expect(page.locator('#food-fields')).toBeVisible();
