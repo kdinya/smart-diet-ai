@@ -5378,7 +5378,8 @@ test.describe('Smoke: product add-ons', () => {
     await openView(page, 'diary');
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
     await entry.locator('[data-toggle-food]').click();
-    await expect(entry.locator('.food-components-detail .product-main-block')).toHaveCount(2);
+    await expect(entry.locator('.food-components-detail .product-main-block')).toHaveCount(1);
+    await expect(entry.locator('.food-components-detail .product-total-block')).toHaveCount(0);
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
     await entry.locator('[data-edit-food]').click();
 
@@ -5480,6 +5481,70 @@ test.describe('Smoke: product add-ons', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await page.evaluate(() => { document.querySelectorAll('#food-components-list select').forEach((el) => { if (!el.classList.contains('dd-native')) throw new Error('native select left'); }); });
+  });
+
+  test('an open add-on portions list floats over the dialog without resizing it and stays on screen', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+    await openView(page, 'diary');
+    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+
+    const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
+    await dd.scrollIntoViewIfNeeded();
+    const measure = () => page.evaluate(() => {
+      const box = document.querySelector('#modal .modal');
+      return { scrollHeight: box.scrollHeight, scrollTop: box.scrollTop, pageHeight: document.documentElement.scrollHeight };
+    });
+    const before = await measure();
+    await dd.locator('.dd-btn').click();
+    const list = dd.locator('.dd-list');
+    await expect(list).toBeVisible();
+    const geo = await list.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { fixed: getComputedStyle(el).position === 'fixed', top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight, vw: window.innerWidth };
+    });
+    expect(geo.fixed).toBe(true);
+    expect(geo.top).toBeGreaterThanOrEqual(0);
+    expect(geo.bottom).toBeLessThanOrEqual(geo.vh);
+    expect(geo.left).toBeGreaterThanOrEqual(0);
+    expect(geo.right).toBeLessThanOrEqual(geo.vw);
+    expect(await measure()).toEqual(before);
+    await dd.locator('.dd-opt', { hasText: /^1$/ }).click();
+    await expect(list).toBeHidden();
+    await expect(dd.locator('.dd-btn')).toHaveText('1');
+  });
+
+  test('the portions list opens upward when there is no room below the field', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 520 });
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+    await openView(page, 'diary');
+    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+
+    const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
+    await dd.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+    await dd.locator('.dd-btn').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const box = el.closest('.modal');
+      box.scrollTop += r.bottom - (window.innerHeight - 24);
+    });
+    await dd.locator('.dd-btn').click();
+    const list = dd.locator('.dd-list');
+    await expect(list).toBeVisible();
+    const geo = await dd.evaluate((el) => {
+      const l = el.querySelector('.dd-list').getBoundingClientRect();
+      const b = el.querySelector('.dd-btn').getBoundingClientRect();
+      return { listBottom: l.bottom, btnTop: b.top, listTop: l.top, vh: window.innerHeight };
+    });
+    expect(geo.listBottom).toBeLessThanOrEqual(geo.btnTop);
+    expect(geo.listTop).toBeGreaterThanOrEqual(0);
   });
 
   test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
