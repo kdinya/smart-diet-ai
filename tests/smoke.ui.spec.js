@@ -7580,7 +7580,7 @@ test.describe('Smoke: shared product catalog', () => {
     const copyBtn = page.locator('#products-list [data-copy-catalog-product]').first();
     await copyBtn.click();
 
-    await expect(page.locator('.toast-msg').last()).toContainText('«Blueberries» додано до ваших продуктів');
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('productAddedToMine').replace('{name}', 'Blueberries')));
 
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Blueberries');
@@ -7609,7 +7609,7 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(pubBtn).toBeVisible();
     await pubBtn.click();
 
-    await expect(page.locator('.toast-msg').last()).toContainText('успішно опубліковано в каталозі');
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('catalogPublishedSuccess').replace('{name}', 'Oatmeal')));
     expect(backend.tables.catalog_products.some((p) => p.name === 'Oatmeal')).toBe(true);
 
     // Switch to catalog view and check admin edit/delete controls
