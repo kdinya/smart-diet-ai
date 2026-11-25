@@ -1949,9 +1949,10 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await openApp(page, store());
     await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
     await openView(page, 'products');
-    await page.locator('#products-list .product-toggle-main').first().click();
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
-    await page.locator('#products-list [data-add-product]').first().click();
+    const product = page.locator('#products-list .product-item[data-product-id="11111111-1111-4111-8111-111111111111"]');
+    if (await product.evaluate((element) => element.classList.contains('collapsed'))) await product.locator('.product-toggle-main').click();
+    await product.locator('[data-add-product]').click();
     await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
@@ -1961,7 +1962,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
-    await page.locator('#products-list [data-add-product]').first().click();
+    if (await product.evaluate((element) => element.classList.contains('collapsed'))) await product.locator('.product-toggle-main').click();
+    await product.locator('[data-add-product]').click();
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Доброго ранку! Я ще сонний, але сніданок — це дуже важлива справа 🍳😴');
@@ -5023,10 +5025,13 @@ test.describe('Smoke: product add-ons', () => {
 
     await coffeeItem.locator('.product-toggle-main').click();
     const toggle = coffeeItem.locator('[data-toggle-product-addons]');
+    await expect(coffeeItem).not.toHaveClass(/collapsed/);
+    await expect(toggle).toBeVisible();
     await expect(toggle).toHaveText('Show additional products');
     const row = await coffeeItem.locator('.product-row').evaluate((el) => el.compareDocumentPosition(el.nextElementSibling) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(row).toBeTruthy();
     const toggleBox = await toggle.boundingBox();
+    expect(toggleBox).not.toBeNull();
     expect(toggleBox.x).toBeGreaterThanOrEqual(0);
     expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(360);
 
@@ -5051,6 +5056,7 @@ test.describe('Smoke: product add-ons', () => {
     await coffeeItem.locator('[data-toggle-product-addons]').click();
     await expect(addon).toBeVisible();
     const desktopToggleBox = await coffeeItem.locator('[data-toggle-product-addons]').boundingBox();
+    expect(desktopToggleBox).not.toBeNull();
     expect(desktopToggleBox.x).toBeGreaterThanOrEqual(0);
     expect(desktopToggleBox.x + desktopToggleBox.width).toBeLessThanOrEqual(1280);
 
@@ -5058,8 +5064,10 @@ test.describe('Smoke: product add-ons', () => {
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await openView(page, 'products');
-    await coffeeItem.locator('.product-toggle-main').click();
-    await expect(coffeeItem.locator('[data-toggle-product-addons]')).toHaveText('Показати додаткові продукти');
+    await expect(coffeeItem).not.toHaveClass(/collapsed/);
+    await expect(toggle).toHaveText('Сховати додаткові продукти');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(addon).toBeVisible();
     expect(await page.evaluate(() => Object.keys(I.en).sort().join('|') === Object.keys(I.uk).sort().join('|'))).toBe(true);
   });
 
@@ -5069,7 +5077,7 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }, { id: sugarId, grams: 10 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk, sugar], foods: [], weights: [] });
     await openView(page, 'products');
-    const item = page.locator(`.product-item[data-product-id="${COFFEE}"]`);
+    const item = page.locator(`#products-list .product-item[data-product-id="${COFFEE}"]`);
     await item.locator('.product-toggle-main').click();
     await item.locator('[data-toggle-product-addons]').click();
     const milkCheckbox = item.locator(`[data-product-companion-enabled="${MILK}"]`);
@@ -5084,7 +5092,7 @@ test.describe('Smoke: product add-ons', () => {
     await item.locator('.product-toggle-main').click();
     await item.locator('[data-toggle-product-addons]').click();
     await expect(milkCheckbox).not.toBeChecked();
-    await page.locator(`[data-add-product="${COFFEE}"]`).click();
+    await item.locator(`[data-add-product="${COFFEE}"]`).click();
     await page.locator('#pick-add').click();
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 110, 42]]);
   });
@@ -6116,8 +6124,8 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate(() => setBotServiceState({ period: 'day', pajamas: false }));
 
     await openView(page, 'products');
-    const shawarmaItem = page.locator(`.product-item[data-product-id="${SHAWARMA}"]`);
-    const pitaItem = page.locator(`.product-item[data-product-id="${PITA}"]`);
+    const shawarmaItem = page.locator(`#products-list .product-item[data-product-id="${SHAWARMA}"]`);
+    const pitaItem = page.locator(`#products-list .product-item[data-product-id="${PITA}"]`);
     await expect(shawarmaItem.locator('.product-name .product-is-composite')).toBeVisible();
     await expect(pitaItem.locator('.product-name .product-is-composite')).toHaveCount(0);
 
@@ -6432,15 +6440,20 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
   test('the product list shows only the dish totals and keeps actions behind the more button', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [dish], foods: [], weights: [] });
     await openView(page, 'products');
-    await expect(page.locator('.product-components-preview')).toHaveCount(0);
-    await expect(page.locator('[data-more-product]')).toHaveCount(1);
-    await expect(page.locator('.product-actions')).not.toHaveClass(/is-open/);
-    await page.locator('.product-toggle-main').first().click();
-    await page.locator('[data-more-product]').first().click();
-    await expect(page.locator('.product-actions')).toHaveClass(/is-open/);
-    await expect(page.locator('[data-share-product]')).toBeVisible();
-    await expect(page.locator('[data-edit-product]')).toBeVisible();
-    const circles = page.locator('[data-more-product] svg circle');
+    const item = page.locator(`#products-list .product-item[data-product-id="${dish.id}"]`);
+    await expect(item.locator('.product-components-preview')).toHaveCount(0);
+    await expect(item.locator('[data-more-product]')).toHaveCount(1);
+    await expect(item.locator('.product-actions')).not.toHaveClass(/is-open/);
+    await item.locator('.product-toggle-main').click();
+    await item.locator('[data-more-product]').click();
+    await expect(item.locator('.product-actions')).toHaveClass(/is-open/);
+    await expect(item.locator('[data-share-product]')).toBeVisible();
+    await expect(item.locator('[data-edit-product]')).toBeVisible();
+    await page.evaluate(() => renderProducts());
+    await expect(item).not.toHaveClass(/collapsed/);
+    await expect(item.locator('.product-actions')).toHaveClass(/is-open/);
+    await expect(item.locator('[data-more-product]')).toHaveAttribute('aria-expanded', 'true');
+    const circles = item.locator('[data-more-product] svg circle');
     await expect(circles.nth(0)).toHaveAttribute('cx', '12');
     await expect(circles.nth(0)).toHaveAttribute('cy', '5');
     await expect(circles.nth(1)).toHaveAttribute('cx', '12');
@@ -6858,9 +6871,9 @@ test.describe('Smoke: pediatric calorie goals', () => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'en' }, products: [prodWithNote, prodWithoutNote, compWithNote], foods: [], weights: [] });
 
     await openView(page, 'products');
-    const itemWithNote = page.locator(`.product-item[data-product-id="${PROD_WITH_NOTE}"]`);
-    const itemWithoutNote = page.locator(`.product-item[data-product-id="${PROD_WITHOUT_NOTE}"]`);
-    const compItem = page.locator(`.product-item[data-product-id="${COMP_WITH_NOTE}"]`);
+    const itemWithNote = page.locator(`#products-list .product-item[data-product-id="${PROD_WITH_NOTE}"]`);
+    const itemWithoutNote = page.locator(`#products-list .product-item[data-product-id="${PROD_WITHOUT_NOTE}"]`);
+    const compItem = page.locator(`#products-list .product-item[data-product-id="${COMP_WITH_NOTE}"]`);
 
     await expect(itemWithNote.locator('[data-info-product]')).toHaveCount(1);
     await expect(itemWithoutNote.locator('[data-info-product]')).toHaveCount(0);
@@ -6937,8 +6950,8 @@ test.describe('Smoke: pediatric calorie goals', () => {
     expect(store.products.find(p => p.id === PROD_WITH_NOTE).note).toBe('Brand X, updated note');
 
     // Reopen info to delete note with confirmation
-    await itemWithNote.locator('.product-toggle-main').click();
-    await itemWithNote.locator('[data-more-product]').click();
+    if (await itemWithNote.evaluate((element) => element.classList.contains('collapsed'))) await itemWithNote.locator('.product-toggle-main').click();
+    if (!(await itemWithNote.locator('.product-actions').evaluate((element) => element.classList.contains('is-open')))) await itemWithNote.locator('[data-more-product]').click();
     await itemWithNote.locator('[data-info-product]').click();
     await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
     await expect(page.locator('#product-note-view-section')).toBeVisible();
@@ -6984,8 +6997,8 @@ test.describe('Smoke: pediatric calorie goals', () => {
     const parsed = await page.evaluate((json) => parseBackup(json), backupJson);
     expect(parsed.products[0].note).toBe('Saved in backup');
 
-    await itemWithoutNote.locator('.product-toggle-main').click();
-    await itemWithoutNote.locator('[data-more-product]').click();
+    if (await itemWithoutNote.evaluate((element) => element.classList.contains('collapsed'))) await itemWithoutNote.locator('.product-toggle-main').click();
+    if (!(await itemWithoutNote.locator('.product-actions').evaluate((element) => element.classList.contains('is-open')))) await itemWithoutNote.locator('[data-more-product]').click();
     await itemWithoutNote.locator('[data-info-product]').click();
     await page.click('#product-note-view-edit');
     await page.fill('#product-note-modal-text', '');

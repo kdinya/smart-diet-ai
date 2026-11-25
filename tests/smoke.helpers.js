@@ -597,8 +597,9 @@ async function shareFirstProductWith(page, friend) {
   await openView(page, 'settings');
   await expect(page.locator('#friends-list')).toContainText(friend);
   await openView(page, 'products');
-  await page.locator('#products-list [data-toggle-product]').first().click();
-  await page.locator('#products-list [data-share-product]').first().click();
+  const item = page.locator('#products-list .product-item').first();
+  if (await item.evaluate((element) => element.classList.contains('collapsed'))) await item.locator('.product-toggle-main').click();
+  await item.locator('[data-share-product]').click();
   await expect(page.locator('#share-modal')).toHaveClass(/open/);
   await page.locator('#share-body label', { hasText: friend }).locator('input').check();
   await page.click('#share-confirm');
@@ -608,8 +609,9 @@ async function shareFirstProductWithMany(page, friends) {
   await openView(page, 'settings');
   for (const friend of friends) await expect(page.locator('#friends-list')).toContainText(friend);
   await openView(page, 'products');
-  await page.locator('#products-list [data-toggle-product]').first().click();
-  await page.locator('#products-list [data-share-product]').first().click();
+  const item = page.locator('#products-list .product-item').first();
+  if (await item.evaluate((element) => element.classList.contains('collapsed'))) await item.locator('.product-toggle-main').click();
+  await item.locator('[data-share-product]').click();
   await expect(page.locator('#share-modal')).toHaveClass(/open/);
   for (const friend of friends) await page.locator('#share-body label', { hasText: friend }).locator('input').check();
   await page.click('#share-confirm');
@@ -634,4 +636,3 @@ async function selectDiaryDate(page, date) {
 }
 
 module.exports = { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
-
