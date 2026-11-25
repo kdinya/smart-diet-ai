@@ -5208,6 +5208,13 @@ test.describe('Smoke: product add-ons', () => {
     await expect(page.locator('#pick-body [data-toggle-pick-addons]')).toHaveCount(1);
     await expect(group.locator('[data-pick-addons]')).toBeHidden();
     await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#pick-body .product-total-block')).toHaveCount(0);
+    expect(await page.evaluate((id) => {
+      const g = document.querySelector(`#pick-body [data-pick-group="${id}"]`);
+      const toggle = g.querySelector('[data-toggle-pick-addons]').getBoundingClientRect();
+      const box = g.getBoundingClientRect();
+      return g.classList.contains('pick-item-group') && toggle.top >= box.top && toggle.bottom <= box.bottom + 1;
+    }, COFFEE)).toBe(true);
 
     await group.locator('[data-toggle-pick-addons]').click();
     await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'true');
@@ -7383,5 +7390,113 @@ test.describe('Smoke: food entry choice modal', () => {
     const editNote = page.locator("#food-components-field .companion-portion-note");
     await expect(editNote).toBeVisible();
     await expect(editNote).toContainText("на одну порцію");
+  });
+});
+
+test.describe('Smoke: phone back button', () => {
+  const isOpen = (page, selector) => page.locator(selector).evaluate((el) => el.classList.contains('open'));
+  const markAlive = (page) => page.evaluate(() => { window.__alive = 1; });
+  const atBase = (page) => expect.poll(() => page.evaluate(() => (history.state && history.state.sd) || 0)).toBe(0);
+
+  test('back closes an open dialog first and only then leaves the app', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await markAlive(page);
+    await page.evaluate(() => openModal('food'));
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.goBack();
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    expect(await page.evaluate(() => window.__alive)).toBe(1);
+    await atBase(page);
+  });
+
+  test('back returns to the previous section one step at a time', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await markAlive(page);
+    await openView(page, 'diary');
+    await openView(page, 'settings');
+    await expect(page.locator('#view-settings')).toHaveClass(/active/);
+    await page.goBack();
+    await expect(page.locator('#view-diary')).toHaveClass(/active/);
+    await page.goBack();
+    await expect(page.locator('#view-home')).toHaveClass(/active/);
+    expect(await page.evaluate(() => window.__alive)).toBe(1);
+    await atBase(page);
+  });
+
+  test('back closes only the top layer when a confirmation is open over a dialog', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.evaluate(() => openModal('food'));
+    await page.evaluate(() => { window.__confirmResult = 'pending'; askConfirm('Sure?').then((v) => { window.__confirmResult = v; }); });
+    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
+    await page.goBack();
+    await expect(page.locator('#confirm-modal')).not.toHaveClass(/open/);
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    expect(await page.evaluate(() => window.__confirmResult)).toBe(false);
+    await page.goBack();
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+  });
+
+  test('closing a dialog with the close button leaves no extra history step', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await markAlive(page);
+    await page.evaluate(() => openModal('food'));
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect.poll(() => page.evaluate(() => history.state && history.state.sd)).toBe(1);
+    await page.locator('#modal-close').click();
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    await atBase(page);
+    await page.goBack();
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+  });
+
+  test('back closes an open dropdown list before the dialog under it', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await page.locator('#food-add-manual').click();
+    await page.locator('#food-form .dd:has(#food-meal) .dd-btn').click();
+    await expect(page.locator('#food-form .dd.open')).toHaveCount(1);
+    await page.goBack();
+    await expect(page.locator('#food-form .dd.open')).toHaveCount(0);
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+  });
+
+  test('back returns from manual entry to the choice screen before closing the dialog', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
+    await page.locator('#food-add-manual').click();
+    await expect(page.locator('#food-fields')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('#food-fields')).toBeHidden();
+    await expect(page.locator('#pick-product')).toBeVisible();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await page.goBack();
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+  });
+
+  test('back steps out of the products picker pane before closing it', async ({ page }) => {
+    const milk = { id: '22222222-2222-4222-8222-222222222222', name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 };
+    await openApp(page, { prefs: BASE_PREFS, products: [milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products[0]));
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.goBack();
+    await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
+  });
+
+  test('back closes every dialog of the app', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    const ids = await page.evaluate(() => [...document.querySelectorAll('.modal-back')].map((el) => el.id).filter((id) => id && id !== 'onboarding-modal'));
+    const stuck = [];
+    for (const id of ids) {
+      await page.evaluate((target) => document.getElementById(target).classList.add('open'), id);
+      await page.waitForTimeout(60);
+      await page.goBack();
+      await page.waitForTimeout(80);
+      if (await isOpen(page, `#${id}`)) stuck.push(id);
+      await page.evaluate((target) => document.getElementById(target).classList.remove('open'), id);
+      await page.waitForTimeout(60);
+    }
+    expect(stuck).toEqual([]);
   });
 });
