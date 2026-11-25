@@ -463,11 +463,13 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
     await first.locator('[data-action="add-food"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -679,6 +681,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(labels.indexOf('Сніданок')).toBeLessThan(labels.indexOf('Обід'));
     expect(labels.indexOf('Обід')).toBeLessThan(labels.indexOf('Вечеря'));
     await page.locator('#diary-meals [data-meal="snack"]').first().click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Snack food'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -697,6 +700,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
     await page.evaluate(() => window.__advanceTestClock(59 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -706,6 +710,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(foods[1].snackId).toBe(firstId);
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -724,6 +729,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await addFood(page, 'Lunch', 'lunch');
     await page.evaluate(() => window.__advanceTestClock(10 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Pear'],['#food-grams','100'],['#food-kcal','50'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','12']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -733,6 +739,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     expect(snacks[1].snackId).not.toBe(firstId);
     const firstCard=page.locator(`#diary-meals [data-meal-key*="|snack|${firstId}"]`).first();
     await firstCard.locator('[data-action="add-food"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Orange'],['#food-grams','100'],['#food-kcal','45'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','11']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -1154,6 +1161,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'diary');
     await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
+    await page.locator('#modal.open').waitFor();
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     await page.fill('#food-name', 'Storage test meal');
     await page.fill('#food-grams', '150');
