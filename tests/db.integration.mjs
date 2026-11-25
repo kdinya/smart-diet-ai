@@ -424,13 +424,13 @@ async function run() {
   check('Non-admin user B can read full catalog product details', catItem?.name === 'CI Catalog Beet Salad' && catItem?.verified === true && catItem?.components?.length === 3, describe(r));
 
   // 11. Non-admin user B cannot update catalog product
-  r = await rest('catalog_products', { as: 'b', method: 'PATCH', query: `id=${eq(catalogItemId)}`, body: { name: 'Hacked name' } });
+  r = await rest('catalog_products', { as: 'b', method: 'PATCH', query: `id=${eq(catalogItemId)}`, body: { name: 'Hacked name' }, prefer: 'return=representation' });
   check('Non-admin user B cannot update catalog product', emptyOrDenied(r), describe(r));
   r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=name` });
   check('Catalog product name remained unchanged after unauthorized update attempt', r.json?.[0]?.name === 'CI Catalog Beet Salad', describe(r));
 
   // 12. Non-admin user B cannot delete catalog product
-  r = await rest('catalog_products', { as: 'b', method: 'DELETE', query: `id=${eq(catalogItemId)}` });
+  r = await rest('catalog_products', { as: 'b', method: 'DELETE', query: `id=${eq(catalogItemId)}`, prefer: 'return=representation' });
   check('Non-admin user B cannot delete catalog product', emptyOrDenied(r), describe(r));
   r = await rest('catalog_products', { query: `id=${eq(catalogItemId)}&select=id` });
   check('Catalog product exists after unauthorized delete attempt', rows(r) === 1, describe(r));
