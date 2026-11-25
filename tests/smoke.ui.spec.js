@@ -20,8 +20,8 @@ test.describe('Smoke: app version', () => {
     expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
     expect(release.latest.fixed.en).toEqual([]);
     expect(release.latest.fixed.uk).toEqual([]);
-    expect(release.latest.improved.en).toContain('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.');
-    expect(release.latest.improved.uk).toContain('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.');
+    expect(release.latest.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
+    expect(release.latest.improved.uk.some((item) => item.includes('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.'))).toBe(true);
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
 
     await openView(page, 'settings');
@@ -7595,7 +7595,8 @@ test.describe('Smoke: shared product catalog', () => {
 
     const card = page.locator('#products-list .catalog-product-item').first();
     await expect(card).toHaveClass(/is-in-my-products/);
-    await expect(card.locator('.catalog-owned-badge')).toHaveText('✓У моїх');
+    await expect(card.locator('.catalog-owned-badge')).toHaveAttribute('aria-label', 'Вже є у ваших продуктах');
+    await expect(card.locator('.catalog-owned-badge svg')).toHaveCount(1);
     await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
   });
 
@@ -7636,6 +7637,10 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(card.locator('.product-row')).toBeHidden();
     await card.locator('.product-toggle-main').click();
     await expect(card.locator('.product-row')).toBeVisible();
+    await expect(card.locator('.catalog-copy-btn svg')).toHaveCount(1);
+    await expect(card.locator('.catalog-copy-btn svg')).toHaveAttribute('aria-hidden', 'true');
+    await page.mouse.move(1, 1);
+    await expect(card).toHaveCSS('border-left-color', 'rgb(141, 154, 158)');
     await card.locator('.product-toggle-expand').click();
     await expect(card.locator('.product-row')).toBeHidden();
     await expect(page.locator('#view-products')).toHaveCSS('background-image', /linear-gradient/);
@@ -7665,11 +7670,21 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(card.locator('[data-more-product]')).toHaveAttribute('aria-expanded', 'true');
     const copyBtn = card.locator('[data-copy-catalog-product]');
     await expect(copyBtn).toBeVisible();
+    await page.evaluate(() => {
+      const originalAnimate = Element.prototype.animate;
+      window.__catalogFlightCalls = 0;
+      Element.prototype.animate = function (...args) {
+        if (this.classList.contains('catalog-copy-flight')) window.__catalogFlightCalls += 1;
+        return originalAnimate.call(this, ...args);
+      };
+    });
     await copyBtn.click();
+    await expect.poll(() => page.evaluate(() => window.__catalogFlightCalls)).toBe(1);
 
     await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('productAddedToMine').replace('{name}', 'Blueberries')));
     await expect(card).toHaveClass(/is-in-my-products/);
-    await expect(card.locator('.catalog-owned-badge')).toHaveText(await page.evaluate(() => `✓${t('catalogAlreadyInMine')}`));
+    await expect(card.locator('.catalog-owned-badge')).toHaveAttribute('aria-label', await page.evaluate(() => t('catalogAlreadyInMineTitle')));
+    await expect(card.locator('.catalog-owned-badge svg')).toHaveCount(1);
     await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Blueberries');
