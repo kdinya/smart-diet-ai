@@ -5209,8 +5209,16 @@ test.describe('Smoke: product add-ons', () => {
     await expect(group.locator('[data-pick-addons]')).toBeHidden();
     await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'false');
 
-    await group.locator('[data-toggle-pick-addons]').click();
-    await expect(group.locator('[data-toggle-pick-addons]')).toHaveAttribute('aria-expanded', 'true');
+    const toggle = group.locator('[data-toggle-pick-addons]');
+    const groupRect = await group.boundingBox();
+    const toggleRect = await toggle.boundingBox();
+    expect(toggleRect.y).toBeGreaterThanOrEqual(groupRect.y);
+    expect(toggleRect.y + toggleRect.height).toBeLessThanOrEqual(groupRect.y + groupRect.height + 1);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(group.locator('[data-pick-addons] .product-main-block')).toHaveCount(1);
+    await expect(group.locator('[data-pick-addons] .product-total-block')).toHaveCount(0);
     const addon = group.locator(`[data-product-addon="${MILK}"]`);
     await expect(addon.locator('.product-addon-name')).toHaveText('Milk');
     await expect(addon.locator('.companion-nutrition')).toContainText('50 g');
