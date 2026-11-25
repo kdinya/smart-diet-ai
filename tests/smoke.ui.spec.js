@@ -5419,7 +5419,7 @@ test.describe('Smoke: product add-ons', () => {
       const layout = await card.evaluate((el) => {
         const box = (sel) => el.querySelector(sel).getBoundingClientRect();
         const c = el.getBoundingClientRect();
-        const p = box('[data-component-portions]');
+        const p = el.querySelector('[data-component-portions]').closest('.dd').querySelector('.dd-btn').getBoundingClientRect();
         const g = box('[data-component-grams]');
         return {
           sameRow: Math.abs(p.top - g.top) < 2 && Math.abs(p.height - g.height) < 2,
@@ -5443,6 +5443,43 @@ test.describe('Smoke: product add-ons', () => {
     await page.locator(`#food-components-list [data-component-toggle="${HONEY}"]`).uncheck();
     await expect(page.locator(`#food-components-list [data-component-grams="${HONEY}"]`)).toBeDisabled();
     await expect(page.locator(`#food-components-list [data-component-portions="${HONEY}"]`)).toBeDisabled();
+  });
+
+  test('add-on portions in the meal edit modal use the styled list instead of a native select', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+    await openView(page, 'diary');
+    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+
+    const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
+    const dd = card.locator('.dd');
+    await expect(dd).toHaveCount(1);
+    await expect(dd.locator('select')).toHaveClass(/dd-native/);
+    await expect(dd.locator('.dd-btn')).toHaveText('0.5');
+    await expect(dd.locator('.dd-list')).toBeHidden();
+    await dd.locator('.dd-btn').click();
+    await expect(dd.locator('.dd-list')).toBeVisible();
+    const inView = await dd.locator('.dd-list').evaluate((el) => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; });
+    expect(inView).toBe(true);
+    await dd.locator('.dd-opt', { hasText: /^2$/ }).click();
+    await expect(dd.locator('.dd-list')).toBeHidden();
+    await expect(dd.locator('.dd-btn')).toHaveText('2');
+    await expect(card.locator('[data-component-grams]')).toHaveValue('200');
+
+    await card.locator('[data-component-grams]').fill('50');
+    await expect(dd.locator('.dd-btn')).toHaveText('0.5');
+
+    await card.locator(`[data-component-toggle="${MILK}"]`).uncheck();
+    await expect(dd.locator('.dd-btn')).toBeDisabled();
+    await card.locator(`[data-component-toggle="${MILK}"]`).check();
+    await expect(dd.locator('.dd-btn')).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    await page.evaluate(() => { document.querySelectorAll('#food-components-list select').forEach((el) => { if (!el.classList.contains('dd-native')) throw new Error('native select left'); }); });
   });
 
   test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
