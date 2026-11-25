@@ -7748,6 +7748,29 @@ test.describe('Smoke: shared product catalog', () => {
     expect(backend.tables.catalog_products.some((product) => product.name === 'Oatmeal edited')).toBe(false);
   });
 
+  test('admin can edit a composite catalog product', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+    backend.tables.catalog_products.push({
+      id: 'cat-composite-1', name: 'Protein Bowl', grams: 250, kcal: 320, protein: 28,
+      fat: 8, carbs: 30, verified: true, companions: [], note: '',
+      components: [{ id: 'component-1', name: 'Greek Yogurt', grams: 200, kcal: 118, protein: 20, fat: 0.8, carbs: 7.2, enabled: true }],
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Protein Bowl' });
+    await card.locator('.product-toggle-main').click();
+    await card.locator('[data-more-product]').click();
+    await card.locator('[data-edit-catalog-product]').click();
+    await expect(page.locator('#composite-modal')).toHaveClass(/open/);
+    await page.fill('#composite-name', 'Protein Bowl edited');
+    await page.locator('#composite-save-btn').click();
+    await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('catalogUpdatedSuccess').replace('{name}', 'Protein Bowl edited')));
+    expect(backend.tables.catalog_products.find((product) => product.id === 'cat-composite-1')?.name).toBe('Protein Bowl edited');
+    expect(backend.tables.catalog_products.find((product) => product.id === 'cat-composite-1')?.components).toHaveLength(1);
+  });
   test('admin update does not report success when RLS returns no changed row', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     const backend = createBackend();
