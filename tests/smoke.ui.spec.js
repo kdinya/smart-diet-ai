@@ -16,10 +16,12 @@ test.describe('Smoke: app version', () => {
       latest: APP_RELEASES[APP_RELEASES.length - 1],
     }));
     expect(release.newestFirst[0]).toBe(release.version);
-    expect(release.latest.fixed.en).toContain('Restored catalog copy, edit and delete actions on mobile, with success feedback only after a row changes.');
-    expect(release.latest.fixed.uk).toContain('Відновлено копіювання, редагування й видалення в каталозі на мобільних екранах; успіх показується лише після фактичної зміни запису.');
-    expect(release.latest.improved.en).toContain('Guest copy actions are clearly marked unavailable and explain that sign-in is required.');
-    expect(release.latest.improved.uk).toContain('Кнопка копіювання для гостей має чіткий неактивний стан і пояснює, що потрібно увійти.');
+    expect(release.latest.description.en).toBe('Explore shared products and save the ones you need.');
+    expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
+    expect(release.latest.fixed.en).toEqual([]);
+    expect(release.latest.fixed.uk).toEqual([]);
+    expect(release.latest.improved.en).toContain('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.');
+    expect(release.latest.improved.uk).toContain('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.');
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
 
     await openView(page, 'settings');
@@ -7556,6 +7558,7 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#products-list')).toContainText('Greek Yogurt');
 
     const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
     const moreBtn = card.locator('[data-more-product]');
     await expect(moreBtn).toBeVisible();
     await moreBtn.click();
@@ -7573,6 +7576,71 @@ test.describe('Smoke: shared product catalog', () => {
     expect((await readStore(page)).products || []).toHaveLength(0);
   });
 
+  test('catalog marks an existing product and omits its add action', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-already-saved', name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10,
+      fat: 0.4, carbs: 3.6, verified: true, companions: [], components: [], note: 'Rich in protein',
+    });
+
+    await mockSupabase(page, backend);
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'uk' },
+      products: [{ id: 'mine-greek-yogurt', name: 'Greek Yogurt', grams: 100, kcal: 59, protein: 10, fat: 0.4, carbs: 3.6 }],
+      foods: [], weights: [],
+    });
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await expect(card).toHaveClass(/is-in-my-products/);
+    await expect(card.locator('.catalog-owned-badge')).toHaveText('✓У моїх');
+    await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
+  });
+
+  test('catalog cards share product collapse behavior and mobile controls align cleanly', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-mobile-layout', name: 'Fresh Strawberries', grams: 100, kcal: 32, protein: 0.7,
+      fat: 0.3, carbs: 7.7, verified: false, companions: [], components: [], note: '',
+    });
+
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    const toolbar = page.locator('#products-toolbar');
+    const searchBox = await page.locator('#product-search').boundingBox();
+    const sortBox = await toolbar.locator('.dd-btn').boundingBox();
+    const catalogBox = await page.locator('#catalog-toggle-btn').boundingBox();
+    const newProductBox = await page.locator('#product-new').boundingBox();
+    const toolbarBox = await toolbar.boundingBox();
+    expect(searchBox).not.toBeNull();
+    expect(sortBox).not.toBeNull();
+    expect(catalogBox).not.toBeNull();
+    expect(newProductBox).not.toBeNull();
+    expect(searchBox.x).toBeCloseTo(toolbarBox.x, 0);
+    expect(searchBox.width).toBeCloseTo(toolbarBox.width, 0);
+    expect(sortBox.x).toBeCloseTo(toolbarBox.x, 0);
+    expect(sortBox.width).toBeCloseTo(toolbarBox.width, 0);
+    expect(catalogBox.y).toBeCloseTo(newProductBox.y, 0);
+    expect(catalogBox.x).toBeLessThan(newProductBox.x);
+    expect(newProductBox.x + newProductBox.width).toBeLessThanOrEqual(360);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await expect(card).toHaveClass(/collapsed/);
+    await expect(card.locator('.product-row')).toBeHidden();
+    await card.locator('.product-toggle-main').click();
+    await expect(card.locator('.product-row')).toBeVisible();
+    await card.locator('.product-toggle-expand').click();
+    await expect(card.locator('.product-row')).toBeHidden();
+    await expect(page.locator('#view-products')).toHaveCSS('background-image', /linear-gradient/);
+  });
+
   test('authenticated non-admin can copy from the mobile catalog and the open menu survives rerender', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const backend = createBackend();
@@ -7588,6 +7656,7 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#products-list')).toContainText('Blueberries');
 
     const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
     const moreBtn = card.locator('[data-more-product]');
     await moreBtn.click();
     await expect(moreBtn).toHaveAttribute('aria-expanded', 'true');
@@ -7599,6 +7668,9 @@ test.describe('Smoke: shared product catalog', () => {
     await copyBtn.click();
 
     await expect(page.locator('.toast-msg').last()).toContainText(await page.evaluate(() => toastT('productAddedToMine').replace('{name}', 'Blueberries')));
+    await expect(card).toHaveClass(/is-in-my-products/);
+    await expect(card.locator('.catalog-owned-badge')).toHaveText(await page.evaluate(() => `✓${t('catalogAlreadyInMine')}`));
+    await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Blueberries');
 
@@ -7632,6 +7704,7 @@ test.describe('Smoke: shared product catalog', () => {
     await page.locator('#catalog-toggle-btn').click();
     const card = page.locator('#products-list .catalog-product-item').filter({ hasText: 'Oatmeal' });
     await expect(card).toContainText('Oatmeal');
+    await card.locator('.product-toggle-main').click();
     const moreBtn = card.locator('[data-more-product]');
     await moreBtn.click();
     await expect(card.locator('[data-edit-catalog-product]')).toBeVisible();
@@ -7675,6 +7748,7 @@ test.describe('Smoke: shared product catalog', () => {
     await openView(page, 'products');
     await page.locator('#catalog-toggle-btn').click();
     const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
     await card.locator('[data-more-product]').click();
     await card.locator('[data-edit-catalog-product]').click();
     await page.fill('#food-kcal', '80');
@@ -7701,6 +7775,7 @@ test.describe('Smoke: shared product catalog', () => {
     await openView(page, 'products');
     await page.locator('#catalog-toggle-btn').click();
     const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
     await card.locator('[data-more-product]').click();
     await card.locator('[data-delete-catalog-product]').click();
 
