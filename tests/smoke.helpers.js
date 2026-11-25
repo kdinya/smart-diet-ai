@@ -431,20 +431,14 @@ async function autoConfirm(page, answers = true, log = null) {
 
 async function openManualFoodForm(page) {
   await page.locator('#modal.open').waitFor();
-  const manualBtn = page.locator('#food-add-manual');
   const foodFields = page.locator('#food-fields');
-  await page.waitForFunction(() => {
-    const btn = document.getElementById('food-add-manual');
-    const fields = document.getElementById('food-fields');
-    const isVis = el => Boolean(el && el.offsetParent !== null && !el.classList.contains('hidden'));
-    return isVis(btn) || isVis(fields);
+  const manualBtn = page.locator('#food-add-manual');
+  if (await foodFields.isVisible()) return;
+  await manualBtn.waitFor({ state: 'visible' });
+  await page.evaluate(() => {
+    document.getElementById('food-add-manual')?.click();
   });
-  if (await manualBtn.isVisible()) {
-    await manualBtn.click();
-    await expect(foodFields).toBeVisible();
-  } else {
-    await expect(foodFields).toBeVisible();
-  }
+  await expect(foodFields).toBeVisible();
 }
 
 async function addFood(page, name, meal = 'lunch') {
