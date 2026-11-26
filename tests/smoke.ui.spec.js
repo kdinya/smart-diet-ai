@@ -7853,4 +7853,175 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(card).toHaveCount(1);
     expect(backend.tables.catalog_products).toHaveLength(1);
   });
+
+  test('preserves scroll position in products view after opening and closing modals', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const products = Array.from({ length: 25 }, (_, i) => ({
+      id: `p-scroll-${i}`,
+      name: `Продукт ${String(i).padStart(2, '0')}`,
+      grams: 100,
+      kcal: 100 + i,
+      protein: 10,
+      fat: 2,
+      carbs: 10,
+      note: i === 12 ? 'Важлива примітка' : undefined,
+    }));
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.evaluate(() => window.scrollTo(0, 450));
+    await page.waitForTimeout(100);
+    const scrolledBefore = await page.evaluate(() => window.scrollY);
+    expect(scrolledBefore).toBeGreaterThan(300);
+
+    // Open note modal from a product in view at the scrolled position
+    await page.locator('[data-note-product="p-scroll-12"]').dispatchEvent('click');
+    await expect(page.locator('#product-note-modal')).toHaveClass(/open/);
+
+    await page.locator('#product-note-modal-close').click();
+    await expect(page.locator('#product-note-modal')).not.toHaveClass(/open/);
+    await page.waitForTimeout(150);
+
+    const scrolledAfter = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(scrolledAfter - scrolledBefore)).toBeLessThan(10);
+  });
+
+  test('loads catalog instantly from smart_diet_catalog_cache in localStorage', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const cachedCatalog = [
+      { id: 'cat-cache-1', name: 'Кешований вівсяний батончик', grams: 60, kcal: 220, protein: 6, fat: 5, carbs: 38, verified: true, companions: [], components: [] },
+    ];
+    await page.addInitScript((items) => {
+      localStorage.setItem('smart_diet_catalog_cache', JSON.stringify(items));
+    }, cachedCatalog);
+
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-cache-1', name: 'Кешований вівсяний батончик', grams: 60, kcal: 220, protein: 6, fat: 5, carbs: 38, verified: true, companions: [], components: [],
+    });
+    await mockSupabase(page, backend);
+
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+
+    // Verify localStorage key and helper functions
+    const cached = await page.evaluate(() => ({
+      key: CATALOG_CACHE_KEY,
+      loaded: loadCachedCatalog(),
+    }));
+    expect(cached.key).toBe('smart_diet_catalog_cache');
+    expect(cached.loaded).toHaveLength(1);
+    expect(cached.loaded[0].name).toBe('Кешований вівсяний батончик');
+
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Кешований вівсяний батончик');
+  });
+
+  test('warns and proposes copy suffix when creating a simple product or composite dish with duplicate name', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const existing = [
+      { id: 'p-orig-1', name: 'Сир кисломолочний', grams: 100, kcal: 110, protein: 18, fat: 2, carbs: 3 },
+    ];
+    const confirmations = [];
+    await autoConfirm(page, true, confirmations);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: existing, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await page.locator('#product-new').click();
+    await page.locator('#product-type-simple').click();
+    await page.fill('#food-name', 'сир кисломолочний');
+    await page.fill('#food-grams', '150');
+    await page.fill('#food-kcal', '165');
+    await page.click('#food-save');
+
+    await expect(page.locator('#products-list')).toContainText('сир кисломолочний (копія)');
+    expect(confirmations.some((msg) => msg.includes('вже є у ваших продуктах') && msg.includes('(копія)'))).toBe(true);
+
+    confirmations.length = 0;
+    await page.locator('#product-new').click();
+    await page.locator('#product-type-composite').click();
+    await page.fill('#composite-name', 'Сир кисломолочний');
+    await page.locator('#composite-add-ingredient').click();
+    await page.fill('#food-name', 'Сметана');
+    await page.fill('#food-grams', '50');
+    await page.fill('#food-kcal', '80');
+    await page.click('#food-save');
+    await page.click('#composite-save-btn');
+
+    await expect(page.locator('#products-list')).toContainText('Сир кисломолочний (копія)');
+  });
+
+  test('aligns product row icons with info icon to the left of sync/owned icon and expand button to the right', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const myProducts = [
+      { id: 'p-sync-test', name: 'Авокадо', grams: 100, kcal: 160, protein: 2, fat: 15, carbs: 9, note: 'Корисні жири' },
+    ];
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-sync-test', name: 'Авокадо', grams: 100, kcal: 160, protein: 2, fat: 15, carbs: 9, verified: true, note: 'Стиглий сорт Хаас', companions: [], components: [],
+    });
+
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: myProducts, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    const myItem = page.locator('#products-list .product-item').first();
+    const myInfoBtn = myItem.locator('.product-note-badge');
+    const mySyncBadge = myItem.locator('.catalog-sync-badge');
+    const myExpandBtn = myItem.locator('.product-toggle-expand');
+
+    await expect(myInfoBtn).toBeVisible();
+    await expect(mySyncBadge).toBeVisible();
+    await expect(myExpandBtn).toBeVisible();
+
+    const infoBoxMy = await myInfoBtn.boundingBox();
+    const syncBoxMy = await mySyncBadge.boundingBox();
+    const expandBoxMy = await myExpandBtn.boundingBox();
+
+    expect(infoBoxMy.x).toBeLessThan(syncBoxMy.x);
+    expect(syncBoxMy.x).toBeLessThan(expandBoxMy.x);
+
+    await page.locator('#catalog-toggle-btn').click();
+    const catItem = page.locator('#products-list .catalog-product-item').first();
+    const catInfoBtn = catItem.locator('.product-note-badge');
+    const catOwnedBadge = catItem.locator('.catalog-owned-badge');
+    const catExpandBtn = catItem.locator('.product-toggle-expand');
+
+    await expect(catInfoBtn).toBeVisible();
+    await expect(catOwnedBadge).toBeVisible();
+    await expect(catExpandBtn).toBeVisible();
+
+    const infoBoxCat = await catInfoBtn.boundingBox();
+    const ownedBoxCat = await catOwnedBadge.boundingBox();
+    const expandBoxCat = await catExpandBtn.boundingBox();
+
+    expect(infoBoxCat.x).toBeLessThan(ownedBoxCat.x);
+    expect(ownedBoxCat.x).toBeLessThan(expandBoxCat.x);
+  });
+
+  test('removes inner white card shell in catalog mode', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+
+    const cardEl = page.locator('#view-products > .card');
+    await expect(cardEl).toBeVisible();
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
+
+    const cardStyles = await cardEl.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return {
+        background: s.backgroundColor,
+        boxShadow: s.boxShadow,
+        borderWidth: s.borderTopWidth,
+        padding: s.padding,
+      };
+    });
+
+    expect(cardStyles.background).toBe('rgba(0, 0, 0, 0)');
+    expect(cardStyles.boxShadow).toBe('none');
+    expect(cardStyles.padding).toBe('0px');
+  });
 });
