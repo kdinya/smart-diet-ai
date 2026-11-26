@@ -87,7 +87,7 @@ jobs:
             fi
           done
           node --input-type=module <<'NODE'
-          const productionRef = 'wscpmrtjjbevesrchhjq';
+          const productionRef = 'wscprmtjjbevesrchhjr';
           const app = new URL(process.env.TEST_SUPABASE_URL);
           const match = app.hostname.toLowerCase().match(/^([a-z0-9_-]+)\.supabase\.co$/);
           if (!match) throw new Error('TEST_SUPABASE_URL must use <project-ref>.supabase.co');

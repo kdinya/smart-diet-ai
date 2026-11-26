@@ -98,6 +98,7 @@ function createBackend() {
     signupError: null,
     signupWithoutSession: false,
     signupIdentities: undefined,
+    authNetworkFailure: null,
   };
 }
 
@@ -117,6 +118,7 @@ async function mockSupabase(page, backend) {
     }
 
     if (url.pathname === '/auth/v1/token') {
+      if (backend.authNetworkFailure === 'signin') return route.abort();
       const body = req.postDataJSON();
       const id = USERS[body.email];
       if (!id || body.password !== PASSWORD) {
@@ -128,6 +130,7 @@ async function mockSupabase(page, backend) {
     if (url.pathname === '/auth/v1/signup') {
       const body = req.postDataJSON();
       backend.authEvents.push({ action: 'signup', email: body.email });
+      if (backend.authNetworkFailure === 'signup') return route.abort();
       if (backend.signupError) return json(400, backend.signupError);
       const id = USERS[body.email];
       if (!id || body.password !== PASSWORD) return json(400, { msg: 'Invalid signup request' });
