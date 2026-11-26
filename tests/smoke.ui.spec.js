@@ -35,6 +35,8 @@ test.describe('Smoke: app version', () => {
     expect(release.latest.improved.uk.some((item) => item.includes('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.'))).toBe(true);
     expect(release.latest.improved.en.some((item) => item.includes('Search now scrolls consistently in My products and the shared catalog'))).toBe(true);
     expect(release.latest.improved.uk.some((item) => item.includes('Прокручування пошуку узгоджене'))).toBe(true);
+    expect(release.latest.improved.en.some((item) => item.includes('Improved tablet page layouts and password visibility controls.'))).toBe(true);
+    expect(release.latest.improved.uk.some((item) => item.includes('Покращено розкладку сторінок на планшеті та керування видимістю пароля.'))).toBe(true);
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
 
     await openView(page, 'settings');
@@ -394,6 +396,11 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'text');
     await page.locator('#onboard-auth-password-toggle').click();
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'password');
+    await page.locator('#onboard-confirm-password-toggle').click();
+    await expect(page.locator('#onboard-confirm-password')).toHaveAttribute('type', 'text');
+    await expect(page.locator('#onboard-confirm-password-toggle')).toHaveAttribute('aria-label', 'Hide password');
+    await page.locator('#onboard-confirm-password-toggle').click();
+    await expect(page.locator('#onboard-confirm-password')).toHaveAttribute('type', 'password');
     const toggleBounds = await page.locator('#onboard-auth-password-toggle').boundingBox();
     const confirmBounds = await page.locator('#onboard-confirm-password').boundingBox();
     expect(toggleBounds.x + toggleBounds.width).toBeLessThanOrEqual(360);
@@ -436,12 +443,17 @@ test.describe('Smoke: first-run setup', () => {
     const backend = createBackend();
     await mockSupabase(page, backend);
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await page.setViewportSize({ width: 360, height: 800 });
     await openView(page, 'settings');
     await page.locator('[data-auth="signup"]').click();
     await expect(page.locator('#auth-password-hint')).toBeVisible();
     await expect(page.locator('#auth-signup-name-field')).toBeVisible();
     await expect(page.locator('#auth-confirm-password-field')).toBeVisible();
     await expect(page.locator('#auth-confirm-password')).toHaveAttribute('autocomplete', 'new-password');
+    for (const selector of ['#auth-password', '#auth-password-toggle', '#auth-confirm-password', '#auth-confirm-password-toggle']) {
+      const bounds = await page.locator(selector).boundingBox();
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(360);
+    }
     await page.locator('[data-auth="signin"]').click();
     await expect(page.locator('#auth-signup-name-field')).toBeHidden();
     await expect(page.locator('#auth-confirm-password-field')).toBeHidden();
@@ -450,6 +462,10 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#auth-password')).toHaveAttribute('type', 'text');
     await page.locator('#auth-password-toggle').click();
     await expect(page.locator('#auth-password')).toHaveAttribute('type', 'password');
+    await page.locator('#auth-confirm-password-toggle').click();
+    await expect(page.locator('#auth-confirm-password')).toHaveAttribute('type', 'text');
+    await page.locator('#auth-confirm-password-toggle').click();
+    await expect(page.locator('#auth-confirm-password')).toHaveAttribute('type', 'password');
   });
 
   test('settings signup saves the entered name in the profile', async ({ page }) => {
@@ -4706,6 +4722,57 @@ test('mobile page titles and descriptions fit beside the date and weight at read
   await page.locator('#save-lang').click();
   await page.setViewportSize({ width: 430, height: 780 });
   for (const view of Object.keys(expectedUk)) await checkView(view, expectedUk[view]);
+});
+
+test('tablet keeps the section sidebar and uses the mobile content layout on every page', async ({ page }) => {
+  await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+
+  for (const width of [768, 1024]) {
+    await page.setViewportSize({ width, height: 1024 });
+    for (const view of ['home', 'diary', 'products', 'stats', 'settings']) {
+      await openView(page, view);
+      await expect(page.locator('.sidebar')).toBeVisible();
+      await expect(page.locator('.mobilebar')).toBeHidden();
+      await expect(page.locator('.mobile-page-intro')).toBeVisible();
+      await expect(page.locator('.mobile-page-intro')).toHaveAttribute('data-page', view);
+      const layout = await page.evaluate((name) => {
+        const sidebar = document.querySelector('.sidebar').getBoundingClientRect();
+        const main = document.querySelector('.main').getBoundingClientRect();
+        const active = document.querySelector('.view.active');
+        const selectors = {
+          home: '#view-home .stack',
+          diary: '#diary-meals',
+          products: '#view-products #products-toolbar',
+          stats: '#view-stats>.grid',
+          settings: '#view-settings>.grid',
+        };
+        const grid = active.querySelector(selectors[name]);
+        return {
+          sidebarLeft: sidebar.left,
+          sidebarWidth: sidebar.width,
+          mainLeft: main.left,
+          mainRight: main.right,
+          gridColumns: getComputedStyle(grid).gridTemplateColumns.split(/\s+/).length,
+          documentOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+          viewOverflow: active.scrollWidth > active.clientWidth + 1,
+        };
+      }, view);
+      expect(layout.sidebarLeft).toBe(0);
+      expect(layout.sidebarWidth).toBe(width <= 950 ? 205 : 244);
+      expect(layout.mainLeft).toBeGreaterThanOrEqual(layout.sidebarWidth);
+      expect(layout.mainRight).toBeLessThanOrEqual(width + 1);
+      expect(layout.documentOverflow).toBe(false);
+      expect(layout.viewOverflow).toBe(false);
+      if (view !== 'products') expect(layout.gridColumns).toBe(1);
+      else expect(layout.gridColumns).toBe(2);
+    }
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openView(page, 'home');
+  await expect(page.locator('.sidebar')).toBeHidden();
+  await expect(page.locator('.mobilebar')).toBeVisible();
+  await expect(page.locator('.mobile-page-intro')).toBeVisible();
 });
 
 test('home hero card contains avocado illustration cleanly within bounds', async ({ page }) => {
