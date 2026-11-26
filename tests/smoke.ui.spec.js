@@ -5925,8 +5925,9 @@ test.describe('Smoke: product add-ons', () => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0 };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [soup, milk, coffee], foods: [], weights: [] });
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Soup')));
-    await expect(page.locator('#pick-components-field .companion-portion-note')).toContainText('per single portion');
-    await page.selectOption('#pick-portions', '2');
+    await expect(page.locator('#pick-components-field .companion-portion-note')).toContainText('whole dish (bowl)');
+    await expect(page.locator('#pick-portions')).toBeHidden();
+    await page.fill('#pick-grams', '400');
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods[0]?.grams)).toBe(400);
     expect(await page.evaluate(() => state.foods[0].components.map((c) => c.grams))).toEqual([200, 200]);
@@ -6863,8 +6864,8 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
         date: today,
         createdAt: Date.now(),
         components: [
-          { id: 'c-oats', name: 'Oats', grams: 120, kcal: 460, protein: 16, fat: 8, carbs: 80, portion: 2, baseGrams: 60 },
-          { id: 'c-milk', name: 'Milk', grams: 200, kcal: 100, protein: 6, fat: 4, carbs: 10, portion: 2, baseGrams: 100 },
+          { id: 'c-oats', name: 'Oats', grams: 120, kcal: 460, protein: 16, fat: 8, carbs: 80 },
+          { id: 'c-milk', name: 'Milk', grams: 200, kcal: 100, protein: 6, fat: 4, carbs: 10 },
         ]
       }],
       weights: []
@@ -6877,26 +6878,26 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
 
-    await expect(page.locator('#food-portions')).toHaveValue('2');
-    await expect(page.locator('#food-components-list [data-component-grams="c-oats"]')).toHaveValue('60');
-    await expect(page.locator('#food-components-list [data-component-grams="c-milk"]')).toHaveValue('100');
-    await page.locator('#food-components-list [data-component-grams="c-oats"]').fill('30');
+    await expect(page.locator('#portion-field')).toHaveClass(/hidden/);
+    await page.locator('[data-companion-toggle="c-oats"]').click();
+    await page.locator('[data-companion-toggle="c-milk"]').click();
+    await expect(page.locator('#food-components-list [data-component-grams="c-oats"]')).toHaveValue('120');
+    await expect(page.locator('#food-components-list [data-component-grams="c-milk"]')).toHaveValue('200');
+    await page.locator('#food-components-list [data-component-grams="c-oats"]').fill('60');
     await expect(page.locator('#food-grams')).toHaveValue('260');
     await expect(page.locator('#food-kcal')).toHaveValue('330');
-    await expect(page.locator('#food-portions')).toHaveValue('2');
 
     await page.click('#food-component-add');
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await page.locator('[data-pick-product="p-banana"]').click();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(3);
-    await expect(page.locator('#food-grams')).toHaveValue('460');
-    await expect(page.locator('#food-kcal')).toHaveValue('508');
-    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await expect(page.locator('#food-grams')).toHaveValue('360');
+    await expect(page.locator('#food-kcal')).toHaveValue('419');
 
     await page.click('#food-save');
     await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
-    await expect.poll(() => page.evaluate(() => state.foods.map(f => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 460, 508]]);
+    await expect.poll(() => page.evaluate(() => state.foods.map(f => [f.name, f.grams, f.kcal]))).toEqual([['Oatmeal bowl', 360, 419]]);
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').components.length)).toBe(2);
     expect(await page.evaluate(() => state.products.find(p => p.name === 'Oatmeal bowl').grams)).toBe(160);
   });
@@ -7723,7 +7724,7 @@ test.describe('Smoke: food entry choice modal', () => {
     await expect(page.locator("#pick-components-field")).toBeVisible();
     const pickNote = page.locator("#pick-components-field .companion-portion-note");
     await expect(pickNote).toBeVisible();
-    await expect(pickNote).toContainText("на одну порцію");
+    await expect(pickNote).toContainText("всю страву");
 
     // Add to lunch
     await page.click("#pick-add");
@@ -7737,7 +7738,7 @@ test.describe('Smoke: food entry choice modal', () => {
     await expect(page.locator("#food-components-field")).toBeVisible();
     const editNote = page.locator("#food-components-field .companion-portion-note");
     await expect(editNote).toBeVisible();
-    await expect(editNote).toContainText("на одну порцію");
+    await expect(editNote).toContainText("всю страву");
   });
 });
 
@@ -8577,23 +8578,22 @@ test.describe('Smoke: composite portion normalization', () => {
     const diaryEntry = page.locator('#diary-meals .meal-item[data-food-id]').first();
     await diaryEntry.locator('[data-toggle-food]').click();
     await diaryEntry.locator('[data-edit-food]').click();
-    await page.selectOption('#food-portions', '1');
+    await page.fill('#food-grams', '100');
     await page.click('#food-save');
     stored = await readStore(page);
     expect(stored.foods[0].grams).toBe(100);
     expect(stored.foods[0].components.find((item) => item.id === 'beet')).toMatchObject({ grams: 100, enabled: true });
   });
 
-  test('places the My products/catalog navigation button inside products toolbar', async ({ page }) => {
+  test('places the My products/catalog navigation button directly above the catalog card', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
     await openView(page, 'products');
     const placement = await page.locator('#catalog-toggle-btn').evaluate((button) => ({
-      parentId: button.parentElement?.id || '',
+      parent: button.parentElement?.className || '',
       insideCard: Boolean(button.closest('.card')),
-      previousSibling: button.nextElementSibling?.id || '',
+      followsToolbar: button.parentElement?.previousElementSibling?.id === 'products-toolbar',
     }));
     expect(placement.insideCard).toBe(false);
-    expect(placement.parentId).toBe('products-toolbar');
-    expect(placement.previousSibling).toBe('product-new');
+    expect(placement.followsToolbar).toBe(true);
   });
 });
