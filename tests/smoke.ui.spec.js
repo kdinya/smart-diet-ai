@@ -7,6 +7,15 @@ async function waitForTransformTransition(locator) {
   })).toBe(true);
 }
 
+async function clearSleepFoodReminderCooldown(page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('smartdiet-sleep-food-reminder');
+    localStorage.removeItem('smartdiet-sleep-food-morning');
+    if (typeof sleepFoodReminderAt !== 'undefined') sleepFoodReminderAt = 0;
+    if (typeof sleepFoodMorningAt !== 'undefined') sleepFoodMorningAt = 0;
+  });
+}
+
 test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
@@ -18,8 +27,8 @@ test.describe('Smoke: app version', () => {
     expect(release.newestFirst[0]).toBe(release.version);
     expect(release.latest.description.en).toBe('Explore shared products and save the ones you need.');
     expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
-    expect(release.latest.fixed.en).toEqual([]);
-    expect(release.latest.fixed.uk).toEqual([]);
+    expect(release.latest.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
+    expect(release.latest.fixed.uk.some((item) => item.includes('Додатки продуктів зі спільного каталогу'))).toBe(true);
     expect(release.latest.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
     expect(release.latest.improved.uk.some((item) => item.includes('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.'))).toBe(true);
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
@@ -464,7 +473,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('multiple snack events are numbered, grouped, and survive reload', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
@@ -474,6 +483,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.click('#food-save');
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -697,7 +707,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('snacks added less than an hour apart share the same snack event', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
@@ -722,7 +732,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('a main meal interrupts the snack hour but an existing snack can still receive food', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
@@ -1935,7 +1945,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('meal add shows a reminder while asleep and returns the assistant to sleep when closed', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
@@ -1953,7 +1964,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('product plus shows a reminder while asleep and does not open the meal picker', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
-    await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
+    await clearSleepFoodReminderCooldown(page);
     await openView(page, 'products');
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     const product = page.locator('#products-list .product-item[data-product-id="11111111-1111-4111-8111-111111111111"]');
@@ -1966,7 +1977,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#bot-comic .bot-comic-actions button').click();
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     if (await product.evaluate((element) => element.classList.contains('collapsed'))) await product.locator('.product-toggle-main').click();
     await product.locator('[data-add-product]').click();
@@ -1978,8 +1990,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('AI-recommended food shows the sleep reminder before opening the meal picker', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
+    await clearSleepFoodReminderCooldown(page);
     await page.evaluate(() => {
-      localStorage.removeItem('smartdiet-sleep-food-reminder');
       clearTimeout(botWelcomeTimer);
       botWelcomeTimer = null;
       botWelcomeScheduled = false;
@@ -2000,7 +2012,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('disabled assistant never intercepts food entry even while asleep', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'uk' }, products: [], foods: [], weights: [] });
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
@@ -2013,7 +2026,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('sleeping and sleepy reminders share a 10-minute cooldown, then show again', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     const add = meal.locator('[data-action="add-food"]');
@@ -2040,7 +2054,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('a sleepy assistant allows morning food and gives a gentle reminder in the evening', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     const add = meal.locator('[data-action="add-food"]');
@@ -2053,7 +2068,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#modal-close').click();
     await page.evaluate(() => hideBotComic(true));
 
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'evening', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'evening', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await add.click();
     await expect(bubble).toHaveClass(/is-visible/);
@@ -2061,7 +2077,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await bubble.locator('.bot-comic-actions button').click();
     await expect(bubble).not.toHaveClass(/is-visible/);
 
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'day', pajamas: false }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'day', pajamas: false }));
     await add.click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(bubble).not.toHaveClass(/is-visible/);
@@ -5434,7 +5451,9 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
 
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
     for (const id of [MILK, HONEY]) {
       const card = page.locator(`#food-components-list [data-component-item="${id}"]`);
       await expect(card).toBeVisible();
@@ -5475,7 +5494,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
     const dd = card.locator('.dd');
@@ -5512,7 +5533,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.scrollIntoViewIfNeeded();
@@ -5547,7 +5570,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.evaluate((el) => el.scrollIntoView({ block: 'end' }));
@@ -7613,23 +7638,29 @@ test.describe('Smoke: shared product catalog', () => {
     await openView(page, 'products');
 
     const toolbar = page.locator('#products-toolbar');
-    const searchBox = await page.locator('#product-search').boundingBox();
-    const sortBox = await toolbar.locator('.dd-btn').boundingBox();
+    const controls = page.locator('#products-controls');
+    const sortBox = await controls.locator('.dd-btn').boundingBox();
+    const legendBox = await page.locator('#products-legend-btn').boundingBox();
+    const lupaBox = await page.locator('#product-search-toggle').boundingBox();
+    const controlsBox = await controls.boundingBox();
     const catalogBox = await page.locator('#catalog-toggle-btn').boundingBox();
     const newProductBox = await page.locator('#product-new').boundingBox();
-    const toolbarBox = await toolbar.boundingBox();
-    expect(searchBox).not.toBeNull();
     expect(sortBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(lupaBox).not.toBeNull();
     expect(catalogBox).not.toBeNull();
     expect(newProductBox).not.toBeNull();
-    expect(searchBox.x).toBeCloseTo(toolbarBox.x, 0);
-    expect(searchBox.width).toBeCloseTo(toolbarBox.width, 0);
-    expect(sortBox.x).toBeCloseTo(toolbarBox.x, 0);
-    expect(sortBox.width).toBeCloseTo(toolbarBox.width, 0);
+    expect(Math.abs(sortBox.width - legendBox.width)).toBeLessThanOrEqual(1);
+    expect(sortBox.height).toBeCloseTo(legendBox.height, 0);
+    expect(lupaBox.width).toBeCloseTo(lupaBox.height, 0);
+    expect(lupaBox.height).toBeCloseTo(sortBox.height, 0);
+    expect(lupaBox.x + lupaBox.width).toBeLessThanOrEqual(controlsBox.x + controlsBox.width + 1);
+    await expect(page.locator('#product-search')).not.toBeInViewport();
     expect(catalogBox.y).toBeCloseTo(newProductBox.y, 0);
     expect(catalogBox.x).toBeLessThan(newProductBox.x);
     expect(newProductBox.x + newProductBox.width).toBeLessThanOrEqual(360);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    await expect(toolbar).toBeVisible();
 
     await page.locator('#catalog-toggle-btn').click();
     const card = page.locator('#products-list .catalog-product-item').first();
@@ -7950,7 +7981,6 @@ test.describe('Smoke: shared product catalog', () => {
 
     await expect(page.locator('#products-list')).toContainText('Сир кисломолочний (копія)');
   });
-
   test('aligns product row icons with info icon to the left of sync/owned icon and expand button to the right', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     const myProducts = [
@@ -8023,5 +8053,143 @@ test.describe('Smoke: shared product catalog', () => {
     expect(cardStyles.background).toBe('rgba(0, 0, 0, 0)');
     expect(cardStyles.boxShadow).toBe('none');
     expect(cardStyles.padding).toBe('0px');
+  });
+
+  test('products controls: equal sort and legend buttons, square search icon, animated search with clear button', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const products = [
+      { id: 'p-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 },
+      { id: 'p-bread', name: 'Bread', grams: 100, kcal: 250, protein: 8, fat: 3, carbs: 48 },
+    ];
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await expect(page.locator('#products-list-title')).toHaveText('Мої продукти');
+    const box = page.locator('#product-search-box');
+    const toggle = page.locator('#product-search-toggle');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(await box.evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#product-search')).toBeFocused();
+    await expect.poll(() => box.evaluate((el) => Math.round(el.getBoundingClientRect().height))).toBe(40);
+    const geometry = await page.evaluate(() => {
+      const c = document.querySelector('#products-controls').getBoundingClientRect();
+      const b = document.querySelector('#product-search-box').getBoundingClientRect();
+      const s = document.querySelector('#products-controls .dd-btn').getBoundingClientRect();
+      return { sameWidth: Math.abs(b.width - c.width) < 2, below: b.top >= s.bottom };
+    });
+    expect(geometry).toEqual({ sameWidth: true, below: true });
+
+    await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '0');
+    await page.keyboard.type('app');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple']);
+    await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '1');
+    await page.locator('#product-search-clear').click();
+    await expect(page.locator('#product-search')).toHaveValue('');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple', 'Bread']);
+    await expect(page.locator('#product-search')).toBeFocused();
+
+    await page.keyboard.type('bre');
+    await openView(page, 'stats');
+    await openView(page, 'products');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#product-search')).toHaveValue('');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple', 'Bread']);
+  });
+
+  test('legend modal explains the product icons and closes', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.locator('#products-legend-btn').click();
+    const modal = page.locator('#products-legend-modal');
+    await expect(modal).toHaveClass(/open/);
+    await expect(modal.locator('.legend-item')).toHaveCount(15);
+    await expect(modal).toContainText('Перевірений продукт');
+    await expect(modal).toContainText('Галочка біля додатка');
+    await expect(modal).not.toContainText('лише адміністратор');
+    await modal.locator('#products-legend-close').click();
+    await expect(modal).not.toHaveClass(/open/);
+  });
+
+  test('catalog shows its own heading and an already-added note instead of an empty actions popup', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-owned', name: 'Blueberries', grams: 100, kcal: 57, protein: 0.7, fat: 0.3, carbs: 14.5,
+      verified: false, companions: [], components: [], note: '',
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await page.evaluate(() => putProduct({ id: 'mine-blue', name: 'Blueberries', grams: 100, kcal: 57, protein: 0.7, fat: 0.3, carbs: 14.5 }));
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list-title')).toHaveText(/Product catalog|Каталог продуктів/);
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
+    await card.locator('.product-more').click();
+    const note = card.locator('.catalog-added-note');
+    await expect(note).toBeVisible();
+    await expect(note).toHaveText(/Already added|Вже додано/);
+    await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
+  });
+
+  test('publishing a product with an add-on stores the add-on data inside the catalog entry', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await page.evaluate(() => {
+      putProduct({ id: 'milk-1', name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 });
+      putProduct({ id: 'coffee-1', name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, verified: true, note: 'Morning', companions: [{ id: 'milk-1', grams: 50, on: true }] });
+    });
+    await openView(page, 'products');
+    await page.locator('#products-list .product-item', { hasText: 'Coffee' }).locator('.product-toggle-main').first().click();
+    await page.locator('#products-list [data-publish-catalog]').first().click();
+    await expect.poll(() => backend.tables.catalog_products.length).toBe(1);
+
+    const row = backend.tables.catalog_products[0];
+    expect(row.verified).toBe(true);
+    expect(row.note).toBe('Morning');
+    expect(row.companions).toEqual([{ id: 'milk-1', grams: 50, on: true, item: { name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 } }]);
+
+    await page.evaluate(() => deleteProduct?.('milk-1'));
+    await page.locator('#catalog-toggle-btn').click();
+    await page.locator('#products-list .product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
+  });
+
+  test('copying a catalog product with add-ons gives an independent copy that includes them', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-coffee', name: 'Coffee with milk', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, verified: true, note: '', components: [],
+      companions: [{ id: 'admin-milk', grams: 50, on: true, item: { name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 } }],
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    await page.locator('#products-list .product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
+    await page.locator('#products-list [data-copy-catalog-product]').first().click();
+
+    await expect.poll(async () => (await readStore(page)).products.length).toBe(2);
+    const stored = await readStore(page);
+    const milk = stored.products.find((p) => p.name === 'Milk');
+    const coffee = stored.products.find((p) => p.name === 'Coffee with milk');
+    expect(milk).toBeDefined();
+    expect(milk.id).not.toBe('admin-milk');
+    expect(coffee.companions).toEqual([{ id: milk.id, grams: 50, on: true }]);
+    expect(backend.tables.catalog_products[0].companions[0].id).toBe('admin-milk');
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Coffee with milk');
+    await page.locator('#products-list .product-item', { hasText: 'Coffee with milk' }).locator('.product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
   });
 });

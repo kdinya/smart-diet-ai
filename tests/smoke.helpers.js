@@ -396,10 +396,23 @@ async function handleRest(route, req, url, backend, json) {
 async function openApp(page, store = {}) {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
   await page.goto('/');
-  await page.evaluate((data) => localStorage.setItem('smartdiet-v1', JSON.stringify(data)), store);
+  await page.evaluate((data) => {
+    localStorage.setItem('smartdiet-v1', JSON.stringify(data));
+    const now = String(Date.now());
+    localStorage.setItem('smartdiet-sleep-food-reminder', now);
+    localStorage.setItem('smartdiet-sleep-food-morning', now);
+  }, store);
   await page.reload();
   await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
-  await page.evaluate(() => localStorage.setItem('smartdiet-sleep-food-reminder', String(Date.now())));
+  await page.evaluate(() => {
+    const now = Date.now();
+    localStorage.setItem('smartdiet-sleep-food-reminder', String(now));
+    localStorage.setItem('smartdiet-sleep-food-morning', String(now));
+    try {
+      if (typeof sleepFoodReminderAt !== 'undefined') sleepFoodReminderAt = now;
+      if (typeof sleepFoodMorningAt !== 'undefined') sleepFoodMorningAt = now;
+    } catch (_) {}
+  });
 }
 
 async function readStore(page) {
