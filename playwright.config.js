@@ -7,7 +7,7 @@ module.exports = defineConfig({
   testMatch: '**/*.spec.js',
   timeout: 60_000,
   fullyParallel: true,
-  workers: Number(process.env.PW_WORKERS || 2),
+  workers: Number(process.env.PW_WORKERS || (process.env.CI ? 1 : 2)),
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: Boolean(process.env.CI),
   reporter: [['list']],

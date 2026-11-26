@@ -1035,7 +1035,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await openView(page, 'products');
     await expect(page.locator('#products-list')).toContainText('Oats');
     await page.locator('#products-list .product-toggle-main').first().click();
-    await page.locator('#products-list [data-add-product]').first().click();
+    await page.locator('#products-list [data-add-product]').first().evaluate((button) => button.click());
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#pick-dates [data-pick-date="tomorrow"]')).toBeVisible();
     await page.locator('#pick-dates [data-pick-date="today"]').click();
@@ -1092,7 +1092,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#nav:visible, #mobile-nav:visible').first()).toBeVisible();
     await openView(page, 'products');
     await page.locator('#products-list .product-item').nth(1).locator('.product-toggle-main').click();
-    await page.locator('#products-list [data-edit-product]').nth(1).click();
+    await page.locator('#products-list [data-edit-product]').nth(1).evaluate((button) => button.click());
     await page.fill('#food-name', 'Buckwheat deluxe');
     await page.click('#food-save');
     stored = await readStore(page);
@@ -1949,9 +1949,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await openApp(page, store());
     await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
     await openView(page, 'products');
-    await page.locator('#products-list .product-toggle-main').first().click();
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
-    await page.locator('#products-list [data-add-product]').first().click();
+    await page.locator('#products-list [data-add-product]').first().evaluate((button) => button.click());
     await page.clock.fastForward(20);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#pick-modal')).not.toHaveClass(/open/);
@@ -1961,7 +1960,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
     await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
-    await page.locator('#products-list [data-add-product]').first().click();
+    await page.locator('#products-list [data-add-product]').first().evaluate((button) => button.click());
     await expect(page.locator('#pick-modal')).toHaveClass(/open/);
     await expect(page.locator('#bot-comic')).toHaveClass(/is-visible/);
     await expect(page.locator('#bot-comic .bot-comic-text')).toHaveText('Доброго ранку! Я ще сонний, але сніданок — це дуже важлива справа 🍳😴');
@@ -7513,7 +7512,7 @@ test.describe('Smoke: shared product catalog', () => {
 
     await toggleBtn.click();
     await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
-    await expect(page.locator('#view-products .view-title')).toHaveText('Спільний каталог');
+    await expect(page.locator('#view-products .view-title')).toHaveText('Каталог продуктів');
     await expect(toggleBtn).toHaveText('← Мої продукти');
     await expect(page.locator('#product-new')).toBeHidden();
 
@@ -7620,5 +7619,62 @@ test.describe('Smoke: shared product catalog', () => {
     const delBtn = page.locator('#products-list [data-delete-catalog-product]').first();
     await expect(editBtn).toBeVisible();
     await expect(delBtn).toBeVisible();
+  });
+
+  test('shows already added status instead of an empty catalog action panel', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-already-added', name: 'Oatmeal', grams: 100, kcal: 360, protein: 13, fat: 6, carbs: 65,
+      verified: true, companions: [], components: [], note: '',
+    });
+
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await page.evaluate(() => putProduct({ id: 'mine-oatmeal', name: 'Oatmeal', grams: 100, kcal: 360, protein: 13, fat: 6, carbs: 65 }));
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
+    await card.locator('[data-more-product]').click();
+    await expect(card.locator('.catalog-already-added')).toHaveText('Already added');
+    await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
+  });
+
+  test('opens localized product legend and animates the compact search controls', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await expect(page.locator('#product-search-toggle')).toBeVisible();
+    await expect(page.locator('#product-controls')).not.toHaveClass(/search-open/);
+    await page.locator('#product-legend-open').click();
+    await expect(page.locator('#product-legend-modal')).toHaveClass(/open/);
+    await expect(page.locator('#product-legend-title')).toHaveText('Позначення та дії продуктів');
+    await page.locator('#product-legend-close').click();
+
+    await page.locator('#product-search-toggle').click();
+    await expect(page.locator('#product-controls')).toHaveClass(/search-open/);
+    await expect(page.locator('#product-search')).toBeFocused();
+    await page.locator('#product-search').fill('oat');
+    await expect(page.locator('#product-search-clear')).toBeVisible();
+    await page.locator('#product-search-clear').click();
+    await expect(page.locator('#product-search')).toHaveValue('');
+    await openView(page, 'diary');
+    await expect(page.locator('#product-controls')).not.toHaveClass(/search-open/);
+    await openView(page, 'products');
+    await expect(page.locator('#product-search-toggle')).toBeVisible();
+  });
+
+  test('keeps the product controls usable at 360px width', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await openView(page, 'products');
+    const controls = await page.locator('#product-controls').boundingBox();
+    const viewport = page.viewportSize();
+    expect(controls).not.toBeNull();
+    expect(controls.width).toBeLessThanOrEqual(viewport.width);
+    await page.locator('#product-search-toggle').click();
+    await expect(page.locator('#product-search')).toBeFocused();
+    await expect(page.locator('#product-sort')).toBeVisible();
+    await expect(page.locator('#product-legend-open')).toBeVisible();
   });
 });
