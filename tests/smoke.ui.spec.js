@@ -6393,7 +6393,8 @@ test.describe('Smoke: product add-ons', () => {
     const newIngredientCard = page.locator('#composite-ingredients-list [data-ingredient-id]');
     await expect(newIngredientCard).toHaveClass(/component-card/);
     await expect(newIngredientCard.locator('.companion-name')).toHaveText('New ingredient');
-    await expect(newIngredientCard.locator('[data-edit-ingredient]')).toBeVisible();
+    await expect(newIngredientCard.locator('[data-companion-toggle]')).toBeVisible();
+    await expect(newIngredientCard.locator('[data-edit-ingredient], [data-delete-ingredient]')).toHaveCount(0);
     await expect(newIngredientCard.locator('[data-composite-ingredient-enabled]')).toBeChecked();
     await expect(newIngredientCard.locator('.companion-nutrition')).toContainText('120');
     await expect(page.locator('#composite-summary')).toContainText('120');
@@ -6482,7 +6483,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#modal-close');
   });
 
-  test('editing ingredient in composite product updates dish totals', async ({ page }) => {
+  test('expanding a composite ingredient lets you change grams and updates dish totals', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
     const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
@@ -6490,13 +6491,11 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
     const pitaCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${PITA}"]`);
     await expect(pitaCard).toHaveClass(/component-card/);
-    await expect(pitaCard.locator('[data-edit-ingredient]')).toBeVisible();
-    await pitaCard.locator('[data-edit-ingredient]').click();
-    await expect(page.locator('#modal')).toHaveClass(/open/);
-
-    await page.fill('#food-grams', '200');
-    await page.fill('#food-kcal', '500');
-    await page.click('#food-save');
+    await expect(pitaCard.locator('[data-edit-ingredient], [data-delete-ingredient]')).toHaveCount(0);
+    await expect(pitaCard.locator('.companion-actions button')).toHaveCount(1);
+    await pitaCard.locator('[data-companion-toggle]').click();
+    await page.fill(`#composite-ingredients-list [data-ingredient-grams="${PITA}"]`, '200');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
 
     await expect(page.locator('#composite-summary')).toContainText('300');
     await expect(page.locator('#composite-summary')).toContainText('660');
@@ -6511,7 +6510,7 @@ test.describe('Smoke: product add-ons', () => {
     });
   });
 
-  test('removing an ingredient asks for confirmation and recalculates totals', async ({ page }) => {
+  test('excluding an ingredient updates the composite totals', async ({ page }) => {
     const SHAWARMA = '55555555-5555-4555-8555-555555555555';
     const shawarma = { id: SHAWARMA, name: 'Shawarma', grams: 200, kcal: 410, protein: 32, fat: 5, carbs: 50, components: [{ id: PITA, name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 }, { id: CHICKEN, name: 'Chicken', grams: 100, kcal: 160, protein: 24, fat: 4, carbs: 0 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [shawarma, pita, chicken], foods: [], weights: [] });
@@ -6519,22 +6518,21 @@ test.describe('Smoke: product add-ons', () => {
     await page.evaluate((s) => openCompositeModal(state.products.find((p) => p.id === s.id)), shawarma);
     const chickenCard = page.locator(`#composite-ingredients-list [data-ingredient-id="${CHICKEN}"]`);
     await expect(chickenCard).toHaveClass(/component-card/);
-    await chickenCard.locator('[data-delete-ingredient]').click();
-    await expect(page.locator('#confirm-modal')).toHaveClass(/open/);
-    await page.click('#confirm-ok');
-
-    await expect(page.locator('#composite-ingredients-list')).not.toContainText('Chicken');
+    await expect(chickenCard.locator('[data-edit-ingredient], [data-delete-ingredient]')).toHaveCount(0);
+    await chickenCard.locator('[data-composite-ingredient-enabled]').uncheck();
+    await expect(chickenCard).toHaveClass(/is-disabled/);
     await expect(page.locator('#composite-summary')).toContainText('100');
     await expect(page.locator('#composite-summary')).toContainText('250');
 
     await page.click('#composite-save-btn');
     await expect.poll(() => page.evaluate(() => {
       const p = state.products.find((x) => x.id === '55555555-5555-4555-8555-555555555555');
-      return p ? { grams: p.grams, kcal: p.kcal, count: p.components.length } : null;
+      return p ? { grams: p.grams, kcal: p.kcal, count: p.components.length, chickenEnabled: p.components.find((item) => item.id === '66666666-6666-4666-8666-666666666666')?.enabled } : null;
     })).toEqual({
       grams: 100,
       kcal: 250,
-      count: 1,
+      count: 2,
+      chickenEnabled: false,
     });
   });
 });
@@ -8585,15 +8583,31 @@ test.describe('Smoke: composite portion normalization', () => {
     expect(stored.foods[0].components.find((item) => item.id === 'beet')).toMatchObject({ grams: 100, enabled: true });
   });
 
-  test('places the My products/catalog navigation button directly above the catalog card', async ({ page }) => {
+  test('keeps catalog navigation above the catalog list and pairs it with New product in My products', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
     await openView(page, 'products');
-    const placement = await page.locator('#catalog-toggle-btn').evaluate((button) => ({
-      parent: button.parentElement?.className || '',
+    const catalogButton = page.locator('#catalog-toggle-btn');
+    await expect(catalogButton).toBeVisible();
+    await expect(page.locator('#product-new')).toBeVisible();
+    expect(await catalogButton.evaluate((button) => button.parentElement?.id)).toBe('products-toolbar');
+    expect(await page.locator('#product-new').evaluate((button) => button.parentElement?.id)).toBe('products-toolbar');
+    const buttonOrder = await page.locator('#products-toolbar').evaluate((toolbar) => [...toolbar.children].map((button) => button.id));
+    expect(buttonOrder).toEqual(['catalog-toggle-btn', 'product-new']);
+    const catalogBox = await catalogButton.boundingBox();
+    const newProductBox = await page.locator('#product-new').boundingBox();
+    expect(catalogBox.y).toBeCloseTo(newProductBox.y, 0);
+    expect(catalogBox.x).toBeLessThan(newProductBox.x);
+    expect(newProductBox.x + newProductBox.width).toBeLessThanOrEqual(360);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+    await catalogButton.click();
+    await expect(page.locator('#product-new')).toBeHidden();
+    const placement = await catalogButton.evaluate((button) => ({
       insideCard: Boolean(button.closest('.card')),
-      followsToolbar: button.parentElement?.previousElementSibling?.id === 'products-toolbar',
+      toolbarBeforeCard: button.parentElement?.nextElementSibling?.classList.contains('card'),
     }));
     expect(placement.insideCard).toBe(false);
-    expect(placement.followsToolbar).toBe(true);
+    expect(placement.toolbarBeforeCard).toBe(true);
   });
 });
