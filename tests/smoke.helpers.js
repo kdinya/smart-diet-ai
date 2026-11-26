@@ -95,6 +95,9 @@ function createBackend() {
     rlsProfiles: false,
     deniedTables: [],
     authEvents: [],
+    signupError: null,
+    signupWithoutSession: false,
+    signupIdentities: undefined,
   };
 }
 
@@ -125,8 +128,14 @@ async function mockSupabase(page, backend) {
     if (url.pathname === '/auth/v1/signup') {
       const body = req.postDataJSON();
       backend.authEvents.push({ action: 'signup', email: body.email });
+      if (backend.signupError) return json(400, backend.signupError);
       const id = USERS[body.email];
       if (!id || body.password !== PASSWORD) return json(400, { msg: 'Invalid signup request' });
+      if (backend.signupWithoutSession) {
+        const user = userObject(id, body.email);
+        user.identities = backend.signupIdentities ?? [{ identity_id: id, provider: 'email' }];
+        return json(200, { user, session: null });
+      }
       return json(200, sessionFor(id, body.email));
     }
 
