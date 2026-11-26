@@ -458,3 +458,91 @@ as $$
 $$;
 revoke all on function public.app_user_names() from public, anon;
 grant execute on function public.app_user_names() to authenticated;
+
+-- Shared product catalog: readable by everyone, editable only by app admins.
+-- Admins are added by hand in the SQL editor, for example:
+--   insert into public.app_admins (user_id) select id from auth.users where email = 'you@example.com';
+create table if not exists public.app_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.app_admins enable row level security;
+
+drop policy if exists "Admins read their own marker" on public.app_admins;
+create policy "Admins read their own marker" on public.app_admins for select to authenticated
+  using (user_id = auth.uid());
+
+revoke all on public.app_admins from public, anon, authenticated;
+grant select on public.app_admins to authenticated;
+
+create or replace function public.is_app_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select exists (select 1 from public.app_admins where user_id = auth.uid());
+$$;
+revoke all on function public.is_app_admin() from public, anon;
+grant execute on function public.is_app_admin() to authenticated;
+
+create table if not exists public.catalog_products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 120 and name = btrim(name)),
+  grams numeric(9,2) not null default 100 check (grams > 0 and grams <= 10000),
+  kcal numeric(9,2) not null default 0 check (kcal between 0 and 10000),
+  protein numeric(9,2) not null default 0 check (protein between 0 and 10000),
+  fat numeric(9,2) not null default 0 check (fat between 0 and 10000),
+  carbs numeric(9,2) not null default 0 check (carbs between 0 and 10000),
+  verified boolean not null default false,
+  note text not null default '' check (char_length(note) <= 2000),
+  companions jsonb not null default '[]'::jsonb check (jsonb_typeof(companions) = 'array' and octet_length(companions::text) <= 16384),
+  components jsonb not null default '[]'::jsonb check (jsonb_typeof(components) = 'array' and octet_length(components::text) <= 65536),
+  source_id uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists catalog_products_name_idx on public.catalog_products (lower(name));
+create index if not exists catalog_products_source_idx on public.catalog_products (source_id);
+create index if not exists catalog_products_updated_idx on public.catalog_products (updated_at);
+
+create or replace function public.touch_catalog_product()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  new.updated_at := now();
+  new.created_at := old.created_at;
+  return new;
+end;
+$$;
+
+drop trigger if exists catalog_products_touch on public.catalog_products;
+create trigger catalog_products_touch before update on public.catalog_products
+  for each row execute function public.touch_catalog_product();
+
+alter table public.catalog_products enable row level security;
+
+drop policy if exists "Everyone reads the catalog" on public.catalog_products;
+create policy "Everyone reads the catalog" on public.catalog_products for select to anon, authenticated
+  using (true);
+
+drop policy if exists "Admins add catalog products" on public.catalog_products;
+create policy "Admins add catalog products" on public.catalog_products for insert to authenticated
+  with check (public.is_app_admin());
+
+drop policy if exists "Admins edit catalog products" on public.catalog_products;
+create policy "Admins edit catalog products" on public.catalog_products for update to authenticated
+  using (public.is_app_admin()) with check (public.is_app_admin());
+
+drop policy if exists "Admins delete catalog products" on public.catalog_products;
+create policy "Admins delete catalog products" on public.catalog_products for delete to authenticated
+  using (public.is_app_admin());
+
+revoke all on public.catalog_products from public, anon, authenticated;
+grant select on public.catalog_products to anon, authenticated;
+grant insert, update, delete on public.catalog_products to authenticated;
