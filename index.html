@@ -492,6 +492,14 @@ $('#composite-save-btn').onclick=async()=>{
     }catch(error){toast(t('catalogUpdateFailed')+': '+(error?.message||''))}
     return;
   }
+  let exists=state.products.some(p=>p.id!==(editingCompositeId||'')&&prodKey(p.name)===prodKey(name));
+  if(exists&&state.prefs.lang==='uk'){
+    let copyName=`${name} (${t('copySuffix')})`;
+    let ok=await askConfirm(t('duplicateDishConfirm').replace('{name}',name).replace('{copy}',copyName),t('confirm'));
+    if(!ok)return;
+    name=copyName;
+    $('#composite-name').value=name;
+  }
   let targetName=name;
   let item={id:editingCompositeId||crypto.randomUUID(),name:targetName,grams:Math.round(tg*10)/10,kcal:Math.round(tk),protein:Math.round(tp*10)/10,fat:Math.round(tf*10)/10,carbs:Math.round(tc*10)/10,verified:$('#composite-verified').checked,...(noteVal?{note:noteVal}:{}),components:currentCompositeIngredients.map(c=>({id:c.id,name:c.name,grams:c.grams,kcal:c.kcal,protein:c.protein,fat:c.fat,carbs:c.carbs,enabled:c.enabled!==false}))};
   await putProduct(item);
@@ -828,6 +836,14 @@ async function saveProduct(){let name=$('#food-name').value.trim().slice(0,120);
       toast(t('catalogUpdatedSuccess').replace('{name}',name));
     }).catch(error=>toast(t('catalogUpdateFailed')+': '+(error?.message||'')));
     return;
+  }
+  let exists=state.products.some(p=>p.id!==(editingProductId||'')&&prodKey(p.name)===prodKey(name));
+  if(exists&&state.prefs.lang==='uk'){
+    let copyName=`${name} (${t('copySuffix')})`;
+    let ok=await askConfirm(t('duplicateProductConfirm').replace('{name}',name).replace('{copy}',copyName),t('confirm'));
+    if(!ok)return;
+    name=copyName;
+    $('#food-name').value=name;
   }
   let old=editingProductId?state.products.find(x=>x.id===editingProductId):null,item={id:editingProductId||crypto.randomUUID(),name,grams:+v[0],kcal:+v[1]||0,protein:+v[2]||0,fat:+v[3]||0,carbs:+v[4]||0,verified:$('#product-verified').checked,...(modalMode==='product'&&$('#product-note-input').value.trim()?{note:$('#product-note-input').value.trim().slice(0,2000)}:{}),...(editingCompanions.length||old?.companions?{companions:editingCompanions.map(c=>({id:c.id,grams:c.grams,on:c.on!==false}))}:{})};if(!putProduct(item))return toast(t('productSaveFailed').replace('{name}',name));window.nutritionBot?.success();if(old&&old.name!==item.name&&state.products.filter(p=>p.id!==old.id&&prodKey(p.name)===prodKey(old.name)).length===0)renameFoods(old.name,item.name);clearClipboardPreviousValues();$('#modal').classList.remove('open');updateScrollLock();toast((old?(old.name!==item.name?t('productRenamed').replace('{old}',old.name).replace('{name}',item.name):t('productUpdated').replace('{name}',item.name)):t('productCreated').replace('{name}',item.name))+' '+productDetailsText(item))}
 let sleepFoodReminderAt=0,sleepFoodMorningAt=0;function interruptFoodAddForSleep(){if(state.prefs.botQuiet===true||!botAssistantEnabled()||!['sleeping','sleepy'].includes(botMotion))return false;let period=botTimePeriod();if(!['morning','night','evening'].includes(period))return false;let now=Date.now(),morning=period==='morning',key=morning?'smartdiet-sleep-food-morning':'smartdiet-sleep-food-reminder',wasSleeping=botMotion==='sleeping',last=morning?sleepFoodMorningAt:sleepFoodReminderAt;try{last=Number(localStorage.getItem(key))||last}catch(_){}if(now-last<600000)return false;if(morning)sleepFoodMorningAt=now;else sleepFoodReminderAt=now;try{localStorage.setItem(key,String(now))}catch(_){}if(morning){showBotComic(t('sleepFoodMorning'),{force:true});return false}if(wasSleeping)setBotMotion('sleepy',undefined,true);showBotComic(t('sleepFoodReminder'),{force:true,actions:[{label:t('close'),value:'close',onSelect:()=>{if(wasSleeping)scheduleBotSleepReturn(1000)}}]});return true}

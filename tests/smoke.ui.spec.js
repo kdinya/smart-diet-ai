@@ -18,8 +18,8 @@ test.describe('Smoke: app version', () => {
     expect(release.newestFirst[0]).toBe(release.version);
     expect(release.latest.description.en).toBe('Explore shared products and save the ones you need.');
     expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
-    expect(release.latest.fixed.en).toEqual([]);
-    expect(release.latest.fixed.uk).toEqual([]);
+    expect(release.latest.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
+    expect(release.latest.fixed.uk.some((item) => item.includes('Додатки продуктів зі спільного каталогу'))).toBe(true);
     expect(release.latest.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
     expect(release.latest.improved.uk.some((item) => item.includes('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.'))).toBe(true);
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
@@ -7932,30 +7932,37 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#products-list')).toContainText('Кешований вівсяний батончик');
   });
 
-  test('warns and proposes copy suffix when copying catalog product with duplicate name to my products', async ({ page }) => {
+  test('warns and proposes copy suffix when creating a simple product or composite dish with duplicate name', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     const existing = [
       { id: 'p-orig-1', name: 'Сир кисломолочний', grams: 100, kcal: 110, protein: 18, fat: 2, carbs: 3 },
     ];
-    const backend = createBackend();
-    backend.tables.catalog_products.push({
-      id: 'cat-dup-1', name: 'Сир кисломолочний', grams: 100, kcal: 110, protein: 18, fat: 2, carbs: 3, verified: true, companions: [], components: [], note: '',
-    });
-    await mockSupabase(page, backend);
-    await startAlice(page, backend);
     const confirmations = [];
     await autoConfirm(page, true, confirmations);
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: existing, foods: [], weights: [] });
     await openView(page, 'products');
 
-    await page.locator('#catalog-toggle-btn').click();
-    const card = page.locator('#products-list .catalog-product-item').first();
-    await card.locator('.product-toggle-main').click();
-    await card.locator('[data-more-product]').click();
-    await card.locator('[data-copy-catalog-product]').click();
+    await page.locator('#product-new').click();
+    await page.locator('#product-type-simple').click();
+    await page.fill('#food-name', 'сир кисломолочний');
+    await page.fill('#food-grams', '150');
+    await page.fill('#food-kcal', '165');
+    await page.click('#food-save');
 
+    await expect(page.locator('#products-list')).toContainText('сир кисломолочний (копія)');
     expect(confirmations.some((msg) => msg.includes('вже є у ваших продуктах') && msg.includes('(копія)'))).toBe(true);
-    await page.locator('#catalog-toggle-btn').click();
+
+    confirmations.length = 0;
+    await page.locator('#product-new').click();
+    await page.locator('#product-type-composite').click();
+    await page.fill('#composite-name', 'Сир кисломолочний');
+    await page.locator('#composite-add-ingredient').click();
+    await page.fill('#food-name', 'Сметана');
+    await page.fill('#food-grams', '50');
+    await page.fill('#food-kcal', '80');
+    await page.click('#food-save');
+    await page.click('#composite-save-btn');
+
     await expect(page.locator('#products-list')).toContainText('Сир кисломолочний (копія)');
   });
   test('aligns product row icons with info icon to the left of sync/owned icon and expand button to the right', async ({ page }) => {
