@@ -66,7 +66,10 @@ const eq = (value) => `eq.${value}`;
 const rows = (r) => (Array.isArray(r.json) ? r.json.length : -1);
 const denied = (r) => r.status >= 400;
 const emptyOrDenied = (r) => denied(r) || (Array.isArray(r.json) && r.json.length === 0);
-const describe = (r) => `HTTP ${r.status}${r.json?.message ? `: ${r.json.message}` : ''}`;
+const describe = (r) => {
+  const detail = [r.json?.message, r.json?.msg, r.json?.error_description, r.json?.error, r.json?.code].find((value) => typeof value === 'string' && value);
+  return `HTTP ${r.status}${detail ? `: ${detail.slice(0, 160)}` : ''}`;
+};
 
 function check(name, ok, detail = '') {
   if (!ok) failures += 1;
@@ -135,6 +138,8 @@ async function run() {
   const A = ids.a;
   const B = ids.b;
   const C = ids.c;
+  r = await rest('profiles', { as: 'service', query: `user_id=${eq(A)}&select=display_name` });
+  check('Auth metadata name appears in the profile', r.json?.[0]?.display_name === 'CI A', describe(r));
   const day = new Date().toISOString().slice(0, 10);
 
   // Owner writes

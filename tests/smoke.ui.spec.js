@@ -379,7 +379,7 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboarding-modal')).toHaveClass(/open/);
   });
 
-  test('registration opens a signup form and submits email and password to Supabase signup', async ({ page }) => {
+  test('registration confirms the password and immediately opens the signed-in profile', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
@@ -388,35 +388,86 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboard-auth-submit')).toContainText('Create account');
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('autocomplete', 'new-password');
     await expect(page.locator('#onboard-username-field')).toBeVisible();
+    await expect(page.locator('#onboard-confirm-password-field')).toBeVisible();
     await expect(page.locator('#onboard-password-hint')).toHaveText('Minimum password length: 6 characters.');
     await page.locator('#onboard-auth-password-toggle').click();
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'text');
     await page.locator('#onboard-auth-password-toggle').click();
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'password');
     const toggleBounds = await page.locator('#onboard-auth-password-toggle').boundingBox();
+    const confirmBounds = await page.locator('#onboard-confirm-password').boundingBox();
     expect(toggleBounds.x + toggleBounds.width).toBeLessThanOrEqual(360);
+    expect(confirmBounds.x + confirmBounds.width).toBeLessThanOrEqual(360);
     await page.fill('#onboard-username', 'Alice');
     await page.fill('#onboard-auth-email', '  new@example.test  ');
     await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
+    await expect(page.locator('#onboard-confirm-password-status')).toHaveText('Passwords match.');
     await page.locator('#onboard-auth-submit').click();
-    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
+    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test', displayName: 'Alice' }]);
     await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['new@example.test']);
     await expect(page.locator('#onboarding-profile')).toBeVisible();
     await expect(page.locator('#onboarding-greeting')).toHaveText('Welcome, Alice!');
     await expect(page.locator('#onboard-name')).toHaveValue('Alice');
+    await expect(page.locator('#onboard-auth-status')).not.toContainText('If you just created an account');
   });
 
-  test('settings auth form shows signup password guidance and lets the user reveal the password', async ({ page }) => {
+  test('signup requires a repeated password and rejects a mismatch in Ukrainian', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk', setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Олена');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Повтори пароль для перевірки.');
+    expect(backend.authEvents).toEqual([]);
+    await page.fill('#onboard-confirm-password', `${PASSWORD}different`);
+    await expect(page.locator('#onboard-confirm-password-status')).toHaveText('Паролі не збігаються.');
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Паролі не збігаються.');
+    expect(backend.authEvents).toEqual([]);
+    await page.fill('#onboard-confirm-password', PASSWORD);
+    await expect(page.locator('#onboard-confirm-password-status')).toHaveText('Паролі збігаються.');
+  });
+
+  test('settings signup shows the name and confirmation fields only in signup mode', async ({ page }) => {
     const backend = createBackend();
     await mockSupabase(page, backend);
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
     await openView(page, 'settings');
     await page.locator('[data-auth="signup"]').click();
     await expect(page.locator('#auth-password-hint')).toBeVisible();
+    await expect(page.locator('#auth-signup-name-field')).toBeVisible();
+    await expect(page.locator('#auth-confirm-password-field')).toBeVisible();
+    await expect(page.locator('#auth-confirm-password')).toHaveAttribute('autocomplete', 'new-password');
+    await page.locator('[data-auth="signin"]').click();
+    await expect(page.locator('#auth-signup-name-field')).toBeHidden();
+    await expect(page.locator('#auth-confirm-password-field')).toBeHidden();
+    await page.locator('[data-auth="signup"]').click();
     await page.locator('#auth-password-toggle').click();
     await expect(page.locator('#auth-password')).toHaveAttribute('type', 'text');
     await page.locator('#auth-password-toggle').click();
     await expect(page.locator('#auth-password')).toHaveAttribute('type', 'password');
+  });
+
+  test('settings signup saves the entered name in the profile', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.locator('[data-auth="signup"]').click();
+    await page.fill('#auth-signup-name', 'Casey');
+    await page.fill('#auth-email', 'new@example.test');
+    await page.fill('#auth-password', PASSWORD);
+    await page.fill('#auth-confirm-password', PASSWORD);
+    await page.locator('#auth-submit').click();
+    await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['new@example.test']);
+    const store = await readStore(page);
+    expect(store.prefs.name).toBe('Casey');
+    await expect(page.locator('#pref-name')).toHaveValue('Casey');
+    expect(backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test', displayName: 'Casey' }]);
   });
 
   test('short signup passwords are rejected with a clear message before calling Supabase', async ({ page }) => {
@@ -427,6 +478,7 @@ test.describe('Smoke: first-run setup', () => {
     await page.fill('#onboard-username', 'Alice');
     await page.fill('#onboard-auth-email', 'new@example.test');
     await page.fill('#onboard-auth-password', '12345');
+    await page.fill('#onboard-confirm-password', '12345');
     await page.locator('#onboard-auth-submit').click();
     await expect(page.locator('#onboard-auth-status')).toHaveText('Use at least 6 characters for the password.');
     expect(backend.authEvents).toEqual([]);
@@ -442,6 +494,7 @@ test.describe('Smoke: first-run setup', () => {
     await page.fill('#onboard-username', 'Alice');
     await page.fill('#onboard-auth-email', 'new@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect(page.locator('#onboard-auth-status')).toContainText('If you just created an account');
     await expect(page.locator('#onboarding-auth')).toBeVisible();
@@ -458,9 +511,88 @@ test.describe('Smoke: first-run setup', () => {
     await page.fill('#onboard-username', 'Alice');
     await page.fill('#onboard-auth-email', 'new@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect(page.locator('#onboard-auth-status')).toHaveText('Enter a valid email address.');
     await expect(page.locator('#onboarding-auth')).toBeVisible();
+  });
+
+  test('signup does not reveal whether an email address is already registered', async ({ page }) => {
+    const backend = createBackend();
+    backend.signupError = { msg: 'User already registered' };
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('We could not create the account. Check your details and try again.');
+    await expect(page.locator('#onboard-auth-status')).not.toContainText('registered');
+  });
+
+  test('signup rate limits stay on the form with a clear message', async ({ page }) => {
+    const backend = createBackend();
+    backend.signupError = { msg: 'email rate limit exceeded' };
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Too many emails have been requested. Wait a while before trying again.');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+    expect((await readStore(page)).synced?.uid).toBeUndefined();
+  });
+
+  test('network errors during signup return a retryable message without signing in', async ({ page }) => {
+    const backend = createBackend();
+    backend.authNetworkFailure = 'signup';
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('We could not create the account. Check your details and try again.');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+    expect((await readStore(page)).synced?.uid).toBeUndefined();
+  });
+
+  test('invalid sign-ins use the same privacy-safe message and never create a session', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signin').click();
+    await page.fill('#onboard-auth-email', 'alice@example.test');
+    await page.fill('#onboard-auth-password', 'wrong-password');
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Incorrect email address or password.');
+    await page.fill('#onboard-auth-email', 'missing@example.test');
+    await page.fill('#onboard-auth-password', 'any-password');
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Incorrect email address or password.');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+    expect((await readStore(page)).synced?.uid).toBeUndefined();
+  });
+
+  test('network errors during sign-in return a retryable message without creating a session', async ({ page }) => {
+    const backend = createBackend();
+    backend.authNetworkFailure = 'signin';
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signin').click();
+    await page.fill('#onboard-auth-email', 'alice@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Sign-in failed. Check your details and try again.');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+    expect((await readStore(page)).synced?.uid).toBeUndefined();
   });
 
   test('registration without a username is blocked before Supabase signup', async ({ page }) => {
@@ -470,6 +602,7 @@ test.describe('Smoke: first-run setup', () => {
     await page.locator('#onboarding-choice-signup').click();
     await page.fill('#onboard-auth-email', 'noname@example.test');
     await page.fill('#onboard-auth-password', PASSWORD);
+    await page.fill('#onboard-confirm-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect(page.locator('#onboard-auth-status')).toHaveText('Enter a username to create an account.');
     expect(backend.authEvents).toEqual([]);
@@ -479,7 +612,7 @@ test.describe('Smoke: first-run setup', () => {
 test.describe('Smoke: accessibility', () => {
   test('settings fields and the diary date have accessible names', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    const ids = ['auth-email', 'auth-password', 'pref-name', 'pref-lang', 'pref-kcal', 'pref-protein', 'pref-carbs', 'pref-fat', 'profile-birth', 'profile-sex', 'profile-height', 'profile-weight', 'profile-weight-date', 'profile-target', 'profile-activity', 'profile-pace', 'profile-notes', 'diary-date'];
+    const ids = ['auth-email', 'auth-password', 'auth-signup-name', 'auth-confirm-password', 'pref-name', 'pref-lang', 'pref-kcal', 'pref-protein', 'pref-carbs', 'pref-fat', 'profile-birth', 'profile-sex', 'profile-height', 'profile-weight', 'profile-weight-date', 'profile-target', 'profile-activity', 'profile-pace', 'profile-notes', 'diary-date'];
     const unnamed = await page.evaluate((list) => list.filter((id) => {
       const el = document.getElementById(id);
       return !el || !((el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'));
