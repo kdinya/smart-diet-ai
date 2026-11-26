@@ -404,7 +404,11 @@ function showFoodFields(context="manual"){let f=$("#food-fields");if(f)f.classLi
 function hideFoodFields(){let f=$("#food-fields");if(f)f.classList.add("hidden");let p=$("#pick-product");if(p)p.classList.remove("hidden");let m=$("#food-add-manual");if(m)m.classList.remove("hidden");let b=$("#food-back-choices");if(b)b.classList.add("hidden");let c=$("#product-calc-field");if(c)c.classList.add("hidden");syncFoodProductOption()}
 function syncIngredientProductOption(){let label=$("#ingredient-save-product-label"),checkbox=$("#ingredient-save-product"),name=$("#food-name").value.trim();if(!label||!checkbox)return;let show=modalMode==="ingredient"&&!!name&&!findProduct(name);label.classList.toggle("hidden",!show);if(!show)checkbox.checked=false}function openIngredientModal(ing){openModal('food');modalMode='ingredient';editingIngredientId=ing?ing.id:null;showFoodFields('ingredient');$('#food-back-choices')?.classList.add('hidden');$('#food-save-product-label')?.classList.add('hidden');$('#product-note-field').classList.add('hidden');$('#product-note-toggle').classList.add('hidden');$('#product-note-input').value='';$('#pick-product').classList.remove('hidden');$('#product-calc-field').classList.remove('hidden');$('#product-verified-label').classList.add('hidden');$('#ingredient-save-product').checked=false;$('#food-meal').closest('.field').classList.add('hidden');$('#food-date').closest('.field').classList.add('hidden');$('#portion-field').classList.add('hidden');$('#product-companions-field').classList.add('hidden');$('#product-companion-add').classList.add('hidden');$('#modal-title').textContent=t(ing?'editIngredient':'addIngredient');setLabelKey($('#food-save'),'saveIngredient');if(ing){$('#food-name').value=ing.name||'';$('#food-grams').value=ing.grams||100;$('#food-kcal').value=ing.kcal!=null?ing.kcal:'';$('#food-protein').value=ing.protein!=null?ing.protein:'';$('#food-fat').value=ing.fat!=null?ing.fat:'';$('#food-carbs').value=ing.carbs!=null?ing.carbs:'';}else{['food-name','food-kcal','food-protein','food-fat','food-carbs'].forEach(id=>$('#'+id).value='');$('#food-grams').value=100}syncIngredientProductOption();calcSnapshot()}
 function saveIngredient(){let name=$('#food-name').value.trim().slice(0,LIM.name);if(!name)return toast(toastT('pleaseFood'));let v=CALC_IDS.map(id=>$('#'+id).value);if(v.some(x=>x!==''&&(!isFinite(+x)||+x<0||+x>LIM.num)))return toast(t('badNumber'));if(!(+v[0]>0))return toast(toastT('productNeedGrams').replace('{name}',name));let previousIngredient=currentCompositeIngredients.find(x=>x.id===editingIngredientId),ing={id:editingIngredientId||crypto.randomUUID(),name,grams:+v[0],kcal:+v[1]||0,protein:+v[2]||0,fat:+v[3]||0,carbs:+v[4]||0,enabled:previousIngredient?previousIngredient.enabled!==false:true},savedProduct=null;if($('#ingredient-save-product').checked&&!findProduct(name)){savedProduct={id:crypto.randomUUID(),name,grams:ing.grams,kcal:ing.kcal,protein:ing.protein,fat:ing.fat,carbs:ing.carbs};if(!putProduct(savedProduct))return toast(t('productSaveFailed').replace('{name}',name))}if(editingIngredientId){let idx=currentCompositeIngredients.findIndex(x=>x.id===editingIngredientId);if(idx!==-1)currentCompositeIngredients[idx]=ing;else currentCompositeIngredients.push(ing)}else{currentCompositeIngredients.push(ing)}$('#modal').classList.remove('open');updateScrollLock();renderCompositeIngredients();updateCompositeSummary();if(savedProduct){window.nutritionBot?.success();toast(t('productCreated').replace('{name}',savedProduct.name)+' '+productDetailsText(savedProduct))}}
-function companionProduct(id){return state.products.find(x=>x.id===id)||catalogProducts.find(x=>x.id===id)}
+let catalogAddonSnap=null;
+function companionSnapshot(item){return{name:String(item.name||'').slice(0,120),grams:+item.grams||100,kcal:+item.kcal||0,protein:+item.protein||0,fat:+item.fat||0,carbs:+item.carbs||0}}
+function catalogAddonMap(p){let map=new Map();(Array.isArray(p&&p.companions)?p.companions:[]).forEach(c=>{if(c&&typeof c.id==='string'&&c.item&&typeof c.item==='object'&&c.item.name)map.set(c.id,{id:c.id,...companionSnapshot(c.item)})});return map}
+function buildCatalogCompanions(list,existing){let kept=existing||new Map();return sanitizeCompanionList(list).map(c=>{let src=kept.get(c.id)||state.products.find(x=>x.id===c.id);return src?{id:c.id,grams:c.grams,on:c.on!==false,item:companionSnapshot(src)}:null}).filter(Boolean)}
+function companionProduct(id){return(catalogAddonSnap&&catalogAddonSnap.get(id))||state.products.find(x=>x.id===id)||catalogProducts.find(x=>x.id===id)}
 function productCompanions(p){return sanitizeCompanionList(p&&p.companions).filter(c=>c.id!==p.id&&companionProduct(c.id))}
 let openCompanions=new Set(),companionToggles=new Map();
 function companionNutritionHtml(id,item,g){let f=(+item.grams||0)>0?(g>0?g:0)/item.grams:1,kcal=Math.round((+item.kcal||0)*f),cr=v=>Math.round((+v||0)*f*10)/10;return `<div class="companion-nutrition" data-companion-nutrition="${id}"><span class="companion-grams">${Math.round(g*10)/10} ${t('g')}</span> · <span class="companion-kcal"><strong>${kcal}</strong> ${t('kcal')}</span> · <span class="companion-macros">${t('proteinShort')} ${cr(item.protein)} · ${t('fatShort')} ${cr(item.fat)} · ${t('carbsShort')} ${cr(item.carbs)} ${t('g')}</span></div>`}
@@ -579,7 +583,7 @@ async function publishToCatalog(p){
     carbs:+p.carbs||0,
     verified:Boolean(p.verified),
     note:typeof p.note==='string'?p.note.trim().slice(0,2000):'',
-    companions:Array.isArray(p.companions)?JSON.parse(JSON.stringify(p.companions)):[],
+    companions:buildCatalogCompanions(p.companions),
     components:Array.isArray(p.components)?JSON.parse(JSON.stringify(p.components)):[]
   };
   let {error}=await sb.from('catalog_products').insert([row]);
@@ -624,9 +628,20 @@ async function copyCatalogProduct(catalogId){
     carbs:+cp.carbs||0,
     verified:Boolean(cp.verified),
     note:typeof cp.note==='string'?cp.note:'',
-    companions:Array.isArray(cp.companions)?JSON.parse(JSON.stringify(cp.companions)):[],
+    companions:[],
     components:Array.isArray(cp.components)?JSON.parse(JSON.stringify(cp.components)):[]
   };
+  let snaps=catalogAddonMap(cp),addonItems=[];
+  for(let c of sanitizeCompanionList(cp.companions)){
+    let snap=snaps.get(c.id);if(!snap)continue;
+    let target=state.products.find(x=>prodKey(x.name)===prodKey(snap.name)&&['grams','kcal','protein','fat','carbs'].every(k=>Math.abs((+x[k]||0)-snap[k])<.001));
+    if(!target){
+      let name=state.products.some(x=>prodKey(x.name)===prodKey(snap.name))?`${snap.name} (${t('copySuffix')})`:snap.name;
+      target={...snap,id:crypto.randomUUID(),name,verified:false,note:'',companions:[],components:[]};addonItems.push(target);
+    }
+    item.companions.push({id:target.id,grams:c.grams,on:c.on!==false});
+  }
+  if(addonItems.some(a=>!putProduct(a))){toast(t('productSaveFailed').replace('{name}',targetName));return}
   catalogJustCopiedId=catalogId;
   if(!putProduct(item)){catalogJustCopiedId=null;toast(t('productSaveFailed').replace('{name}',targetName));return}
   animateCatalogCopy(catalogId,sourceRect);
@@ -649,7 +664,8 @@ async function deleteCatalogProduct(id){
   renderProducts();
 }
 
-function catalogProductRow(p,open=false,openAddons=false,openComps=false,openActions=false){
+function catalogProductRow(p,open=false,openAddons=false,openComps=false,openActions=false){let prev=catalogAddonSnap;catalogAddonSnap=catalogAddonMap(p);try{return catalogProductRowBody(p,open,openAddons,openComps,openActions)}finally{catalogAddonSnap=prev}}
+function catalogProductRowBody(p,open=false,openAddons=false,openComps=false,openActions=false){
   let id=esc(p.id),comps=productComponents(p),totals=comps.length?compositeTotals(comps):companionTotals(p);
   let n=k=>Math.round((+totals[k]||0)*10)/10,addons=productCompanions(p),inMine=isCatalogProductInMine(p);
   let adminActions=isAppAdmin?`<button type="button" data-edit-catalog-product="${id}" aria-label="${t('editCatalogProduct')}" title="${t('editCatalogProduct')}">✎</button><button type="button" class="del" data-delete-catalog-product="${id}" aria-label="${t('deleteCatalogProduct')}" title="${t('deleteCatalogProduct')}">${TRASH}</button>`:'';
@@ -764,7 +780,7 @@ $('#food-name').addEventListener('input',()=>{if(modalMode==='ingredient')syncIn
     }
   }
 });$('#food-portions').addEventListener('change',()=>{let n=+$('#food-portions').value;if(!n||n<=0)return;modalFoodPortions=n;if(foodComponents.length){updateFoodComponentsCalc()}else{let base=portionBase();if(base&&n>0){$('#food-grams').value=calcFmt('grams',base*n);$('#food-grams').dispatchEvent(new Event('input'))}}});$('#food-name').addEventListener('input',e=>{if(!e.inputType||e.inputType==='insertReplacementText')prefillFromProduct()});
-function openProductModal(p,isCatalog=false){openModal('food');modalMode='product';showFoodFields('product');isEditingCatalogProduct=isCatalog;editingCatalogProductId=isCatalog&&p?p.id:null;$('#pick-product').classList.add('hidden');$('#food-add-manual')?.classList.add('hidden');$('#food-back-choices')?.classList.add('hidden');$('#food-save-product-label')?.classList.add('hidden');$('#product-calc-field').classList.remove('hidden');$('#product-verified-label').classList.remove('hidden');$('#ingredient-save-product-label').classList.add('hidden');$('#ingredient-save-product').checked=false;$('#product-verified').checked=!!(p&&p.verified);editingProductId=isCatalog?null:(p?p.id:null);let hasNote=Boolean(p&&typeof p.note==='string'&&p.note.trim());$('#product-note-input').value=(p&&typeof p.note==='string')?p.note:'';if(hasNote){$('#product-note-field').classList.remove('hidden');$('#product-note-toggle').classList.add('hidden')}else{$('#product-note-field').classList.add('hidden');$('#product-note-toggle').classList.remove('hidden')};$('#food-meal').closest('.field').classList.add('hidden');$('#food-date').closest('.field').classList.add('hidden');$('#modal-title').textContent=t(isCatalog?'editCatalogProductTitle':(p?'editProductTitle':'newProductTitle'));$('#portion-field').classList.add('hidden');setLabelKey($('#food-save'),'saveProduct');fillFood(p||{grams:100});editingCompanions=productCompanions(p||{});$('#product-companions-field').classList.remove('hidden');$('#product-companion-add').classList.remove('hidden');renderProductCompanions();calcSnapshot()}
+function openProductModal(p,isCatalog=false){catalogAddonSnap=isCatalog&&p?catalogAddonMap(p):null;openModal('food');modalMode='product';showFoodFields('product');isEditingCatalogProduct=isCatalog;editingCatalogProductId=isCatalog&&p?p.id:null;$('#pick-product').classList.add('hidden');$('#food-add-manual')?.classList.add('hidden');$('#food-back-choices')?.classList.add('hidden');$('#food-save-product-label')?.classList.add('hidden');$('#product-calc-field').classList.remove('hidden');$('#product-verified-label').classList.remove('hidden');$('#ingredient-save-product-label').classList.add('hidden');$('#ingredient-save-product').checked=false;$('#product-verified').checked=!!(p&&p.verified);editingProductId=isCatalog?null:(p?p.id:null);let hasNote=Boolean(p&&typeof p.note==='string'&&p.note.trim());$('#product-note-input').value=(p&&typeof p.note==='string')?p.note:'';if(hasNote){$('#product-note-field').classList.remove('hidden');$('#product-note-toggle').classList.add('hidden')}else{$('#product-note-field').classList.add('hidden');$('#product-note-toggle').classList.remove('hidden')};$('#food-meal').closest('.field').classList.add('hidden');$('#food-date').closest('.field').classList.add('hidden');$('#modal-title').textContent=t(isCatalog?'editCatalogProductTitle':(p?'editProductTitle':'newProductTitle'));$('#portion-field').classList.add('hidden');setLabelKey($('#food-save'),'saveProduct');fillFood(p||{grams:100});editingCompanions=productCompanions(p||{});$('#product-companions-field').classList.remove('hidden');$('#product-companion-add').classList.remove('hidden');renderProductCompanions();calcSnapshot()}
 let pickProduct=null;
 function openPick(){$('#pick-modal').classList.add('open');updateScrollLock()}
 function closePick(){if((pickMode==='companion'||pickMode==='component')&&pickProductSource){showPickMealPane();return}openCompanions.clear();$('#pick-modal').classList.remove('open');updateScrollLock()}
@@ -780,11 +796,11 @@ function openProductPicker(){pickMode='food';pickExcludeIds=new Set();pickProduc
 async function saveProduct(){let name=$('#food-name').value.trim().slice(0,120);if(!name)return toast(toastT('pleaseFood'));let v=CALC_IDS.map(id=>$('#'+id).value);if(v.some(x=>x!==''&&(!isFinite(+x)||+x<0||+x>LIM.num)))return toast(t('badNumber'));if(!(+v[0]>0))return toast(toastT('productNeedGrams').replace('{name}',name));
   if(isEditingCatalogProduct&&editingCatalogProductId){
     let noteVal=$('#product-note-input').value.trim().slice(0,2000);
-    let updated={name,grams:+v[0],kcal:+v[1]||0,protein:+v[2]||0,fat:+v[3]||0,carbs:+v[4]||0,verified:$('#product-verified').checked,note:noteVal||'',companions:editingCompanions.map(c=>({id:c.id,grams:c.grams,on:c.on!==false})),updated_at:new Date().toISOString()};
+    let updated={name,grams:+v[0],kcal:+v[1]||0,protein:+v[2]||0,fat:+v[3]||0,carbs:+v[4]||0,verified:$('#product-verified').checked,note:noteVal||'',companions:buildCatalogCompanions(editingCompanions,catalogAddonSnap),updated_at:new Date().toISOString()};
     sb.from('catalog_products').update(updated).eq('id',editingCatalogProductId).select('id').then(async({data,error})=>{
       if(error)return toast(t('catalogUpdateFailed')+': '+(error.message||''));
       if(!Array.isArray(data)||!data.length)return toast(t('catalogUpdateFailed'));
-      isEditingCatalogProduct=false;editingCatalogProductId=null;$('#modal').classList.remove('open');updateScrollLock();
+      isEditingCatalogProduct=false;editingCatalogProductId=null;catalogAddonSnap=null;$('#modal').classList.remove('open');updateScrollLock();
       await fetchCatalogProducts(true);renderProducts();
       toast(t('catalogUpdatedSuccess').replace('{name}',name));
     }).catch(error=>toast(t('catalogUpdateFailed')+': '+(error?.message||'')));
@@ -1250,7 +1266,7 @@ $('#pick-modal').onclick=async e=>{if(e.target===$('#pick-modal')||e.target.clos
   closePick();toast(toastT('addedToMealDate').replace('{name}',String(p.name||'').slice(0,120)).replace('{meal}',t(pickMeal)).replace('{date}',formatFoodDateLabel(dStr)))};$('#pick-product').onclick=openProductPicker;
 $('#food-add-manual').onclick=()=>{showFoodFields('manual');$('#food-name').focus()};
 $('#food-back-choices').onclick=()=>{hideFoodFields();['food-name','food-grams','food-kcal','food-protein','food-fat','food-carbs'].forEach(id=>$('#'+id).value='');let bEl=$('#food-companion-badge');if(bEl)bEl.innerHTML='';foodComponents=[];foodComponentGrams=new Map();foodComponentEnabled=new Map();renderFoodComponents();calcSnapshot()};
-$('#modal-close').onclick=()=>{clearClipboardPreviousValues();foodComponents=[];foodComponentGrams=new Map();foodComponentEnabled=new Map();renderFoodComponents();hideFoodFields();$('#modal').classList.remove('open');updateScrollLock()};$('#modal').onclick=e=>{if(e.target===$('#modal')){clearClipboardPreviousValues();foodComponents=[];foodComponentGrams=new Map();foodComponentEnabled=new Map();renderFoodComponents();hideFoodFields();$('#modal').classList.remove('open');updateScrollLock()}};
+$('#modal-close').onclick=()=>{clearClipboardPreviousValues();foodComponents=[];foodComponentGrams=new Map();foodComponentEnabled=new Map();renderFoodComponents();hideFoodFields();isEditingCatalogProduct=false;editingCatalogProductId=null;catalogAddonSnap=null;$('#modal').classList.remove('open');updateScrollLock()};$('#modal').onclick=e=>{if(e.target===$('#modal')){clearClipboardPreviousValues();foodComponents=[];foodComponentGrams=new Map();foodComponentEnabled=new Map();renderFoodComponents();hideFoodFields();isEditingCatalogProduct=false;editingCatalogProductId=null;catalogAddonSnap=null;$('#modal').classList.remove('open');updateScrollLock()}};
 $('#food-save').onclick=async()=>{
   if(modalMode==='product')return saveProduct();
   if(modalMode==='ingredient')return saveIngredient();

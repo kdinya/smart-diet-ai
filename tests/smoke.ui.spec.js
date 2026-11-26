@@ -8024,4 +8024,61 @@ test.describe('Smoke: shared product catalog', () => {
     expect(cardStyles.boxShadow).toBe('none');
     expect(cardStyles.padding).toBe('0px');
   });
+
+  test('publishing a product with an add-on stores the add-on data inside the catalog entry', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.app_admins.push({ user_id: 'user-alice' });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await page.evaluate(() => {
+      putProduct({ id: 'milk-1', name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 });
+      putProduct({ id: 'coffee-1', name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, verified: true, note: 'Morning', companions: [{ id: 'milk-1', grams: 50, on: true }] });
+    });
+    await openView(page, 'products');
+    await page.locator('#products-list .product-item', { hasText: 'Coffee' }).locator('.product-toggle-main').first().click();
+    await page.locator('#products-list [data-publish-catalog]').first().click();
+    await expect.poll(() => backend.tables.catalog_products.length).toBe(1);
+
+    const row = backend.tables.catalog_products[0];
+    expect(row.verified).toBe(true);
+    expect(row.note).toBe('Morning');
+    expect(row.companions).toEqual([{ id: 'milk-1', grams: 50, on: true, item: { name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 } }]);
+
+    await page.evaluate(() => deleteProduct?.('milk-1'));
+    await page.locator('#catalog-toggle-btn').click();
+    await page.locator('#products-list .product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
+  });
+
+  test('copying a catalog product with add-ons gives an independent copy that includes them', async ({ page }) => {
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-coffee', name: 'Coffee with milk', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, verified: true, note: '', components: [],
+      companions: [{ id: 'admin-milk', grams: 50, on: true, item: { name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 } }],
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    await page.locator('#products-list .product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
+    await page.locator('#products-list [data-copy-catalog-product]').first().click();
+
+    await expect.poll(async () => (await readStore(page)).products.length).toBe(2);
+    const stored = await readStore(page);
+    const milk = stored.products.find((p) => p.name === 'Milk');
+    const coffee = stored.products.find((p) => p.name === 'Coffee with milk');
+    expect(milk).toBeDefined();
+    expect(milk.id).not.toBe('admin-milk');
+    expect(coffee.companions).toEqual([{ id: milk.id, grams: 50, on: true }]);
+    expect(backend.tables.catalog_products[0].companions[0].id).toBe('admin-milk');
+
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list')).toContainText('Coffee with milk');
+    await page.locator('#products-list .product-item', { hasText: 'Coffee with milk' }).locator('.product-toggle-main').first().click();
+    await page.locator('#products-list [data-toggle-product-addons]').first().click();
+    await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
+  });
 });
