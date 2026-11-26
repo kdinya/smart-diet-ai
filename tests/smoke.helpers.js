@@ -129,7 +129,7 @@ async function mockSupabase(page, backend) {
 
     if (url.pathname === '/auth/v1/signup') {
       const body = req.postDataJSON();
-      backend.authEvents.push({ action: 'signup', email: body.email });
+      backend.authEvents.push({ action: 'signup', email: body.email, displayName: body.data?.display_name });
       if (backend.authNetworkFailure === 'signup') return route.abort();
       if (backend.signupError) return json(400, backend.signupError);
       const id = USERS[body.email];

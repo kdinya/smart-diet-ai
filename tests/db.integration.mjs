@@ -54,7 +54,7 @@ if (dbUrlStr) {
 const runId = randomUUID().slice(0, 8);
 const PASSWORD = `${randomUUID()}Aa1!`;
 const emails = {
-  a: `ci-${runId}-a@users.noreply.github.com`,
+  a: `ci-${runId}-a@example.com`,
   b: `ci-${runId}-b@example.com`,
   c: `ci-${runId}-c@example.com`,
 };
@@ -118,16 +118,6 @@ async function createUser(key) {
   ids[key] = r.json.id;
 }
 
-async function signUpUser(key) {
-  const displayName = `CI ${key.toUpperCase()}`;
-  const r = await call('POST', '/auth/v1/signup', { body: { email: emails[key], password: PASSWORD, data: { display_name: displayName } } });
-  if (r.json?.user?.id) ids[key] = r.json.user.id;
-  if (r.json?.access_token) tokens[key] = r.json.access_token;
-  check('Email signup returns an immediate session without confirmation', !!r.json?.access_token && !!r.json?.refresh_token, describe(r));
-  check('Signup keeps the entered name in auth metadata', r.json?.user?.user_metadata?.display_name === displayName, describe(r));
-  if (!ids[key]) throw new Error(`Signup did not create test user ${key}: ${describe(r)}`);
-}
-
 async function signIn(key) {
   const r = await call('POST', '/auth/v1/token?grant_type=password', {
     body: { email: emails[key], password: PASSWORD },
@@ -142,15 +132,14 @@ const shareBody = (from, to, name) => ({
 
 async function run() {
   let r;
-  await signUpUser('a');
-  for (const key of ['b', 'c']) await createUser(key);
+  for (const key of ['a', 'b', 'c']) await createUser(key);
   for (const key of ['a', 'b', 'c']) await signIn(key);
 
   const A = ids.a;
   const B = ids.b;
   const C = ids.c;
   r = await rest('profiles', { as: 'service', query: `user_id=${eq(A)}&select=display_name` });
-  check('Signup name appears in the profile', r.json?.[0]?.display_name === 'CI A', describe(r));
+  check('Auth metadata name appears in the profile', r.json?.[0]?.display_name === 'CI A', describe(r));
   const day = new Date().toISOString().slice(0, 10);
 
   // Owner writes

@@ -404,7 +404,7 @@ test.describe('Smoke: first-run setup', () => {
     await page.fill('#onboard-confirm-password', PASSWORD);
     await expect(page.locator('#onboard-confirm-password-status')).toHaveText('Passwords match.');
     await page.locator('#onboard-auth-submit').click();
-    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
+    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test', displayName: 'Alice' }]);
     await expect.poll(async () => (await readStore(page)).synced?.uid).toBe(USERS['new@example.test']);
     await expect(page.locator('#onboarding-profile')).toBeVisible();
     await expect(page.locator('#onboarding-greeting')).toHaveText('Welcome, Alice!');
@@ -467,7 +467,7 @@ test.describe('Smoke: first-run setup', () => {
     const store = await readStore(page);
     expect(store.prefs.name).toBe('Casey');
     await expect(page.locator('#pref-name')).toHaveValue('Casey');
-    expect(backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
+    expect(backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test', displayName: 'Casey' }]);
   });
 
   test('short signup passwords are rejected with a clear message before calling Supabase', async ({ page }) => {
