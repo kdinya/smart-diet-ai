@@ -27,10 +27,14 @@ test.describe('Smoke: app version', () => {
     expect(release.newestFirst[0]).toBe(release.version);
     expect(release.latest.description.en).toBe('Explore shared products and save the ones you need.');
     expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
+    expect(release.latest.added.en.some((item) => item.includes('last sign-in date and time'))).toBe(true);
+    expect(release.latest.added.uk.some((item) => item.includes('дату й час останнього входу'))).toBe(true);
     expect(release.latest.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
     expect(release.latest.fixed.uk.some((item) => item.includes('Додатки продуктів зі спільного каталогу'))).toBe(true);
     expect(release.latest.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
     expect(release.latest.improved.uk.some((item) => item.includes('Виразніше оформлення каталогу, зручніше керування продуктами на телефоні та помітне позначення вже збережених продуктів.'))).toBe(true);
+    expect(release.latest.improved.en.some((item) => item.includes('Search now scrolls consistently in My products and the shared catalog'))).toBe(true);
+    expect(release.latest.improved.uk.some((item) => item.includes('Прокручування пошуку узгоджене'))).toBe(true);
     const entryFor = (version) => page.locator('#release-history-list > details').filter({ has: page.locator('summary', { hasText: version }) });
 
     await openView(page, 'settings');
@@ -3265,6 +3269,7 @@ test.describe('Smoke: assistant buttons hide on interaction', () => {
 test.describe('Smoke: app user count', () => {
   test('Friends shows the number of app users and lists their nicknames on tap', async ({ page }) => {
     const backend = createBackend();
+    backend.tables.profiles.push({ user_id: 'user-empty', friend_code: 'EEEE5555', display_name: '  ' });
     await startAlice(page, backend);
     await openView(page, 'settings');
     await expect(page.locator('#app-users')).toBeVisible();
@@ -3276,6 +3281,39 @@ test.describe('Smoke: app user count', () => {
     await expect(page.locator('#app-users-list')).not.toContainText('AAAA2222');
     await page.locator('#app-users-toggle').click();
     await expect(page.locator('#app-users-list')).toBeHidden();
+  });
+
+  test('admins see a localized last sign-in beside every named app user', async ({ page }) => {
+    const backend = createBackend();
+    const aliceSignIn = '2026-11-20T14:35:00.000Z';
+    const bobSignIn = '2026-10-03T08:05:00.000Z';
+    backend.tables.profiles[0].last_sign_in_at = aliceSignIn;
+    backend.tables.profiles[1].last_sign_in_at = bobSignIn;
+    backend.tables.profiles.push(
+      { user_id: 'user-charlie', friend_code: 'CCCC4444', display_name: '', last_sign_in_at: null },
+      { user_id: 'user-empty', friend_code: 'EEEE5555', display_name: '  ', last_sign_in_at: null },
+    );
+    backend.tables.user_profiles.push({ user_id: 'user-charlie', data: { name: 'Charlie' } });
+    backend.tables.app_admins.push({ user_id: USERS['alice@example.test'] });
+    await startAlice(page, backend);
+    await openView(page, 'settings');
+    await expect(page.locator('#app-users-count')).toHaveText('3');
+    await page.locator('#app-users-toggle').click();
+
+    const englishDates = await page.evaluate(([alice, bob]) => [alice, bob].map((value) => new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))), [aliceSignIn, bobSignIn]);
+    const rows = page.locator('#app-users-list .app-user-name');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${englishDates[0]})`);
+    await expect(rows.filter({ hasText: 'Bob' })).toContainText(`(${englishDates[1]})`);
+    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(No sign-ins yet.)');
+
+    await page.selectOption('#pref-lang', 'uk');
+    await page.locator('#save-lang').click();
+    await page.locator('#app-users-toggle').click();
+    await page.locator('#app-users-toggle').click();
+    const ukrainianDate = await page.evaluate((value) => new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)), aliceSignIn);
+    await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${ukrainianDate})`);
+    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(Ще не було входів.)');
   });
 
   test('Friends opens a popup with the nicknames when there are more than five app users', async ({ page }) => {
@@ -8057,6 +8095,7 @@ test.describe('Smoke: shared product catalog', () => {
 
   test('products controls: equal sort and legend buttons, square search icon, animated search with clear button', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     const products = [
       { id: 'p-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 },
       { id: 'p-bread', name: 'Bread', grams: 100, kcal: 250, protein: 8, fat: 3, carbs: 48 },
@@ -8070,10 +8109,29 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(await box.evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
 
+    await page.locator('#products-list').evaluate((el) => { el.style.minHeight = '1400px'; });
+    await page.evaluate(async () => {
+      const controls = document.querySelector('#products-controls');
+      const box = document.querySelector('#product-search-box');
+      const input = document.querySelector('#product-search');
+      const target = Math.max(0, controls.getBoundingClientRect().top + window.scrollY - 12);
+      document.documentElement.style.scrollBehavior = 'auto';
+      window.scrollTo(0, Math.max(0, target - 90));
+      await new Promise(requestAnimationFrame);
+      window.__productSearchOrder = [];
+      box.addEventListener('transitionend', (event) => { if (event.propertyName === 'height') window.__productSearchOrder.push('field'); });
+      window.addEventListener('scroll', () => window.__productSearchOrder.push('scroll'), { passive: true });
+      input.addEventListener('focus', () => window.__productSearchOrder.push('focus'));
+    });
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#product-search')).toBeFocused();
     await expect.poll(() => box.evaluate((el) => Math.round(el.getBoundingClientRect().height))).toBe(40);
+    const searchOrder = await page.evaluate(() => window.__productSearchOrder);
+    expect(searchOrder.indexOf('field')).toBeGreaterThanOrEqual(0);
+    expect(searchOrder.indexOf('field')).toBeLessThan(searchOrder.indexOf('scroll'));
+    expect(searchOrder.indexOf('scroll')).toBeLessThan(searchOrder.indexOf('focus'));
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
     const geometry = await page.evaluate(() => {
       const c = document.querySelector('#products-controls').getBoundingClientRect();
       const b = document.querySelector('#product-search-box').getBoundingClientRect();
@@ -8081,6 +8139,11 @@ test.describe('Smoke: shared product catalog', () => {
       return { sameWidth: Math.abs(b.width - c.width) < 2, below: b.top >= s.bottom };
     });
     expect(geometry).toEqual({ sameWidth: true, below: true });
+
+    const target = await page.evaluate(() => Math.max(0, document.querySelector('#products-controls').getBoundingClientRect().top + window.scrollY - 12));
+    await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
+    await page.locator('#product-search').click();
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
 
     await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '0');
     await page.keyboard.type('app');
@@ -8097,6 +8160,38 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#product-search')).toHaveValue('');
     await expect(page.locator('#products-list .product-name')).toHaveText(['Apple', 'Bread']);
+  });
+
+  test('product search uses the same anchor in My Products and catalog with reduced motion', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.locator('#products-list').evaluate((el) => { el.style.minHeight = '1400px'; });
+
+    const checkOpenAndClickPosition = async () => {
+      const target = await page.evaluate(() => Math.max(0, document.querySelector('#products-controls').getBoundingClientRect().top + window.scrollY - 12));
+      await page.evaluate((top) => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, Math.max(0, top - 90)); }, target);
+      await page.locator('#product-search-toggle').click();
+      await expect(page.locator('#product-search')).toBeFocused();
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+      const openTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
+      await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
+      await page.locator('#product-search').click();
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+      const clickTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
+      await page.locator('#product-search-toggle').click();
+      await expect(page.locator('#product-search-toggle')).toHaveAttribute('aria-expanded', 'false');
+      return { openTop, clickTop };
+    };
+
+    const myProducts = await checkOpenAndClickPosition();
+    await page.evaluate(() => { catalogProducts = Array.from({ length: 8 }, (_, index) => ({ id: `catalog-${index}`, name: `Catalog product ${index + 1}`, grams: 100, kcal: 120, protein: 4, fat: 3, carbs: 18, verified: false, companions: [], components: [], note: '' })); });
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
+    const catalog = await checkOpenAndClickPosition();
+    expect(myProducts).toEqual({ openTop: 12, clickTop: 12 });
+    expect(catalog).toEqual({ openTop: 12, clickTop: 12 });
   });
 
   test('legend modal explains the product icons and closes', async ({ page }) => {

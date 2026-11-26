@@ -138,7 +138,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 begin
   insert into public.profiles (user_id, friend_code, display_name)
-  values (new.id, public.generate_friend_code(), left(coalesce(new.raw_user_meta_data->>'name', ''), 40))
+  values (new.id, public.generate_friend_code(), left(coalesce(nullif(btrim(new.raw_user_meta_data->>'display_name'), ''), nullif(btrim(new.raw_user_meta_data->>'name'), ''), ''), 40))
   on conflict (user_id) do nothing;
   return new;
 end;
@@ -151,9 +151,17 @@ create trigger on_auth_user_created_profile
 
 -- Backfill accounts created before this feature was installed.
 insert into public.profiles (user_id, friend_code, display_name)
-select u.id, public.generate_friend_code(), left(coalesce(u.raw_user_meta_data->>'name', ''), 40)
+select u.id, public.generate_friend_code(), left(coalesce(nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), ''), 40)
 from auth.users u
 on conflict (user_id) do nothing;
+
+update public.profiles p
+set display_name = left(coalesce(nullif(btrim(up.data->>'name'), ''), nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), ''), 40)
+from auth.users u
+left join public.user_profiles up on up.user_id = u.id
+where p.user_id = u.id
+  and nullif(btrim(p.display_name), '') is null
+  and coalesce(nullif(btrim(up.data->>'name'), ''), nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), '') <> '';
 
 create table if not exists public.friendships (
   id uuid primary key default gen_random_uuid(),
@@ -451,10 +459,17 @@ returns table (display_name text)
 language sql
 stable
 security definer
-set search_path = public
+set search_path = pg_catalog, public, auth, pg_temp
 as $$
-  select p.display_name from public.profiles p
-  order by lower(p.display_name), p.user_id;
+  select names.display_name
+  from auth.users u
+  left join public.profiles p on p.user_id = u.id
+  left join public.user_profiles up on up.user_id = u.id
+  cross join lateral (
+    select left(coalesce(nullif(btrim(up.data->>'name'), ''), nullif(btrim(p.display_name), ''), nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), ''), 40) as display_name
+  ) names
+  where names.display_name <> ''
+  order by lower(names.display_name), u.id;
 $$;
 revoke all on function public.app_user_names() from public, anon;
 grant execute on function public.app_user_names() to authenticated;
@@ -472,6 +487,35 @@ drop policy if exists "Users check own admin status" on public.app_admins;
 create policy "Users check own admin status" on public.app_admins
   for select to authenticated
   using (user_id = auth.uid());
+
+create or replace function public.app_user_activity()
+returns table (display_name text, last_sign_in_at timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+as $$
+declare
+  caller uuid := auth.uid();
+begin
+  if caller is null or not exists (select 1 from public.app_admins a where a.user_id = caller) then
+    raise exception 'Administrator access required' using errcode = '42501';
+  end if;
+
+  return query
+  select names.display_name, u.last_sign_in_at
+  from auth.users u
+  left join public.profiles p on p.user_id = u.id
+  left join public.user_profiles up on up.user_id = u.id
+  cross join lateral (
+    select left(coalesce(nullif(btrim(up.data->>'name'), ''), nullif(btrim(p.display_name), ''), nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), ''), 40) as display_name
+  ) names
+  where names.display_name <> ''
+  order by lower(names.display_name), u.id;
+end;
+$$;
+revoke all on function public.app_user_activity() from public, anon;
+grant execute on function public.app_user_activity() to authenticated;
 
 -- Shared product catalog accessible to all users for reading and copying.
 create table if not exists public.catalog_products (

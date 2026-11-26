@@ -146,7 +146,22 @@ async function mockSupabase(page, backend) {
 
     if (url.pathname === '/rest/v1/rpc/app_user_names') {
       if (!userIdFromRequest(req)) return json(401, { message: 'JWT required' });
-      return json(200, backend.tables.profiles.map((row) => ({ display_name: row.display_name })));
+      const named = backend.tables.profiles.map((row) => {
+        const profile = backend.tables.user_profiles.find((item) => item.user_id === row.user_id);
+        return { display_name: String(profile?.data?.name || row.display_name || '').trim().slice(0, 40) };
+      }).filter((row) => row.display_name).sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase()));
+      return json(200, named);
+    }
+
+    if (url.pathname === '/rest/v1/rpc/app_user_activity') {
+      const uid = userIdFromRequest(req);
+      if (!uid) return json(401, { message: 'JWT required' });
+      if (!backend.tables.app_admins.some((row) => row.user_id === uid)) return json(403, { code: '42501', message: 'Administrator access required' });
+      const named = backend.tables.profiles.map((row) => {
+        const profile = backend.tables.user_profiles.find((item) => item.user_id === row.user_id);
+        return { display_name: String(profile?.data?.name || row.display_name || '').trim().slice(0, 40), last_sign_in_at: row.last_sign_in_at || null };
+      }).filter((row) => row.display_name).sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase()));
+      return json(200, named);
     }
 
     if (url.pathname === '/rest/v1/weight_entries' && req.method() === 'POST' && backend.delayWeightWrites) {
