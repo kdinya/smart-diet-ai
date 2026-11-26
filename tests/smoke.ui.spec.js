@@ -7613,23 +7613,29 @@ test.describe('Smoke: shared product catalog', () => {
     await openView(page, 'products');
 
     const toolbar = page.locator('#products-toolbar');
-    const searchBox = await page.locator('#product-search').boundingBox();
-    const sortBox = await toolbar.locator('.dd-btn').boundingBox();
+    const controls = page.locator('#products-controls');
+    const sortBox = await controls.locator('.dd-btn').boundingBox();
+    const legendBox = await page.locator('#products-legend-btn').boundingBox();
+    const lupaBox = await page.locator('#product-search-toggle').boundingBox();
+    const controlsBox = await controls.boundingBox();
     const catalogBox = await page.locator('#catalog-toggle-btn').boundingBox();
     const newProductBox = await page.locator('#product-new').boundingBox();
-    const toolbarBox = await toolbar.boundingBox();
-    expect(searchBox).not.toBeNull();
     expect(sortBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(lupaBox).not.toBeNull();
     expect(catalogBox).not.toBeNull();
     expect(newProductBox).not.toBeNull();
-    expect(searchBox.x).toBeCloseTo(toolbarBox.x, 0);
-    expect(searchBox.width).toBeCloseTo(toolbarBox.width, 0);
-    expect(sortBox.x).toBeCloseTo(toolbarBox.x, 0);
-    expect(sortBox.width).toBeCloseTo(toolbarBox.width, 0);
+    expect(Math.abs(sortBox.width - legendBox.width)).toBeLessThanOrEqual(1);
+    expect(sortBox.height).toBeCloseTo(legendBox.height, 0);
+    expect(lupaBox.width).toBeCloseTo(lupaBox.height, 0);
+    expect(lupaBox.height).toBeCloseTo(sortBox.height, 0);
+    expect(lupaBox.x + lupaBox.width).toBeLessThanOrEqual(controlsBox.x + controlsBox.width + 1);
+    await expect(page.locator('#product-search')).not.toBeInViewport();
     expect(catalogBox.y).toBeCloseTo(newProductBox.y, 0);
     expect(catalogBox.x).toBeLessThan(newProductBox.x);
     expect(newProductBox.x + newProductBox.width).toBeLessThanOrEqual(360);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    await expect(toolbar).toBeVisible();
 
     await page.locator('#catalog-toggle-btn').click();
     const card = page.locator('#products-list .catalog-product-item').first();
@@ -8023,6 +8029,87 @@ test.describe('Smoke: shared product catalog', () => {
     expect(cardStyles.background).toBe('rgba(0, 0, 0, 0)');
     expect(cardStyles.boxShadow).toBe('none');
     expect(cardStyles.padding).toBe('0px');
+  });
+
+  test('products controls: equal sort and legend buttons, square search icon, animated search with clear button', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const products = [
+      { id: 'p-apple', name: 'Apple', grams: 100, kcal: 52, protein: 0.3, fat: 0.2, carbs: 14 },
+      { id: 'p-bread', name: 'Bread', grams: 100, kcal: 250, protein: 8, fat: 3, carbs: 48 },
+    ];
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products, foods: [], weights: [] });
+    await openView(page, 'products');
+
+    await expect(page.locator('#products-list-title')).toHaveText('Мої продукти');
+    const box = page.locator('#product-search-box');
+    const toggle = page.locator('#product-search-toggle');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(await box.evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#product-search')).toBeFocused();
+    await expect.poll(() => box.evaluate((el) => Math.round(el.getBoundingClientRect().height))).toBe(40);
+    const geometry = await page.evaluate(() => {
+      const c = document.querySelector('#products-controls').getBoundingClientRect();
+      const b = document.querySelector('#product-search-box').getBoundingClientRect();
+      const s = document.querySelector('#products-controls .dd-btn').getBoundingClientRect();
+      return { sameWidth: Math.abs(b.width - c.width) < 2, below: b.top >= s.bottom };
+    });
+    expect(geometry).toEqual({ sameWidth: true, below: true });
+
+    await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '0');
+    await page.keyboard.type('app');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple']);
+    await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '1');
+    await page.locator('#product-search-clear').click();
+    await expect(page.locator('#product-search')).toHaveValue('');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple', 'Bread']);
+    await expect(page.locator('#product-search')).toBeFocused();
+
+    await page.keyboard.type('bre');
+    await openView(page, 'stats');
+    await openView(page, 'products');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#product-search')).toHaveValue('');
+    await expect(page.locator('#products-list .product-name')).toHaveText(['Apple', 'Bread']);
+  });
+
+  test('legend modal explains the product icons and closes', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    await page.locator('#products-legend-btn').click();
+    const modal = page.locator('#products-legend-modal');
+    await expect(modal).toHaveClass(/open/);
+    await expect(modal.locator('.legend-item')).toHaveCount(15);
+    await expect(modal).toContainText('Перевірений продукт');
+    await expect(modal).toContainText('Галочка біля додатка');
+    await expect(modal).not.toContainText('лише адміністратор');
+    await modal.locator('#products-legend-close').click();
+    await expect(modal).not.toHaveClass(/open/);
+  });
+
+  test('catalog shows its own heading and an already-added note instead of an empty actions popup', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-owned', name: 'Blueberries', grams: 100, kcal: 57, protein: 0.7, fat: 0.3, carbs: 14.5,
+      verified: false, companions: [], components: [], note: '',
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
+    await page.evaluate(() => putProduct({ id: 'mine-blue', name: 'Blueberries', grams: 100, kcal: 57, protein: 0.7, fat: 0.3, carbs: 14.5 }));
+    await openView(page, 'products');
+    await page.locator('#catalog-toggle-btn').click();
+    await expect(page.locator('#products-list-title')).toHaveText(/Product catalog|Каталог продуктів/);
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
+    await card.locator('.product-more').click();
+    const note = card.locator('.catalog-added-note');
+    await expect(note).toBeVisible();
+    await expect(note).toHaveText(/Already added|Вже додано/);
+    await expect(card.locator('[data-copy-catalog-product]')).toHaveCount(0);
   });
 
   test('publishing a product with an add-on stores the add-on data inside the catalog entry', async ({ page }) => {

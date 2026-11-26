@@ -33,6 +33,8 @@
 - The product form can read copied nutrition text from the clipboard, show the source beside parsed calories, protein, fat and carbohydrates, and let you correct the values before they fill the product form. Previous values remain visible in parentheses beside field titles until you save. Parsing runs locally; nothing is saved until you confirm. "Find calories" still opens a Google search in a new tab.
 - Mark a product as verified in its settings; a check icon then shows next to it in My products.
 - Sort My products alphabetically by default, or by calories, protein, fat, and carbohydrates.
+- Tap the search icon above the list to search My products or the catalog; the field slides open, and a cross clears it. The *Legend* button explains every icon and mark next to a product.
+- Open the shared **Catalog** from My products to browse ready-made products with their full data and add-ons. Signed-in users can copy a product into their own list as an independent copy; guests can browse and are asked to sign in. Only the administrator can publish, edit and delete catalog entries.
 
 **Follow your weight**
 - Log your weight by date and see the chart and the trend. Open the trend chart directly from the latest weight card on the Overview screen, and browse all weigh-ins in a scrollable history dialog.
