@@ -5397,6 +5397,11 @@ test.describe('Smoke: product add-ons', () => {
     await expect(portions).toHaveValue('1.5');
     await expect(page.locator('#food-grams')).toHaveValue('350');
     await expect(main).toContainText('200 g');
+    const pb = await portions.boundingBox();
+    const gb = await grams.boundingBox();
+    expect(Math.abs(pb.y - gb.y)).toBeLessThan(4);
+    expect(Math.abs(pb.height - gb.height)).toBeLessThan(2);
+    expect(gb.x).toBeGreaterThan(pb.x + pb.width - 1);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     expect(overflow).toBe(true);
   });
