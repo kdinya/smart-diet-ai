@@ -464,7 +464,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('multiple snack events are numbered, grouped, and survive reload', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     let first = page.locator('#diary-meals [data-meal-key*="|snack|"]').first();
@@ -474,6 +474,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await page.click('#food-save');
     await page.evaluate(() => window.__advanceTestClock(60 * 60 * 1000));
     await page.locator('#diary-meals [data-new-snack="1"]').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
     if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
     for (const [id, value] of [['#food-name','Banana'],['#food-grams','100'],['#food-kcal','90'],['#food-protein','1'],['#food-fat','0'],['#food-carbs','23']]) await page.fill(id,value);
     await page.click('#food-save');
@@ -697,7 +698,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('snacks added less than an hour apart share the same snack event', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
@@ -722,7 +723,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
 
   test('a main meal interrupts the snack hour but an existing snack can still receive food', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
-    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); }; });
+    await page.evaluate(() => { window.__testNow = Date.now(); Date.now = () => window.__testNow; window.__advanceTestClock = ms => { window.__testNow += ms; localStorage.setItem('smartdiet-sleep-food-reminder', String(window.__testNow)); localStorage.setItem('smartdiet-sleep-food-morning', String(window.__testNow)); }; });
     await openView(page, 'diary');
     await addFood(page, 'Apple', 'snack');
     const firstId=(await readStore(page)).foods.find(f=>f.meal==='snack').snackId;
@@ -5434,7 +5435,9 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
 
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
     for (const id of [MILK, HONEY]) {
       const card = page.locator(`#food-components-list [data-component-item="${id}"]`);
       await expect(card).toBeVisible();
@@ -5475,7 +5478,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
     const dd = card.locator('.dd');
@@ -5512,7 +5517,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.scrollIntoViewIfNeeded();
@@ -5547,7 +5554,9 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
     await openView(page, 'diary');
-    await page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first().click({ force: true });
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.evaluate((el) => el.scrollIntoView({ block: 'end' }));
@@ -7923,40 +7932,32 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#products-list')).toContainText('Кешований вівсяний батончик');
   });
 
-  test('warns and proposes copy suffix when creating a simple product or composite dish with duplicate name', async ({ page }) => {
+  test('warns and proposes copy suffix when copying catalog product with duplicate name to my products', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     const existing = [
       { id: 'p-orig-1', name: 'Сир кисломолочний', grams: 100, kcal: 110, protein: 18, fat: 2, carbs: 3 },
     ];
+    const backend = createBackend();
+    backend.tables.catalog_products.push({
+      id: 'cat-dup-1', name: 'Сир кисломолочний', grams: 100, kcal: 110, protein: 18, fat: 2, carbs: 3, verified: true, companions: [], components: [], note: '',
+    });
+    await mockSupabase(page, backend);
+    await startAlice(page, backend);
     const confirmations = [];
     await autoConfirm(page, true, confirmations);
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, products: existing, foods: [], weights: [] });
     await openView(page, 'products');
 
-    await page.locator('#product-new').click();
-    await page.locator('#product-type-simple').click();
-    await page.fill('#food-name', 'сир кисломолочний');
-    await page.fill('#food-grams', '150');
-    await page.fill('#food-kcal', '165');
-    await page.click('#food-save');
+    await page.locator('#catalog-toggle-btn').click();
+    const card = page.locator('#products-list .catalog-product-item').first();
+    await card.locator('.product-toggle-main').click();
+    await card.locator('[data-more-product]').click();
+    await card.locator('[data-copy-catalog-product]').click();
 
-    await expect(page.locator('#products-list')).toContainText('сир кисломолочний (копія)');
     expect(confirmations.some((msg) => msg.includes('вже є у ваших продуктах') && msg.includes('(копія)'))).toBe(true);
-
-    confirmations.length = 0;
-    await page.locator('#product-new').click();
-    await page.locator('#product-type-composite').click();
-    await page.fill('#composite-name', 'Сир кисломолочний');
-    await page.locator('#composite-add-ingredient').click();
-    await page.fill('#food-name', 'Сметана');
-    await page.fill('#food-grams', '50');
-    await page.fill('#food-kcal', '80');
-    await page.click('#food-save');
-    await page.click('#composite-save-btn');
-
+    await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#products-list')).toContainText('Сир кисломолочний (копія)');
   });
-
   test('aligns product row icons with info icon to the left of sync/owned icon and expand button to the right', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     const myProducts = [
