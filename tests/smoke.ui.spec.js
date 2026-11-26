@@ -383,12 +383,20 @@ test.describe('Smoke: first-run setup', () => {
     const backend = createBackend();
     await mockSupabase(page, backend);
     await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.setViewportSize({ width: 360, height: 800 });
     await page.locator('#onboarding-choice-signup').click();
     await expect(page.locator('#onboard-auth-submit')).toContainText('Create account');
     await expect(page.locator('#onboard-auth-password')).toHaveAttribute('autocomplete', 'new-password');
     await expect(page.locator('#onboard-username-field')).toBeVisible();
+    await expect(page.locator('#onboard-password-hint')).toHaveText('Minimum password length: 6 characters.');
+    await page.locator('#onboard-auth-password-toggle').click();
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'text');
+    await page.locator('#onboard-auth-password-toggle').click();
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'password');
+    const toggleBounds = await page.locator('#onboard-auth-password-toggle').boundingBox();
+    expect(toggleBounds.x + toggleBounds.width).toBeLessThanOrEqual(360);
     await page.fill('#onboard-username', 'Alice');
-    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-email', '  new@example.test  ');
     await page.fill('#onboard-auth-password', PASSWORD);
     await page.locator('#onboard-auth-submit').click();
     await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
@@ -396,6 +404,63 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboarding-profile')).toBeVisible();
     await expect(page.locator('#onboarding-greeting')).toHaveText('Welcome, Alice!');
     await expect(page.locator('#onboard-name')).toHaveValue('Alice');
+  });
+
+  test('settings auth form shows signup password guidance and lets the user reveal the password', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
+    await openView(page, 'settings');
+    await page.locator('[data-auth="signup"]').click();
+    await expect(page.locator('#auth-password-hint')).toBeVisible();
+    await page.locator('#auth-password-toggle').click();
+    await expect(page.locator('#auth-password')).toHaveAttribute('type', 'text');
+    await page.locator('#auth-password-toggle').click();
+    await expect(page.locator('#auth-password')).toHaveAttribute('type', 'password');
+  });
+
+  test('short signup passwords are rejected with a clear message before calling Supabase', async ({ page }) => {
+    const backend = createBackend();
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', '12345');
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Use at least 6 characters for the password.');
+    expect(backend.authEvents).toEqual([]);
+  });
+
+  test('signup without a session stays on the confirmation step and gives privacy-safe guidance', async ({ page }) => {
+    const backend = createBackend();
+    backend.signupWithoutSession = true;
+    backend.signupIdentities = [];
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toContainText('If you just created an account');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+    await expect(page.locator('#onboarding-profile')).toBeHidden();
+    expect((await readStore(page)).synced?.uid).toBeUndefined();
+  });
+
+  test('invalid signup email response is translated into a clear message', async ({ page }) => {
+    const backend = createBackend();
+    backend.signupError = { msg: 'Invalid email address' };
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('Enter a valid email address.');
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
   });
 
   test('registration without a username is blocked before Supabase signup', async ({ page }) => {
