@@ -110,7 +110,7 @@ function rpc(name, { as, body }) {
 const admin = (method, path, body) => call(method, `/auth/v1/admin${path}`, { key: SERVICE, body });
 
 async function createUser(key) {
-  const r = await admin('POST', '/users', { email: emails[key], password: PASSWORD, email_confirm: true });
+  const r = await admin('POST', '/users', { email: emails[key], password: PASSWORD, email_confirm: true, user_metadata: { display_name: `CI ${key.toUpperCase()}` } });
   if (r.status >= 300 || !r.json?.id) throw new Error(`Could not create test user ${key}: ${describe(r)}`);
   ids[key] = r.json.id;
 }
@@ -156,6 +156,11 @@ async function run() {
 
   r = await rest('user_profiles', { as: 'a', method: 'POST', body: { user_id: A, data: { name: 'CI A', goals: { kcal: 2000 } } } });
   check('Owner can save a profile document', r.status === 201, describe(r));
+
+  r = await rest('profiles', { as: 'service', method: 'PATCH', query: `user_id=${eq(A)}`, body: { display_name: '' } });
+  check('Test fixture can simulate a profile with a name only in its private document', r.status < 300, describe(r));
+  r = await rest('profiles', { as: 'service', method: 'PATCH', query: `user_id=${eq(B)}`, body: { display_name: '' } });
+  check('Test fixture can simulate a profile with a name only in signup metadata', r.status < 300, describe(r));
 
   r = await rest('food_entries', { as: 'a', query: `user_id=${eq(A)}&select=id` });
   check('Owner reads own food entries', rows(r) === 1, describe(r));
@@ -337,6 +342,14 @@ async function run() {
   r = await rpc('app_user_names', { as: 'a', body: {} });
   check('Signed-in user can read app user names', Array.isArray(r.json) && r.json.length >= 2, describe(r));
   check('App user names expose only display_name', Array.isArray(r.json) && r.json.every(row => Object.keys(row).join() === 'display_name'), describe(r));
+  const appNames = Array.isArray(r.json) ? r.json.map(row => row.display_name) : [];
+  check('App user names include saved-profile, signup-metadata, and profile names', ['CI A', 'CI B', 'CI C'].every(name => appNames.includes(name)), describe(r));
+  check('App user names exclude empty profiles', Array.isArray(r.json) && r.json.every(row => typeof row.display_name === 'string' && row.display_name.trim()), describe(r));
+
+  r = await rpc('app_user_activity', { as: 'b', body: {} });
+  check('Non-admin cannot read last-sign-in activity', denied(r), describe(r));
+  rAnon = await rpc('app_user_activity', { body: {} });
+  check('Anonymous user cannot read last-sign-in activity', denied(rAnon), describe(rAnon));
 
   // Friend invite links: one-time, expiring, and never self-accepted
   r = await rpc('create_friend_invite', { as: 'a', body: {} });
@@ -366,6 +379,11 @@ async function run() {
   // 1. Promote user A to admin via service role
   r = await rest('app_admins', { as: 'service', method: 'POST', body: { user_id: A } });
   check('Service role can add user A to app_admins', r.status === 201, describe(r));
+
+  r = await rpc('app_user_activity', { as: 'a', body: {} });
+  const namedActivity = Array.isArray(r.json) ? r.json.filter(row => ['CI A', 'CI B', 'CI C'].includes(row.display_name)) : [];
+  check('Admin activity contains last-sign-in timestamps for all named test users', ['CI A', 'CI B', 'CI C'].every(name => namedActivity.some(row => row.display_name === name && Number.isFinite(Date.parse(row.last_sign_in_at)))), describe(r));
+  check('Admin activity exposes only display_name and last_sign_in_at', Array.isArray(r.json) && r.json.every(row => Object.keys(row).sort().join() === 'display_name,last_sign_in_at'), describe(r));
 
   // 2. User A can check their own admin status
   r = await rest('app_admins', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
