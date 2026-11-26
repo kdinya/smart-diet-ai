@@ -8397,7 +8397,7 @@ test.describe('Smoke: shared product catalog', () => {
     expect(searchOrder.indexOf('field')).toBeGreaterThanOrEqual(0);
     expect(searchOrder.indexOf('field')).toBeLessThan(searchOrder.indexOf('scroll'));
     expect(searchOrder.indexOf('scroll')).toBeLessThan(searchOrder.indexOf('focus'));
-    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
     const geometry = await page.evaluate(() => {
       const c = document.querySelector('#products-controls').getBoundingClientRect();
       const b = document.querySelector('#product-search-box').getBoundingClientRect();
@@ -8409,7 +8409,7 @@ test.describe('Smoke: shared product catalog', () => {
     const target = await page.evaluate(() => Math.max(0, document.querySelector('#products-controls').getBoundingClientRect().top + window.scrollY - 12));
     await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
     await page.locator('#product-search').click();
-    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
 
     await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '0');
     await page.keyboard.type('app');
@@ -8440,11 +8440,11 @@ test.describe('Smoke: shared product catalog', () => {
       await page.evaluate((top) => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, Math.max(0, top - 90)); }, target);
       await page.locator('#product-search-toggle').click();
       await expect(page.locator('#product-search')).toBeFocused();
-      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
       const openTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
       await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
       await page.locator('#product-search').click();
-      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(12);
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
       const clickTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
       await page.locator('#product-search-toggle').click();
       await expect(page.locator('#product-search-toggle')).toHaveAttribute('aria-expanded', 'false');
@@ -8456,8 +8456,8 @@ test.describe('Smoke: shared product catalog', () => {
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
     const catalog = await checkOpenAndClickPosition();
-    expect(myProducts).toEqual({ openTop: 12, clickTop: 12 });
-    expect(catalog).toEqual({ openTop: 12, clickTop: 12 });
+    expect(myProducts).toEqual({ openTop: 24, clickTop: 24 });
+    expect(catalog).toEqual({ openTop: 24, clickTop: 24 });
   });
 
   test('legend modal explains the product icons and closes', async ({ page }) => {
@@ -8584,15 +8584,16 @@ test.describe('Smoke: composite portion normalization', () => {
     expect(stored.foods[0].components.find((item) => item.id === 'beet')).toMatchObject({ grams: 100, enabled: true });
   });
 
-  test('places the My products/catalog navigation button directly above the catalog card', async ({ page }) => {
+  test('places the My products/catalog navigation button inside products toolbar', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
     await openView(page, 'products');
     const placement = await page.locator('#catalog-toggle-btn').evaluate((button) => ({
-      parent: button.parentElement?.className || '',
+      parentId: button.parentElement?.id || '',
       insideCard: Boolean(button.closest('.card')),
-      followsToolbar: button.parentElement?.previousElementSibling?.id === 'products-toolbar',
+      previousSibling: button.nextElementSibling?.id || '',
     }));
     expect(placement.insideCard).toBe(false);
-    expect(placement.followsToolbar).toBe(true);
+    expect(placement.parentId).toBe('products-toolbar');
+    expect(placement.previousSibling).toBe('product-new');
   });
 });
