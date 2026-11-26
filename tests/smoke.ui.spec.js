@@ -8553,3 +8553,45 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(page.locator('#products-list [data-product-addons]')).toContainText('Milk');
   });
 });
+
+test.describe('Smoke: composite portion normalization', () => {
+  test('keeps active ingredients at 100% of the selected dish portion when adding and editing', async ({ page }) => {
+    const products = [{
+      id: 'beet-salad', name: 'Beet salad', grams: 100, kcal: 80, protein: 2, fat: 3, carbs: 12,
+      components: [
+        { id: 'beet', name: 'Beet', grams: 70, kcal: 30, protein: 1, fat: 0, carbs: 7, enabled: true },
+        { id: 'mayo', name: 'Mayonnaise', grams: 30, kcal: 50, protein: 1, fat: 3, carbs: 5, enabled: false },
+      ],
+    }];
+    await openApp(page, { prefs: BASE_PREFS, products, foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products[0]));
+    await page.fill('#pick-grams', '210');
+    await page.click('#pick-add');
+    let stored = await readStore(page);
+    expect(stored.foods[0].grams).toBe(210);
+    expect(stored.foods[0].components.find((item) => item.id === 'beet')).toMatchObject({ grams: 210, enabled: true });
+    expect(stored.foods[0].components.find((item) => item.id === 'mayo').enabled).toBe(false);
+
+    await openView(page, 'diary');
+    const diaryEntry = page.locator('#diary-meals .meal-item[data-food-id]').first();
+    await diaryEntry.locator('[data-toggle-food]').click();
+    await diaryEntry.locator('[data-edit-food]').click();
+    await page.selectOption('#food-portions', '1');
+    await page.click('#food-save');
+    stored = await readStore(page);
+    expect(stored.foods[0].grams).toBe(100);
+    expect(stored.foods[0].components.find((item) => item.id === 'beet')).toMatchObject({ grams: 100, enabled: true });
+  });
+
+  test('places the My products/catalog navigation button directly above the catalog card', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    const placement = await page.locator('#catalog-toggle-btn').evaluate((button) => ({
+      parent: button.parentElement?.className || '',
+      insideCard: Boolean(button.closest('.card')),
+      followsToolbar: button.parentElement?.previousElementSibling?.id === 'products-toolbar',
+    }));
+    expect(placement.insideCard).toBe(false);
+    expect(placement.followsToolbar).toBe(true);
+  });
+});
