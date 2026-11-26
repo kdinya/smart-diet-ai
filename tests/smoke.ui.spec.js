@@ -7,6 +7,15 @@ async function waitForTransformTransition(locator) {
   })).toBe(true);
 }
 
+async function clearSleepFoodReminderCooldown(page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('smartdiet-sleep-food-reminder');
+    localStorage.removeItem('smartdiet-sleep-food-morning');
+    if (typeof sleepFoodReminderAt !== 'undefined') sleepFoodReminderAt = 0;
+    if (typeof sleepFoodMorningAt !== 'undefined') sleepFoodMorningAt = 0;
+  });
+}
+
 test.describe('Smoke: app version', () => {
   test('shows the current release version in Settings in both interface languages', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
@@ -1936,7 +1945,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('meal add shows a reminder while asleep and returns the assistant to sleep when closed', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
@@ -1954,7 +1964,7 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('product plus shows a reminder while asleep and does not open the meal picker', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
-    await page.evaluate(() => localStorage.removeItem('smartdiet-sleep-food-reminder'));
+    await clearSleepFoodReminderCooldown(page);
     await openView(page, 'products');
     await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     const product = page.locator('#products-list .product-item[data-product-id="11111111-1111-4111-8111-111111111111"]');
@@ -1967,7 +1977,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#bot-comic .bot-comic-actions button').click();
     await page.clock.fastForward(1000);
     await expect.poll(() => page.evaluate(() => botMotion), { timeout: 2000 }).toBe('sleeping');
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     if (await product.evaluate((element) => element.classList.contains('collapsed'))) await product.locator('.product-toggle-main').click();
     await product.locator('[data-add-product]').click();
@@ -1979,8 +1990,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('AI-recommended food shows the sleep reminder before opening the meal picker', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
+    await clearSleepFoodReminderCooldown(page);
     await page.evaluate(() => {
-      localStorage.removeItem('smartdiet-sleep-food-reminder');
       clearTimeout(botWelcomeTimer);
       botWelcomeTimer = null;
       botWelcomeScheduled = false;
@@ -2001,7 +2012,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('disabled assistant never intercepts food entry even while asleep', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, botMode: 'button', lang: 'uk' }, products: [], foods: [], weights: [] });
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleeping');
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
@@ -2014,7 +2026,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
   test('sleeping and sleepy reminders share a 10-minute cooldown, then show again', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-11-06T02:00:00') });
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'night', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'night', pajamas: true }));
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     const add = meal.locator('[data-action="add-food"]');
@@ -2041,7 +2054,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
 
   test('a sleepy assistant allows morning food and gives a gentle reminder in the evening', async ({ page }) => {
     await openApp(page, store());
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); localStorage.removeItem('smartdiet-sleep-food-morning'); setBotServiceState({ period: 'morning', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'morning', pajamas: true }));
     const meal = page.locator('#home-meals .meal-card').first();
     await meal.locator('.meal-head').click();
     const add = meal.locator('[data-action="add-food"]');
@@ -2054,7 +2068,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await page.locator('#modal-close').click();
     await page.evaluate(() => hideBotComic(true));
 
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'evening', pajamas: true }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'evening', pajamas: true }));
     await expect.poll(() => page.evaluate(() => botMotion)).toBe('sleepy');
     await add.click();
     await expect(bubble).toHaveClass(/is-visible/);
@@ -2062,7 +2077,8 @@ test.describe('Smoke: sleepy assistant food reminder', () => {
     await bubble.locator('.bot-comic-actions button').click();
     await expect(bubble).not.toHaveClass(/is-visible/);
 
-    await page.evaluate(() => { localStorage.removeItem('smartdiet-sleep-food-reminder'); setBotServiceState({ period: 'day', pajamas: false }); });
+    await clearSleepFoodReminderCooldown(page);
+    await page.evaluate(() => setBotServiceState({ period: 'day', pajamas: false }));
     await add.click();
     await expect(page.locator('#modal')).toHaveClass(/open/);
     await expect(bubble).not.toHaveClass(/is-visible/);
