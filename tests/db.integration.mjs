@@ -362,6 +362,49 @@ async function run() {
   r = await rpc('accept_friend_invite', { as: 'c', body: { invite_token: expiredToken } });
   check('Expired invite is rejected', r.json === 'expired', JSON.stringify(r.json));
 
+  // Shared catalog: everyone reads it, only app admins write to it
+  r = await rest('app_admins', { as: 'service', method: 'POST', body: { user_id: A } });
+  check('Service role can register an app admin', r.status === 201, describe(r));
+  r = await rest('app_admins', { as: 'b', method: 'POST', body: { user_id: B } });
+  check('Regular user cannot make themselves an admin', denied(r), describe(r));
+  r = await rest('app_admins', { as: 'b', query: 'select=user_id' });
+  check('Regular user does not see the admin list', emptyOrDenied(r), describe(r));
+  r = await rest('app_admins', { as: 'a', query: 'select=user_id' });
+  check('Admin sees only their own marker', rows(r) === 1 && r.json[0].user_id === A, describe(r));
+  rAnon = await rest('app_admins');
+  check('Anonymous visitor cannot read the admin list', emptyOrDenied(rAnon), describe(rAnon));
+
+  const catalogBody = (name) => ({ name, grams: 100, kcal: 130, protein: 3, fat: 1, carbs: 28, verified: true, note: 'CI note', companions: [], components: [] });
+  r = await rest('catalog_products', { as: 'b', method: 'POST', body: catalogBody('CI catalog by user') });
+  check('Regular user cannot add a catalog product', denied(r), describe(r));
+  r = await rest('catalog_products', { method: 'POST', body: catalogBody('CI catalog by visitor') });
+  check('Anonymous visitor cannot add a catalog product', denied(r), describe(r));
+  r = await rest('catalog_products', { as: 'a', method: 'POST', prefer: 'return=representation', body: { ...catalogBody('CI catalog rice'), source_id: randomUUID() } });
+  const catalogId = r.json?.[0]?.id;
+  check('Admin can add a catalog product', r.status === 201 && !!catalogId, describe(r));
+  r = await rest('catalog_products', { as: 'a', method: 'POST', body: catalogBody('ci CATALOG RICE') });
+  check('Catalog names are unique regardless of case', denied(r), describe(r));
+  r = await rest('catalog_products', { as: 'a', method: 'POST', body: { ...catalogBody('CI catalog bad'), kcal: 10001 } });
+  check('Catalog rejects out-of-range values', denied(r), describe(r));
+  rAnon = await rest('catalog_products', { query: `id=${eq(catalogId)}&select=name,verified,note,companions,components` });
+  check('Anonymous visitor can read the catalog with all details', rows(rAnon) === 1 && rAnon.json[0].note === 'CI note' && rAnon.json[0].verified === true, describe(rAnon));
+  r = await rest('catalog_products', { as: 'b', query: `id=${eq(catalogId)}&select=id` });
+  check('Signed-in user can read the catalog', rows(r) === 1, describe(r));
+  r = await rest('catalog_products', { as: 'b', method: 'PATCH', query: `id=${eq(catalogId)}`, body: { kcal: 1 }, prefer: 'return=representation' });
+  check('Regular user cannot edit a catalog product', emptyOrDenied(r), describe(r));
+  r = await rest('catalog_products', { as: 'b', method: 'DELETE', query: `id=${eq(catalogId)}`, prefer: 'return=representation' });
+  check('Regular user cannot delete a catalog product', emptyOrDenied(r), describe(r));
+  r = await rest('catalog_products', { as: 'service', query: `id=${eq(catalogId)}&select=kcal` });
+  check('Catalog product is unchanged after refused writes', rows(r) === 1 && Number(r.json[0].kcal) === 130, describe(r));
+  r = await rest('catalog_products', { as: 'a', method: 'PATCH', query: `id=${eq(catalogId)}`, body: { kcal: 140 }, prefer: 'return=representation' });
+  check('Admin can edit a catalog product', rows(r) === 1 && Number(r.json[0].kcal) === 140, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=id` });
+  const personalBefore = rows(r);
+  r = await rest('catalog_products', { as: 'a', method: 'DELETE', query: `id=${eq(catalogId)}`, prefer: 'return=representation' });
+  check('Admin can delete a catalog product', rows(r) === 1, describe(r));
+  r = await rest('products', { as: 'a', query: `user_id=${eq(A)}&select=id` });
+  check('Deleting from the catalog does not touch personal products', rows(r) === personalBefore && personalBefore > 0, describe(r));
+
   // Deleting an account removes its data
   r = await admin('DELETE', `/users/${A}`);
   check('Test account can be deleted', r.status < 300, describe(r));
@@ -373,6 +416,7 @@ async function run() {
 }
 
 async function cleanup() {
+  await rest('catalog_products', { as: 'service', method: 'DELETE', query: 'name=ilike.CI%20catalog*' });
   for (const key of ['a', 'b', 'c']) {
     if (!ids[key]) continue;
     const r = await admin('DELETE', `/users/${ids[key]}`);

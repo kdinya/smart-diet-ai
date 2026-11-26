@@ -83,6 +83,8 @@ function createBackend() {
       ],
       friendships: [],
       product_shares: [],
+      catalog_products: [],
+      app_admins: [],
     },
     friendAttempts: {},
     foodWriteStarted: false,
@@ -271,6 +273,80 @@ async function handleSocial(route, req, url, backend, json, table, uid) {
   return json(405, { message: 'Method not mocked' });
 }
 
+function catalogMatches(row, params) {
+  for (const [key, value] of params) {
+    if (['select', 'order', 'limit', 'offset', 'on_conflict'].includes(key)) continue;
+    if (value.startsWith('eq.') && String(row[key]) !== value.slice(3)) return false;
+    if (value.startsWith('gte.') && !(String(row[key]) >= value.slice(4))) return false;
+  }
+  return true;
+}
+
+/**
+ * Stand-in for catalog_products and app_admins with the same visibility rules as supabase/schema.sql:
+ * everyone reads the catalog, only app admins write, and a write without rights touches no rows.
+ */
+function handleCatalog(route, req, url, backend, json, table, uid) {
+  const rows = backend.tables[table];
+  const params = [...url.searchParams.entries()];
+  const isAdmin = !!uid && backend.tables.app_admins.some((row) => row.user_id === uid);
+  const wantsRows = (req.headers()['prefer'] || '').includes('return=representation');
+  const noContent = () => route.fulfill({ status: 204, headers: CORS, body: '' });
+  if (backend.failCatalog) return json(500, { code: 'XX000', message: 'simulated catalog failure' });
+
+  if (table === 'app_admins') {
+    if (!uid) return json(401, { message: 'permission denied for table app_admins' });
+    if (req.method() !== 'GET') return json(403, { code: '42501', message: 'permission denied for table app_admins' });
+    const found = rows.filter((row) => row.user_id === uid && catalogMatches(row, params));
+    if ((req.headers()['accept'] || '').includes('vnd.pgrst.object+json')) {
+      return found.length === 1 ? json(200, found[0]) : json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
+    }
+    return json(200, found);
+  }
+
+  if (req.method() === 'GET') {
+    let found = rows.filter((row) => catalogMatches(row, params)).sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)) || String(a.id).localeCompare(String(b.id)));
+    const offset = Number(url.searchParams.get('offset') || 0);
+    const limit = url.searchParams.get('limit');
+    found = found.slice(offset, limit ? offset + Number(limit) : undefined);
+    const columns = (url.searchParams.get('select') || '*').split(',');
+    if (columns[0] !== '*') found = found.map((row) => Object.fromEntries(columns.map((key) => [key, row[key]])));
+    backend.catalogReads = (backend.catalogReads || 0) + 1;
+    return json(200, found);
+  }
+
+  const denied = { code: '42501', message: 'new row violates row-level security policy for table "catalog_products"' };
+  if (req.method() === 'POST') {
+    if (!isAdmin) return json(403, denied);
+    const body = req.postDataJSON();
+    const items = Array.isArray(body) ? body : [body];
+    for (const item of items) {
+      if (rows.some((row) => row.name.toLowerCase() === String(item.name).toLowerCase())) {
+        return json(409, { code: '23505', message: 'duplicate key value violates unique constraint "catalog_products_name_idx"' });
+      }
+    }
+    items.forEach((item, index) => {
+      const stamp = new Date(Date.now() + index).toISOString();
+      rows.push({ id: item.id || `cat-${rows.length + 1}`, created_at: stamp, updated_at: stamp, verified: false, note: '', companions: [], components: [], source_id: null, ...item });
+    });
+    return route.fulfill({ status: 201, headers: CORS, body: '' });
+  }
+
+  if (req.method() === 'PATCH') {
+    const touched = isAdmin ? rows.filter((row) => catalogMatches(row, params)) : [];
+    touched.forEach((row) => Object.assign(row, req.postDataJSON(), { updated_at: new Date(Date.now() + 1000).toISOString() }));
+    return wantsRows ? json(200, touched) : noContent();
+  }
+
+  if (req.method() === 'DELETE') {
+    const gone = isAdmin ? rows.filter((row) => catalogMatches(row, params)) : [];
+    gone.forEach((row) => rows.splice(rows.indexOf(row), 1));
+    return wantsRows ? json(200, gone) : noContent();
+  }
+
+  return json(405, { message: 'Method not mocked' });
+}
+
 async function handleRest(route, req, url, backend, json) {
   const table = url.pathname.replace('/rest/v1/', '');
   const rows = backend.tables[table];
@@ -285,6 +361,7 @@ async function handleRest(route, req, url, backend, json) {
   if (table === 'user_profiles' && backend.failProfiles) {
     return json(404, { code: 'PGRST205', message: "Could not find the table 'public.user_profiles' in the schema cache" });
   }
+  if (table === 'catalog_products' || table === 'app_admins') return handleCatalog(route, req, url, backend, json, table, uid);
   if (!uid) return json(401, { message: 'JWT required' });
   if (SOCIAL_TABLES.includes(table)) return handleSocial(route, req, url, backend, json, table, uid);
 
@@ -579,5 +656,5 @@ async function selectDiaryDate(page, date) {
   await page.click('#cal-done');
 }
 
-module.exports = { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
+module.exports = { handleCatalog, test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url, userObject, sessionFor, userIdFromRequest, createBackend, mockSupabase, matchesFilters, SOCIAL_TABLES, FRIEND_CODE, areFriends, handleRequestFriend, SHARE_VALUE_KEYS, handleSocial, handleRest, openApp, readStore, openDietitianChat, openAskChat, openView, connectSupabase, signIn, signOut, setupConfirmWatch, autoConfirm, addFood, foodRow, OLD_FOOD, IMPORT_BACKUP, backupFile, EMPTY_STORE, setDisplayName, startUser, startAlice, openAsUser, befriend, addProduct, shareFirstProductWith, shareFirstProductWithMany, AI_STORE, selectDiaryDate };
 
