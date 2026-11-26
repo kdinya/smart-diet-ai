@@ -54,7 +54,7 @@ if (dbUrlStr) {
 const runId = randomUUID().slice(0, 8);
 const PASSWORD = `${randomUUID()}Aa1!`;
 const emails = {
-  a: `ci-${runId}-a@example.com`,
+  a: `ci-${runId}-a@users.noreply.github.com`,
   b: `ci-${runId}-b@example.com`,
   c: `ci-${runId}-c@example.com`,
 };
