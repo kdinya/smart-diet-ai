@@ -151,8 +151,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.name, f.grams, f.kcal]))).toEqual([['Coffee', 100, 2]]);
     expect(await page.evaluate(() => state.products.find((p) => p.id === '11111111-1111-4111-8111-111111111111').companions)).toEqual([{ id: MILK, grams: 50 }]);
   });
-  // Superseded by the normalized active-component regressions above; retained as documentation of the former additive model.
-  test.skip('adding a product from the main diary modal adds its checked add-ons to the same meal', async ({ page }) => {
+  test('adding a product from the main diary modal adds its checked add-ons to the same meal', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
@@ -182,7 +181,38 @@ test.describe('Smoke: product add-ons', () => {
     expect(await page.evaluate((id) => state.products.find((p) => p.id === id).companions, COFFEE)).toEqual([{ id: MILK, grams: 50 }]);
   });
 
-  test.skip('editing add-on grams in the main diary modal does not mutate the saved product setting', async ({ page }) => {
+  test('adding a product with multiple add-ons from main modal does not compress or scale add-ons down', async ({ page }) => {
+    const ADDON1 = '44444444-4444-4444-8444-444444444444';
+    const ADDON2 = '55555555-5555-4555-8555-555555555555';
+    const MAIN = '66666666-6666-4666-8666-666666666666';
+    const addon1 = { id: ADDON1, name: 'Addon 1', grams: 4, kcal: 20, protein: 1, fat: 1, carbs: 2 };
+    const addon2 = { id: ADDON2, name: 'Addon 2', grams: 25, kcal: 100, protein: 5, fat: 5, carbs: 8 };
+    const mainProd = { id: MAIN, name: 'Main dish', grams: 200, kcal: 300, protein: 20, fat: 10, carbs: 30, companions: [{ id: ADDON1, grams: 4 }, { id: ADDON2, grams: 25 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [mainProd, addon1, addon2], foods: [], weights: [] });
+    await page.evaluate(() => openModal('food', 'breakfast'));
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
+    await page.fill('#food-name', 'Main dish');
+    await page.dispatchEvent('#food-name', 'change');
+    await expect(page.locator('#product-companions-field')).toBeVisible();
+    await page.click('#food-save');
+    await expect.poll(() => page.evaluate(() => {
+      const f = state.foods.find(x => x.name === 'Main dish');
+      if (!f) return null;
+      return {
+        totalGrams: f.grams,
+        baseCompGrams: f.components?.find(c => c.isBase || c.id === '__base__')?.grams,
+        addon1Grams: f.components?.find(c => c.id === '44444444-4444-4444-8444-444444444444')?.grams,
+        addon2Grams: f.components?.find(c => c.id === '55555555-5555-4555-8555-555555555555')?.grams,
+      };
+    })).toEqual({
+      totalGrams: 229,
+      baseCompGrams: 200,
+      addon1Grams: 4,
+      addon2Grams: 25,
+    });
+  });
+
+  test('editing add-on grams in the main diary modal does not mutate the saved product setting', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openModal('food', 'breakfast'));
