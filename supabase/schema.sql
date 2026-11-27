@@ -521,6 +521,7 @@ $$;
 revoke all on function public.record_app_open() from public, anon;
 grant execute on function public.record_app_open() to authenticated;
 
+drop function if exists public.app_user_activity();
 create or replace function public.app_user_activity()
 returns table (display_name text, last_opened_at timestamptz)
 language plpgsql
@@ -550,6 +551,8 @@ end;
 $$;
 revoke all on function public.app_user_activity() from public, anon;
 grant execute on function public.app_user_activity() to authenticated;
+
+notify pgrst, 'reload schema';
 
 -- Shared product catalog accessible to all users for reading and copying.
 create table if not exists public.catalog_products (
@@ -597,4 +600,3 @@ drop policy if exists "Admins delete catalog products" on public.catalog_product
 create policy "Admins delete catalog products" on public.catalog_products
   for delete to authenticated
   using (exists (select 1 from public.app_admins where user_id = auth.uid()));
-
