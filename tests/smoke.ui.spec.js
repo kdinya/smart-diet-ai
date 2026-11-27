@@ -25,8 +25,8 @@ test.describe('Smoke: app version', () => {
       latest: APP_RELEASES[APP_RELEASES.length - 1],
     }));
     expect(release.newestFirst[0]).toBe(release.version);
-    expect(release.latest.description.en).toBe('Explore shared products and save the ones you need.');
-    expect(release.latest.description.uk).toBe('Знаходьте потрібні продукти у спільному каталозі та зберігайте їх у своєму списку.');
+    expect(release.latest.description.en).toBe('Modularized localization dictionaries for improved loading and streamlined updates.');
+    expect(release.latest.description.uk).toBe('Модуляризація словників локалізації для швидшого завантаження та зручніших оновлень.');
     expect(release.latest.added.en.some((item) => item.includes('last sign-in date and time'))).toBe(true);
     expect(release.latest.added.uk.some((item) => item.includes('дату й час останнього входу'))).toBe(true);
     expect(release.latest.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
