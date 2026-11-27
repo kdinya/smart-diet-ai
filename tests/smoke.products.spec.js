@@ -1653,7 +1653,7 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
     ],
   };
 
-  test('ingredient gram fields show no unit suffix and right-aligned numbers in add and edit dialogs', async ({ page }) => {
+  test('ingredient gram fields show unit suffix in add and edit dialogs', async ({ page }) => {
     const today = new Date().toLocaleDateString('en-CA');
     await openApp(page, {
       prefs: { ...BASE_PREFS, lang: 'en' },
@@ -1664,17 +1664,17 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
 
     await openView(page, 'diary');
     await page.locator('#diary-meals [data-edit-food]').click();
+    await page.locator('#food-components-list [data-component-item="c-oats"] [data-companion-toggle]').click();
     const editInput = page.locator('#food-components-list [data-component-grams="c-oats"]');
-    await expect(editInput).toHaveCSS('text-align', 'right');
-    expect(await editInput.evaluate((el) => el.parentElement.textContent.trim())).toBe('');
-    expect(await page.locator('#food-components-list .companion-unit').count()).toBe(0);
+    await expect(editInput).toBeVisible();
+    await expect(page.locator('#food-components-list [data-component-item="c-oats"] .companion-unit')).toHaveText('g');
     await page.locator('#modal-close').click();
 
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    await page.locator('#pick-components-list [data-component-item="c-oats"] [data-companion-toggle]').click();
     const pickInput = page.locator('#pick-components-list [data-component-grams="c-oats"]');
-    await expect(pickInput).toHaveCSS('text-align', 'right');
-    expect(await pickInput.evaluate((el) => el.parentElement.textContent.trim())).toBe('');
-    expect(await page.locator('#pick-components-list .companion-unit').count()).toBe(0);
+    await expect(pickInput).toBeVisible();
+    await expect(page.locator('#pick-components-list [data-component-item="c-oats"] .companion-unit')).toHaveText('g');
   });
 
   test('ingredient gram fields stay inside their cards in the edit dialog at 360px', async ({ page }) => {
@@ -1688,6 +1688,9 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
     await page.setViewportSize({ width: 360, height: 740 });
     await openView(page, 'diary');
     await page.locator('#diary-meals [data-edit-food]').click();
+    for (const id of ['c-oats', 'c-milk']) {
+      await page.locator(`#food-components-list [data-component-item="${id}"] [data-companion-toggle]`).click();
+    }
     await expect(page.locator('#food-components-list [data-component-grams]')).toHaveCount(2);
     const fit = await page.evaluate(() => {
       const inputs = [...document.querySelectorAll('#food-components-list [data-component-grams]')];
@@ -1705,6 +1708,9 @@ test.describe('Smoke: dish ingredient gram fields and legacy shared products', (
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [bowl], foods: [], weights: [] });
     await page.setViewportSize({ width: 360, height: 740 });
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Oatmeal bowl')));
+    for (const id of ['c-oats', 'c-milk']) {
+      await page.locator(`#pick-components-list [data-component-item="${id}"] [data-companion-toggle]`).click();
+    }
     await expect(page.locator('#pick-components-list [data-component-grams]')).toHaveCount(2);
     const fit = await page.evaluate(() => {
       const inputs = [...document.querySelectorAll('#pick-components-list [data-component-grams]')];
