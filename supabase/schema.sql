@@ -488,8 +488,41 @@ create policy "Users check own admin status" on public.app_admins
   for select to authenticated
   using (user_id = auth.uid());
 
+create table if not exists public.app_open_activity (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  last_opened_at timestamptz not null default now()
+);
+alter table public.app_open_activity enable row level security;
+revoke all on public.app_open_activity from public, anon, authenticated;
+
+create or replace function public.record_app_open()
+returns timestamptz
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+as $$
+declare
+  caller uuid := auth.uid();
+  opened_at timestamptz;
+begin
+  if caller is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+
+  insert into public.app_open_activity (user_id, last_opened_at)
+  values (caller, now())
+  on conflict (user_id) do update set last_opened_at = excluded.last_opened_at
+  returning last_opened_at into opened_at;
+
+  return opened_at;
+end;
+$$;
+revoke all on function public.record_app_open() from public, anon;
+grant execute on function public.record_app_open() to authenticated;
+
 create or replace function public.app_user_activity()
-returns table (display_name text, last_sign_in_at timestamptz)
+returns table (display_name text, last_opened_at timestamptz)
 language plpgsql
 stable
 security definer
@@ -503,10 +536,11 @@ begin
   end if;
 
   return query
-  select names.display_name, u.last_sign_in_at
+  select names.display_name, activity.last_opened_at
   from auth.users u
   left join public.profiles p on p.user_id = u.id
   left join public.user_profiles up on up.user_id = u.id
+  left join public.app_open_activity activity on activity.user_id = u.id
   cross join lateral (
     select left(coalesce(nullif(btrim(up.data->>'name'), ''), nullif(btrim(p.display_name), ''), nullif(btrim(u.raw_user_meta_data->>'display_name'), ''), nullif(btrim(u.raw_user_meta_data->>'name'), ''), ''), 40) as display_name
   ) names

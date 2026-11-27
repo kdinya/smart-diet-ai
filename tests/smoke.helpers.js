@@ -84,6 +84,7 @@ function createBackend() {
       friendships: [],
       product_shares: [],
       app_admins: [],
+      app_open_activity: [],
       catalog_products: [],
     },
     friendAttempts: {},
@@ -95,6 +96,7 @@ function createBackend() {
     rlsProfiles: false,
     deniedTables: [],
     authEvents: [],
+    activityEvents: [],
     signupError: null,
     signupWithoutSession: false,
     signupIdentities: undefined,
@@ -156,6 +158,17 @@ async function mockSupabase(page, backend) {
       return handleRequestFriend(req, backend, json);
     }
 
+    if (url.pathname === '/rest/v1/rpc/record_app_open') {
+      const uid = userIdFromRequest(req);
+      if (!uid) return json(401, { message: 'JWT required' });
+      const last_opened_at = new Date().toISOString();
+      const activity = backend.tables.app_open_activity.find((row) => row.user_id === uid);
+      if (activity) activity.last_opened_at = last_opened_at;
+      else backend.tables.app_open_activity.push({ user_id: uid, last_opened_at });
+      backend.activityEvents.push({ user_id: uid, last_opened_at });
+      return json(200, last_opened_at);
+    }
+
     if (url.pathname === '/rest/v1/rpc/app_user_names') {
       if (!userIdFromRequest(req)) return json(401, { message: 'JWT required' });
       const named = backend.tables.profiles.map((row) => {
@@ -171,7 +184,8 @@ async function mockSupabase(page, backend) {
       if (!backend.tables.app_admins.some((row) => row.user_id === uid)) return json(403, { code: '42501', message: 'Administrator access required' });
       const named = backend.tables.profiles.map((row) => {
         const profile = backend.tables.user_profiles.find((item) => item.user_id === row.user_id);
-        return { display_name: String(profile?.data?.name || row.display_name || '').trim().slice(0, 40), last_sign_in_at: row.last_sign_in_at || null };
+        const activity = backend.tables.app_open_activity.find((item) => item.user_id === row.user_id);
+        return { display_name: String(profile?.data?.name || row.display_name || '').trim().slice(0, 40), last_opened_at: activity?.last_opened_at || null };
       }).filter((row) => row.display_name).sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase()));
       return json(200, named);
     }

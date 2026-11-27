@@ -32,6 +32,9 @@ test.describe('Smoke: app version', () => {
     const v11 = await page.evaluate(() => APP_RELEASES.find((item) => item.version === '2026.11.11'));
     expect(v11.added.en.some((item) => item.includes('last sign-in date and time'))).toBe(true);
     expect(v11.added.uk.some((item) => item.includes('дату й час останнього входу'))).toBe(true);
+    const currentRelease = await page.evaluate(() => APP_RELEASES.find((item) => item.version === '2026.11.12'));
+    expect(currentRelease.added.en.some((item) => item.includes('last opened the app'))).toBe(true);
+    expect(currentRelease.added.uk.some((item) => item.includes('востаннє відкривав застосунок'))).toBe(true);
     expect(v11.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
     expect(v11.fixed.uk.some((item) => item.includes('Додатки продуктів зі спільного каталогу'))).toBe(true);
     expect(v11.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
@@ -3500,21 +3503,40 @@ test.describe('Smoke: app user count', () => {
     await expect(page.locator('#app-users-list')).toBeHidden();
   });
 
-  test('admins see a localized last sign-in beside every named app user', async ({ page }) => {
+  test('signed-in users record an app open at launch and when returning to the foreground', async ({ page }) => {
     const backend = createBackend();
-    const aliceDate = new Date();
-    aliceDate.setHours(14, 35, 0, 0);
-    const aliceSignIn = aliceDate.toISOString();
-    const bobSignIn = '2026-10-03T08:05:00.000Z';
-    backend.tables.profiles[0].last_sign_in_at = aliceSignIn;
-    backend.tables.profiles[1].last_sign_in_at = bobSignIn;
+    await startAlice(page, backend);
+    await expect.poll(() => backend.activityEvents.length).toBeGreaterThan(0);
+    const initialEvents = backend.activityEvents.length;
+    expect(backend.activityEvents[0].user_id).toBe(USERS['alice@example.test']);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => backend.activityEvents.length).toBe(initialEvents + 1);
+    expect(backend.activityEvents.at(-1).user_id).toBe(USERS['alice@example.test']);
+  });
+
+  test('admins see a localized last app-open time beside every named app user', async ({ page }) => {
+    const backend = createBackend();
+    const bobOpenedAt = '2026-10-03T08:05:00.000Z';
+    backend.tables.profiles[0].last_sign_in_at = '2026-01-02T08:05:00.000Z';
+    backend.tables.profiles[1].last_sign_in_at = '2026-01-03T08:05:00.000Z';
+    backend.tables.app_open_activity.push({ user_id: 'user-bob', last_opened_at: bobOpenedAt });
     backend.tables.profiles.push(
-      { user_id: 'user-charlie', friend_code: 'CCCC4444', display_name: '', last_sign_in_at: null },
-      { user_id: 'user-empty', friend_code: 'EEEE5555', display_name: '  ', last_sign_in_at: null },
+      { user_id: 'user-charlie', friend_code: 'CCCC4444', display_name: '' },
+      { user_id: 'user-empty', friend_code: 'EEEE5555', display_name: '  ' },
     );
     backend.tables.user_profiles.push({ user_id: 'user-charlie', data: { name: 'Charlie' } });
     backend.tables.app_admins.push({ user_id: USERS['alice@example.test'] });
     await startAlice(page, backend);
+    await expect.poll(() => backend.activityEvents.length).toBeGreaterThan(0);
+    const aliceOpenedAt = backend.tables.app_open_activity.find((row) => row.user_id === USERS['alice@example.test']).last_opened_at;
     await openView(page, 'settings');
     await expect(page.locator('#app-users-count')).toHaveText('3');
     await page.locator('#app-users-toggle').click();
@@ -3522,20 +3544,28 @@ test.describe('Smoke: app user count', () => {
     const englishDates = await page.evaluate(([alice, bob]) => [
       new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(new Date(alice)),
       new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(bob)),
-    ], [aliceSignIn, bobSignIn]);
+    ], [aliceOpenedAt, bobOpenedAt]);
     const rows = page.locator('#app-users-list .app-user-name');
     await expect(rows).toHaveCount(3);
     await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${englishDates[0]})`);
     await expect(rows.filter({ hasText: 'Bob' })).toContainText(`(${englishDates[1]})`);
-    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(No sign-ins yet.)');
+    const bobSignInDate = await page.evaluate(() => new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date('2026-01-03T08:05:00.000Z')));
+    await expect(rows.filter({ hasText: 'Bob' })).not.toContainText(`(${bobSignInDate})`);
+    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(No app opens yet.)');
 
     await page.selectOption('#pref-lang', 'uk');
     await page.locator('#save-lang').click();
     await page.locator('#app-users-toggle').click();
     await page.locator('#app-users-toggle').click();
-    const ukrainianDate = await page.evaluate((value) => new Intl.DateTimeFormat('uk-UA', { timeStyle: 'short' }).format(new Date(value)), aliceSignIn);
-    await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${ukrainianDate})`);
-    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(Ще не було входів.)');
+    const ukrainianDates = await page.evaluate(([alice, bob]) => [alice, bob].map((value) => {
+      const date = new Date(value);
+      const now = new Date();
+      const today = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+      return new Intl.DateTimeFormat('uk-UA', today ? { timeStyle: 'short' } : { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+    }), [aliceOpenedAt, bobOpenedAt]);
+    await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${ukrainianDates[0]})`);
+    await expect(rows.filter({ hasText: 'Bob' })).toContainText(`(${ukrainianDates[1]})`);
+    await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(Застосунок ще не відкривали.)');
   });
 
   test('Friends opens a popup with the nicknames when there are more than five app users', async ({ page }) => {
