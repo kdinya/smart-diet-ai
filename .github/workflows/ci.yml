@@ -31,6 +31,7 @@ jobs:
           node --check sw.js
           node --check tests/smoke.helpers.js
           node --check tests/smoke.ui.spec.js
+          node --check tests/smoke.products.spec.js
           node --check tests/smoke.sync.spec.js
           node --check tests/smoke.ai.spec.js
       - run: npm ci
