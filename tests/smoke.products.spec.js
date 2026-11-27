@@ -2325,7 +2325,7 @@ test.describe('Smoke: shared product catalog', () => {
     expect(searchOrder.indexOf('field')).toBeGreaterThanOrEqual(0);
     expect(searchOrder.indexOf('field')).toBeLessThan(searchOrder.indexOf('scroll'));
     expect(searchOrder.indexOf('scroll')).toBeLessThan(searchOrder.indexOf('focus'));
-    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(48);
     const geometry = await page.evaluate(() => {
       const c = document.querySelector('#products-controls').getBoundingClientRect();
       const b = document.querySelector('#product-search-box').getBoundingClientRect();
@@ -2337,7 +2337,7 @@ test.describe('Smoke: shared product catalog', () => {
     const target = await page.evaluate(() => Math.max(0, document.querySelector('#products-controls').getBoundingClientRect().top + window.scrollY - 12));
     await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
     await page.locator('#product-search').click();
-    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
+    await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(48);
 
     await expect(page.locator('#product-search-clear')).toHaveCSS('opacity', '0');
     await page.keyboard.type('app');
@@ -2368,11 +2368,11 @@ test.describe('Smoke: shared product catalog', () => {
       await page.evaluate((top) => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, Math.max(0, top - 90)); }, target);
       await page.locator('#product-search-toggle').click();
       await expect(page.locator('#product-search')).toBeFocused();
-      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(48);
       const openTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
       await page.evaluate((top) => window.scrollTo(0, Math.max(0, top - 90)), target);
       await page.locator('#product-search').click();
-      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(24);
+      await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top))).toBe(48);
       const clickTop = await page.evaluate(() => Math.round(document.querySelector('#products-controls').getBoundingClientRect().top));
       await page.locator('#product-search-toggle').click();
       await expect(page.locator('#product-search-toggle')).toHaveAttribute('aria-expanded', 'false');
@@ -2384,8 +2384,8 @@ test.describe('Smoke: shared product catalog', () => {
     await page.locator('#catalog-toggle-btn').click();
     await expect(page.locator('#view-products')).toHaveClass(/in-catalog-view/);
     const catalog = await checkOpenAndClickPosition();
-    expect(myProducts).toEqual({ openTop: 24, clickTop: 24 });
-    expect(catalog).toEqual({ openTop: 24, clickTop: 24 });
+    expect(myProducts).toEqual({ openTop: 48, clickTop: 48 });
+    expect(catalog).toEqual({ openTop: 48, clickTop: 48 });
   });
 
   test('legend modal explains the product icons and closes', async ({ page }) => {
