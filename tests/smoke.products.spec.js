@@ -1196,7 +1196,7 @@ test.describe('Smoke: product add-ons', () => {
     await page.click('#composite-save-btn');
     await expect.poll(() => page.evaluate(() => {
       const p = state.products.find((x) => x.id === '55555555-5555-4555-8555-555555555555');
-      return p ? { grams: p.grams, kcal: p.kcal, count: p.components.length, chickenEnabled: p.components.find((item) => item.id === '66666666-6666-4666-8666-666666666666')?.enabled } : null;
+      return p ? { grams: p.grams, kcal: p.kcal, count: p.components.length, chickenEnabled: p.components.find((item) => item.id === '44444444-4444-4444-8444-444444444444')?.enabled } : null;
     })).toEqual({
       grams: 100,
       kcal: 250,
