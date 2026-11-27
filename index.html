@@ -1383,15 +1383,15 @@ $('#food-save').onclick=async()=>{
       let activeAddons=addons.filter(c=>!pickCompanionSel.get(c.id)?.removed);
       if(activeAddons.length){
         let baseG=+data.grams||(+p.grams||100),baseK=+data.kcal||(+p.kcal||0),baseP=+data.protein||(+p.protein||0),baseF=+data.fat||(+p.fat||0),baseC=+data.carbs||(+p.carbs||0);
-        let baseComp={id:'__base__',name:data.name,grams:baseG,kcal:baseK,protein:baseP,fat:baseF,carbs:baseC,enabled:true,isBase:true};
+        let baseComp={id:'__base__',name:data.name,grams:baseG,kcal:baseK,protein:baseP,fat:baseF,carbs:baseC,enabled:true,isBase:true,portion:modalFoodPortions||1,baseGrams:+p.grams||100};
         let addonComps=activeAddons.map(c=>{
           let item=companionProduct(c.id),sel=pickCompanionSel.get(c.id),g=sel?.grams??c.grams,on=sel?!!sel.on:true,f=(+item.grams||0)>0?g/item.grams:1,cr=v=>Math.round((+v||0)*f*10)/10;
-          return{id:c.id,name:item.name,grams:Math.round(g*10)/10,kcal:Math.round((+item.kcal||0)*f),protein:cr(item.protein),fat:cr(item.fat),carbs:cr(item.carbs),enabled:on};
+          return{id:c.id,name:item.name,grams:Math.round(g*10)/10,kcal:Math.round((+item.kcal||0)*f),protein:cr(item.protein),fat:cr(item.fat),carbs:cr(item.carbs),enabled:on,baseGrams:Math.round(g*10)/10};
         });
-        let normalized=normalizeFoodComponentsForEntry([baseComp,...addonComps],modalFoodPortions||1,+p.grams||baseG,false);
-        savedComponents=normalized;
-        let totals=normalized.filter(c=>c.enabled!==false).reduce((a,c)=>{for(let k of ['grams','kcal','protein','fat','carbs'])a[k]+=(+c[k]||0);return a},{grams:0,kcal:0,protein:0,fat:0,carbs:0});
-        data.grams=Math.round(totals.grams*10)/10;data.kcal=Math.round(totals.kcal);data.protein=Math.round(totals.protein*10)/10;data.fat=Math.round(totals.fat*10)/10;data.carbs=Math.round(totals.carbs*10)/10;
+        savedComponents=[baseComp,...addonComps];
+        let tg=baseG,tk=baseK,tp=baseP,tf=baseF,tc=baseC;
+        addonComps.forEach(c=>{if(c.enabled){tg+=c.grams;tk+=c.kcal;tp+=c.protein;tf+=c.fat;tc+=c.carbs;}});
+        data.grams=Math.round(tg*10)/10;data.kcal=Math.round(tk);data.protein=Math.round(tp*10)/10;data.fat=Math.round(tf*10)/10;data.carbs=Math.round(tc*10)/10;
       }
     }
     let main=await addFood({...data,portions:modalFoodPortions,snackId:editingSnackId,...(savedComponents?{components:savedComponents}:{})});
