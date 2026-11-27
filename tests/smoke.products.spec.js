@@ -2545,4 +2545,29 @@ test.describe('Smoke: composite portion normalization', () => {
     expect(placement.navigationSlot).toBe('catalog-nav-slot');
     expect(placement.aboveCatalogList).toBe(true);
   });
+
+  test('catalog navigation button is never visible on home, diary, stats, or settings views', async ({ page }) => {
+    await openApp(page, { prefs: BASE_PREFS, products: [], foods: [], weights: [] });
+    await openView(page, 'products');
+    const catalogButton = page.locator('#catalog-toggle-btn');
+    await expect(catalogButton).toBeVisible();
+
+    await catalogButton.click();
+    await expect(catalogButton).toBeVisible();
+
+    await openView(page, 'home');
+    await expect(catalogButton).toBeHidden();
+
+    await openView(page, 'diary');
+    await expect(catalogButton).toBeHidden();
+
+    await openView(page, 'stats');
+    await expect(catalogButton).toBeHidden();
+
+    await openView(page, 'settings');
+    await expect(catalogButton).toBeHidden();
+
+    await openView(page, 'products');
+    await expect(catalogButton).toBeVisible();
+  });
 });
