@@ -33,8 +33,8 @@ test.describe('Smoke: app version', () => {
     expect(v11.added.en.some((item) => item.includes('last sign-in date and time'))).toBe(true);
     expect(v11.added.uk.some((item) => item.includes('дату й час останнього входу'))).toBe(true);
     const currentRelease = await page.evaluate(() => APP_RELEASES.find((item) => item.version === '2026.11.12'));
-    expect(currentRelease.added.en.some((item) => item.includes('last opened the app'))).toBe(true);
-    expect(currentRelease.added.uk.some((item) => item.includes('востаннє відкривав застосунок'))).toBe(true);
+    expect(currentRelease.added.en.some((item) => item.includes('last opened the app'))).toBe(false);
+    expect(currentRelease.added.uk.some((item) => item.includes('востаннє відкривав застосунок'))).toBe(false);
     expect(v11.fixed.en.some((item) => item.includes('Add-ons of shared catalog products'))).toBe(true);
     expect(v11.fixed.uk.some((item) => item.includes('Додатки продуктів зі спільного каталогу'))).toBe(true);
     expect(v11.improved.en.some((item) => item.includes('A clearer catalog design, easier product controls on mobile, and a visible mark for items already saved.'))).toBe(true);
@@ -4746,7 +4746,7 @@ test('mobile page titles and descriptions fit beside the date and weight at read
     expect(geometry.artworkContent).toContain(expected.at(-1));
     expect(Number(geometry.artworkZ)).toBeLessThan(Number(geometry.titleZ));
     expect(geometry.artworkRight).toBe(0);
-    expect(geometry.artworkTop).toBe(12);
+    expect(geometry.artworkTop).toBe(22);
     expect(geometry.artworkSize).toBeCloseTo(86.4, 1);
     expect(geometry.textSize).toBeGreaterThanOrEqual(14);
     expect(geometry.overflow).toBe(false);
@@ -4791,11 +4791,13 @@ test('tablet keeps the section sidebar and uses the mobile content layout on eve
           mainLeft: main.left,
           mainRight: main.right,
           gridColumns: getComputedStyle(grid).gridTemplateColumns.split(/\s+/).length,
+          artworkTop: parseFloat(getComputedStyle(document.querySelector('.mobile-page-intro'), '::after').top),
           documentOverflow: document.documentElement.scrollWidth > innerWidth + 1,
           viewOverflow: active.scrollWidth > active.clientWidth + 1,
         };
       }, view);
       expect(layout.sidebarLeft).toBe(0);
+      expect(layout.artworkTop).toBe(12);
       expect(layout.sidebarWidth).toBe(width <= 950 ? 205 : 244);
       expect(layout.mainLeft).toBeGreaterThanOrEqual(layout.sidebarWidth);
       expect(layout.mainRight).toBeLessThanOrEqual(width + 1);
@@ -4831,7 +4833,7 @@ test('home hero card contains avocado illustration cleanly within bounds', async
       afterZ: after.zIndex,
     };
   });
-  expect(styles.top).toBeGreaterThanOrEqual(0);
+  expect(styles.top).toBe(16);
   expect(styles.minHeight).toBeGreaterThanOrEqual(140);
   expect(Number(styles.h2Z)).toBeGreaterThan(Number(styles.afterZ || 0));
   expect(Number(styles.pZ)).toBeGreaterThan(Number(styles.afterZ || 0));
