@@ -2519,10 +2519,10 @@ test.describe('Smoke: composite portion normalization', () => {
     const catalogButton = page.locator('#catalog-toggle-btn');
     await expect(catalogButton).toBeVisible();
     await expect(page.locator('#product-new')).toBeVisible();
-    expect(await catalogButton.evaluate((button) => button.parentElement?.id)).toBe('products-toolbar');
+    expect(await catalogButton.evaluate((button) => button.parentElement?.id)).toBe('catalog-toggle-slot');
     expect(await page.locator('#product-new').evaluate((button) => button.parentElement?.id)).toBe('products-toolbar');
-    const buttonOrder = await page.locator('#products-toolbar').evaluate((toolbar) => [...toolbar.children].map((button) => button.id));
-    expect(buttonOrder).toEqual(['catalog-toggle-btn', 'product-new']);
+    const toolbarOrder = await page.locator('#products-toolbar').evaluate((toolbar) => [...toolbar.children].map((item) => item.id));
+    expect(toolbarOrder).toEqual(['catalog-toggle-slot', 'product-new']);
     const catalogBox = await catalogButton.boundingBox();
     const newProductBox = await page.locator('#product-new').boundingBox();
     expect(catalogBox.y).toBeCloseTo(newProductBox.y, 0);
@@ -2532,11 +2532,17 @@ test.describe('Smoke: composite portion normalization', () => {
 
     await catalogButton.click();
     await expect(page.locator('#product-new')).toBeHidden();
+    await expect(catalogButton).toBeVisible();
     const placement = await catalogButton.evaluate((button) => ({
       insideCard: Boolean(button.closest('.card')),
-      toolbarBeforeCard: button.parentElement?.nextElementSibling?.classList.contains('card'),
+      navigationSlot: button.parentElement?.id,
+      aboveCatalogList: (() => {
+        const catalogCard = document.querySelector('#view-products .card');
+        return Boolean(catalogCard && button.getBoundingClientRect().bottom <= catalogCard.getBoundingClientRect().top);
+      })(),
     }));
     expect(placement.insideCard).toBe(false);
-    expect(placement.toolbarBeforeCard).toBe(true);
+    expect(placement.navigationSlot).toBe('catalog-nav-slot');
+    expect(placement.aboveCatalogList).toBe(true);
   });
 });

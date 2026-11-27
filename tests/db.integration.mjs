@@ -351,10 +351,18 @@ async function run() {
   check('App user names include saved-profile, signup-metadata, and profile names', ['CI A', 'CI B', 'CI C'].every(name => appNames.includes(name)), describe(r));
   check('App user names exclude empty profiles', Array.isArray(r.json) && r.json.every(row => typeof row.display_name === 'string' && row.display_name.trim()), describe(r));
 
+  const recordedOpens = {};
+  for (const who of ['a', 'b', 'c']) recordedOpens[who] = await rpc('record_app_open', { as: who, body: {} });
+  check('Authenticated users can record an app-open timestamp', ['a', 'b', 'c'].every(who => Number.isFinite(Date.parse(recordedOpens[who].json))), JSON.stringify(recordedOpens));
+  r = await rpc('record_app_open', { body: {} });
+  check('Anonymous user cannot record an app-open timestamp', denied(r), describe(r));
+  r = await rest('app_open_activity', { as: 'b', query: 'select=user_id,last_opened_at' });
+  check('Users cannot read the private app-open activity table directly', denied(r), describe(r));
+
   r = await rpc('app_user_activity', { as: 'b', body: {} });
-  check('Non-admin cannot read last-sign-in activity', denied(r), describe(r));
+  check('Non-admin cannot read app-open activity', denied(r), describe(r));
   rAnon = await rpc('app_user_activity', { body: {} });
-  check('Anonymous user cannot read last-sign-in activity', denied(rAnon), describe(rAnon));
+  check('Anonymous user cannot read app-open activity', denied(rAnon), describe(rAnon));
 
   // Friend invite links: one-time, expiring, and never self-accepted
   r = await rpc('create_friend_invite', { as: 'a', body: {} });
@@ -387,8 +395,8 @@ async function run() {
 
   r = await rpc('app_user_activity', { as: 'a', body: {} });
   const namedActivity = Array.isArray(r.json) ? r.json.filter(row => ['CI A', 'CI B', 'CI C'].includes(row.display_name)) : [];
-  check('Admin activity contains last-sign-in timestamps for all named test users', ['CI A', 'CI B', 'CI C'].every(name => namedActivity.some(row => row.display_name === name && Number.isFinite(Date.parse(row.last_sign_in_at)))), describe(r));
-  check('Admin activity exposes only display_name and last_sign_in_at', Array.isArray(r.json) && r.json.every(row => Object.keys(row).sort().join() === 'display_name,last_sign_in_at'), describe(r));
+  check('Admin activity contains app-open timestamps for all named test users', ['CI A', 'CI B', 'CI C'].every(name => namedActivity.some(row => row.display_name === name && Number.isFinite(Date.parse(row.last_opened_at)))), describe(r));
+  check('Admin activity exposes only display_name and last_opened_at', Array.isArray(r.json) && r.json.every(row => Object.keys(row).sort().join() === 'display_name,last_opened_at'), describe(r));
 
   // 2. User A can check their own admin status
   r = await rest('app_admins', { as: 'a', query: `user_id=${eq(A)}&select=user_id` });
