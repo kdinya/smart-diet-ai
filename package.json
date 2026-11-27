@@ -7,7 +7,8 @@
     "test:smoke:ui": "playwright test tests/smoke.ui.spec.js",
     "test:smoke:sync": "playwright test tests/smoke.sync.spec.js",
     "test:smoke:ai": "playwright test tests/smoke.ai.spec.js",
-    "test:smoke:products": "playwright test tests/smoke.products.spec.js"
+    "test:smoke:products": "playwright test tests/smoke.products.spec.js",
+    "test:unit": "node tests/unit/calc.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

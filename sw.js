@@ -1,5 +1,5 @@
-const CACHE='smart-diet-shell-v290';
-const SHELL=['./','./index.html','./js/i18n.js','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js','./vendor/spine-canvas-4.2.114.min.js','./assets/ecobot-spine/ecobot.json','./assets/ecobot-spine/ecobot.atlas','./assets/ecobot-spine/ecobot.webp'];
+const CACHE='smart-diet-shell-v291';
+const SHELL=['./','./index.html','./js/i18n.js','./js/calc-nutrition.js','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js','./vendor/spine-canvas-4.2.114.min.js','./assets/ecobot-spine/ecobot.json','./assets/ecobot-spine/ecobot.atlas','./assets/ecobot-spine/ecobot.webp'];
 
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())

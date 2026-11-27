@@ -30,6 +30,8 @@ jobs:
           node -e "const vm = require('vm'); const html = require('fs').readFileSync('index.html', 'utf8'); [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach((m) => new vm.Script(m[1]))"
           node --check sw.js
           node --check js/i18n.js
+          node --check js/calc-nutrition.js
+          node tests/unit/calc.test.mjs
           node --check tests/smoke.helpers.js
           node --check tests/smoke.ui.spec.js
           node --check tests/smoke.products.spec.js
