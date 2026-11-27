@@ -9,7 +9,7 @@
     "test:smoke:sync": "playwright test tests/smoke.sync.spec.js",
     "test:smoke:ai": "playwright test tests/smoke.ai.spec.js",
     "test:smoke:products": "playwright test tests/smoke.products.spec.js",
-    "test:unit": "node tests/unit/calc.test.mjs && node tests/unit/ai.test.mjs && node tests/unit/i18n.test.mjs && node tests/unit/ecobot.test.mjs",
+    "test:unit": "node tests/unit/calc.test.mjs && node tests/unit/ai.test.mjs && node tests/unit/i18n.test.mjs && node tests/unit/ecobot.test.mjs && node tests/unit/storage.test.mjs",
     "test:smoke:diary": "playwright test tests/smoke.diary.spec.js",
     "test:smoke:assistant": "playwright test tests/smoke.assistant.spec.js",
     "test:smoke:weight": "playwright test tests/smoke.weight.spec.js",
