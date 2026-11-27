@@ -514,13 +514,15 @@ function setupConfirmWatch(plan) {
     const modal = document.getElementById('confirm-modal');
     if (!modal) return false;
     window.__confirmWatchInstalled = true;
-    new MutationObserver(() => {
+    const trigger = () => {
       if (!modal.classList.contains('open')) return;
       const current = window.__confirmPlan || { queue: [], fallback: false };
       const accept = current.queue.length ? current.queue.shift() : current.fallback;
       if (window.__confirmAsked) window.__confirmAsked(document.getElementById('confirm-message').textContent);
       document.getElementById(accept ? 'confirm-ok' : 'confirm-cancel').click();
-    }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+    };
+    new MutationObserver(trigger).observe(modal, { attributes: true, attributeFilter: ['class'] });
+    trigger();
     return true;
   };
   if (!install()) document.addEventListener('DOMContentLoaded', install);
