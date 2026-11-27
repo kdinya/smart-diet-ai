@@ -1092,8 +1092,11 @@ document.getElementById('app-users-modal')?.addEventListener('click',e=>{if(e.ta
 async function loadAppUsers(){
   if(!user||!sb||friendSchemaMissing){appUserNames=null;renderAppUsers();return}
   try{
-    let showActivity=Boolean(isAppAdmin),result=await sb.rpc(showActivity?'app_user_activity':'app_user_names');
-    if(result.error&&showActivity&&isSchemaError(result.error)){showActivity=false;result=await sb.rpc('app_user_names')}
+    let showActivity=false,result=await sb.rpc('app_user_activity');
+    if(result.error){
+      if(!isSchemaError(result.error)&&!isPermissionError(result.error))throw result.error;
+      result=await sb.rpc('app_user_names');
+    }else showActivity=true;
     if(result.error)throw result.error;
     appUserNames=(Array.isArray(result.data)?result.data:[]).map(row=>({display_name:String(row?.display_name||'').trim().slice(0,40),last_sign_in_at:showActivity?row?.last_sign_in_at||null:null,hasLastSignIn:showActivity})).filter(row=>row.display_name);
   }catch(e){appUserNames=null}
