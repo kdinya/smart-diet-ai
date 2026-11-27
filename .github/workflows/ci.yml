@@ -34,6 +34,7 @@ jobs:
           node --check js/ai-service.js
           node tests/unit/calc.test.mjs
           node tests/unit/ai.test.mjs
+          node tests/unit/i18n.test.mjs
           node --check tests/smoke.helpers.js
           node --check tests/smoke.ui.spec.js
           node --check tests/smoke.products.spec.js
