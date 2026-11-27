@@ -3502,7 +3502,9 @@ test.describe('Smoke: app user count', () => {
 
   test('admins see a localized last sign-in beside every named app user', async ({ page }) => {
     const backend = createBackend();
-    const aliceSignIn = '2026-11-20T14:35:00.000Z';
+    const aliceDate = new Date();
+    aliceDate.setHours(14, 35, 0, 0);
+    const aliceSignIn = aliceDate.toISOString();
     const bobSignIn = '2026-10-03T08:05:00.000Z';
     backend.tables.profiles[0].last_sign_in_at = aliceSignIn;
     backend.tables.profiles[1].last_sign_in_at = bobSignIn;
@@ -3517,7 +3519,10 @@ test.describe('Smoke: app user count', () => {
     await expect(page.locator('#app-users-count')).toHaveText('3');
     await page.locator('#app-users-toggle').click();
 
-    const englishDates = await page.evaluate(([alice, bob]) => [alice, bob].map((value) => new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))), [aliceSignIn, bobSignIn]);
+    const englishDates = await page.evaluate(([alice, bob]) => [
+      new Intl.DateTimeFormat('en-US', { timeStyle: 'short' }).format(new Date(alice)),
+      new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(bob)),
+    ], [aliceSignIn, bobSignIn]);
     const rows = page.locator('#app-users-list .app-user-name');
     await expect(rows).toHaveCount(3);
     await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${englishDates[0]})`);
@@ -3528,7 +3533,7 @@ test.describe('Smoke: app user count', () => {
     await page.locator('#save-lang').click();
     await page.locator('#app-users-toggle').click();
     await page.locator('#app-users-toggle').click();
-    const ukrainianDate = await page.evaluate((value) => new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)), aliceSignIn);
+    const ukrainianDate = await page.evaluate((value) => new Intl.DateTimeFormat('uk-UA', { timeStyle: 'short' }).format(new Date(value)), aliceSignIn);
     await expect(rows.filter({ hasText: 'Alice' })).toContainText(`(${ukrainianDate})`);
     await expect(rows.filter({ hasText: 'Charlie' })).toContainText('(Ще не було входів.)');
   });

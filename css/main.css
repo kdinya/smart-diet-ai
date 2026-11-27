@@ -314,3 +314,5 @@ body.bot-actions-closing .bot-chat-action-fab.bot-action-closing{animation-delay
 
 
 #catalog-nav-slot{display:none}#catalog-nav-slot.is-visible{display:block;margin:0 0 16px}#catalog-nav-slot #catalog-toggle-btn{width:auto;justify-content:center}
+
+#view-products.in-catalog-view #products-toolbar{display:none}
