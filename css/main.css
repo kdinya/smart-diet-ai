@@ -6260,8 +6260,11 @@ body.bot-comic-action-blocking #bot-peeker {
   margin: 0 0 16px;
 }
 #catalog-nav-slot #catalog-toggle-btn {
-  width: auto;
+  width: 100%;
   justify-content: center;
+}
+body:not(:has(#view-products.active)) #catalog-nav-slot {
+  display: none !important;
 }
 
 #view-products.in-catalog-view #products-toolbar {

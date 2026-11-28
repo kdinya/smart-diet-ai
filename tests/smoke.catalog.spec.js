@@ -500,15 +500,25 @@ test.describe('Smoke: shared product catalog', () => {
     await expect(catalogButton).toBeVisible();
     const placement = await catalogButton.evaluate((button) => ({
       insideCard: Boolean(button.closest('.card')),
+      insideProductsView: Boolean(button.closest('#view-products')),
       navigationSlot: button.parentElement?.id,
+      aboveProductsView: (() => {
+        const productsView = document.querySelector('#view-products');
+        return Boolean(productsView && button.getBoundingClientRect().bottom <= productsView.getBoundingClientRect().top);
+      })(),
       aboveCatalogList: (() => {
         const catalogCard = document.querySelector('#view-products .card');
         return Boolean(catalogCard && button.getBoundingClientRect().bottom <= catalogCard.getBoundingClientRect().top);
       })(),
     }));
     expect(placement.insideCard).toBe(false);
+    expect(placement.insideProductsView).toBe(false);
     expect(placement.navigationSlot).toBe('catalog-nav-slot');
+    expect(placement.aboveProductsView).toBe(true);
     expect(placement.aboveCatalogList).toBe(true);
+    const slotBox = await page.locator('#catalog-nav-slot').boundingBox();
+    const btnBox = await catalogButton.boundingBox();
+    expect(btnBox.width).toBeCloseTo(slotBox.width, 1);
   });
 
   test('catalog navigation button is never visible on home, diary, stats, or settings views', async ({ page }) => {

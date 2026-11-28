@@ -968,8 +968,8 @@
           </div>
           <div class="meal-grid" id="diary-meals"></div>
         </section>
+        <div id="catalog-nav-slot"></div>
         <section class="view" id="view-products">
-          <div id="catalog-nav-slot"></div>
           <h2 class="view-title" data-i18n="productsTitle">My products</h2>
           <p class="view-desc" data-i18n="productsDesc">
             Save foods you eat often and add them to your diary in one tap.
@@ -9706,7 +9706,11 @@
               isCat ? "catalogBackToMine" : "catalogBtn",
             );
           let navSlot = $("#catalog-nav-slot");
-          if (navSlot) navSlot.classList.toggle("is-visible", isCat);
+          if (navSlot)
+            navSlot.classList.toggle(
+              "is-visible",
+              currentAppView === "products" && isCat,
+            );
           let toggleSlot = isCat ? navSlot : $("#catalog-toggle-slot");
           if (toggleSlot) toggleSlot.appendChild(toggleBtn);
         }
@@ -10775,6 +10779,12 @@
         $$(".view").forEach((e) =>
           e.classList.toggle("active", e.id === "view-" + n),
         );
+        let navSlot = $("#catalog-nav-slot");
+        if (navSlot)
+          navSlot.classList.toggle(
+            "is-visible",
+            n === "products" && productViewMode === "catalog",
+          );
         syncMobilePageIntro(n);
         $$("[data-view]").forEach((e) =>
           e.classList.toggle("active", e.dataset.view === n),
