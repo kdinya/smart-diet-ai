@@ -9,7 +9,7 @@
     "test:smoke:sync": "playwright test tests/smoke.sync.spec.js",
     "test:smoke:ai": "playwright test tests/smoke.ai.spec.js",
     "test:smoke:products": "playwright test tests/smoke.products-basic.spec.js tests/smoke.composite.spec.js tests/smoke.addons.spec.js tests/smoke.catalog.spec.js",
-    "test:unit": "node tests/unit/calc.test.mjs && node tests/unit/ai.test.mjs && node tests/unit/i18n.test.mjs && node tests/unit/ecobot.test.mjs && node tests/unit/storage.test.mjs",
+    "test:unit": "node tests/unit/calc.test.mjs && node tests/unit/ai.test.mjs && node tests/unit/i18n.test.mjs && node tests/unit/ecobot.test.mjs && node tests/unit/storage.test.mjs && node tests/unit/catalog.test.mjs && node tests/unit/sync.test.mjs",
     "test:smoke:diary": "playwright test tests/smoke.diary.spec.js",
     "test:smoke:assistant": "playwright test tests/smoke.assistant.spec.js",
     "test:smoke:weight": "playwright test tests/smoke.weight.spec.js",
@@ -24,7 +24,9 @@
     "test:smoke:products:basic": "playwright test tests/smoke.products-basic.spec.js",
     "test:smoke:composite": "playwright test tests/smoke.composite.spec.js",
     "test:smoke:addons": "playwright test tests/smoke.addons.spec.js",
-    "test:smoke:catalog": "playwright test tests/smoke.catalog.spec.js"
+    "test:smoke:catalog": "playwright test tests/smoke.catalog.spec.js",
+    "test:unit:catalog": "node tests/unit/catalog.test.mjs",
+    "test:unit:sync": "node tests/unit/sync.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

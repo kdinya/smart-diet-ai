@@ -27,6 +27,14 @@
      - Target: `js/calc-nutrition.js` only.
      - Rules: Contains pure domain calculation functions (`calcProteinTarget`, `calcMacrosFor`, `compositeTotals`, `scaleNutrients`, `scaleComponentGrams`, `normalizeFoodComponentsForEntry`, `parseImportedNutrition`, etc.). Never read or edit `index.html` or `css/*`.
      - Verification: Run instant unit tests `node tests/unit/calc.test.mjs` (~100 ms).
+   - **Product catalog logic, companion mapping, or copy/publish operations:**
+     - Target: `js/catalog.js` and `tests/unit/catalog.test.mjs`.
+     - Rules: Handles companion mapping (`catalogAddonMap`, `buildCatalogCompanions`), duplicate checks (`isProductInCatalog`, `isCatalogProductInMine`), and catalog data prep (`buildCatalogProductRow`, `prepareCopiedCatalogProduct`).
+     - Verification: Run unit tests `node tests/unit/catalog.test.mjs` and `node --check js/catalog.js`.
+   - **Cloud synchronization, queue normalization, or table row mapping:**
+     - Target: `js/sync.js` and `tests/unit/sync.test.mjs`.
+     - Rules: Handles row mapping (`cloudFoodRow`, `cloudProductRow`, `cloudWeightRow`), queue normalization (`normalizeSyncQueue`), rejection tracking, and batch sync operations (`sendRowsBatch`, `fetchAllRowsPaged`).
+     - Verification: Run unit tests `node tests/unit/sync.test.mjs` and `node --check js/sync.js`.
    - **AI prompts, models, providers, or reply formatting:**
      - Target: `js/ai-service.js` only.
      - Rules: Handles AI provider endpoints, requests (`callGemini`, `callOpenAICompat`, `callAnthropic`, etc.), prompts (`nutritionPrompt`, `mealPlanPrompt`, `analysisPrompt`, `askPrompt`, `dailyRecommendationPrompt`), and response parsers. Keep client-side API key contract in `state.ai` intact.
