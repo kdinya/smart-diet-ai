@@ -122,7 +122,7 @@ test.describe('Smoke: mobile layout at 360px', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
 
-  test('home meals actions at 360px show analyze day, add food and all entries with equal widths', async ({ page }) => {
+  test('home meals actions at 360px show analyze day, add food and all entries with equal widths in one row', async ({ page }) => {
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
     await openView(page, 'home');
     const actions = page.locator('#view-home .home-meals-actions');
@@ -134,9 +134,31 @@ test.describe('Smoke: mobile layout at 360px', () => {
     const b3 = await buttons.nth(2).boundingBox();
     expect(b1.x).toBeLessThan(b2.x);
     expect(b2.x).toBeLessThan(b3.x);
+    expect(Math.abs(b1.y - b2.y)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(b2.y - b3.y)).toBeLessThanOrEqual(1.5);
     expect(Math.abs(b1.width - b2.width)).toBeLessThanOrEqual(1.5);
     expect(Math.abs(b2.width - b3.width)).toBeLessThanOrEqual(1.5);
     expect(b3.x + b3.width).toBeLessThanOrEqual(360);
+  });
+
+  test('home meals actions at 390px show analyze day, add food and all entries in one row with equal widths without overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'home');
+    const actions = page.locator('#view-home .home-meals-actions');
+    await expect(actions).toBeVisible();
+    const buttons = actions.locator('button');
+    await expect(buttons).toHaveCount(3);
+    const b1 = await buttons.nth(0).boundingBox();
+    const b2 = await buttons.nth(1).boundingBox();
+    const b3 = await buttons.nth(2).boundingBox();
+    expect(b1.x).toBeLessThan(b2.x);
+    expect(b2.x).toBeLessThan(b3.x);
+    expect(Math.abs(b1.y - b2.y)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(b2.y - b3.y)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(b1.width - b2.width)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(b2.width - b3.width)).toBeLessThanOrEqual(1.5);
+    expect(b3.x + b3.width).toBeLessThanOrEqual(390);
   });
 });
 
@@ -556,6 +578,8 @@ test('home meals action buttons are placed in meals card between analyze day and
 
   expect(b1.x).toBeLessThan(b2.x);
   expect(b2.x).toBeLessThan(b3.x);
+  expect(Math.abs(b1.y - b2.y)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(b2.y - b3.y)).toBeLessThanOrEqual(1.5);
 
   expect(Math.abs(b1.width - b2.width)).toBeLessThanOrEqual(1.5);
   expect(Math.abs(b2.width - b3.width)).toBeLessThanOrEqual(1.5);
