@@ -271,6 +271,15 @@ button {
   padding-top: 5px;
   border-top: 1px dashed var(--line);
 }
+.component-card.is-addon.collapsed {
+  gap: 2px;
+  padding: 6px 10px;
+}
+.component-card.is-addon.collapsed .companion-nutrition {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 1px;
+}
 .component-card.is-disabled {
   opacity: 0.55;
   background: #fafbf9;

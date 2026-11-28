@@ -381,6 +381,7 @@ test.describe('Smoke: product add-ons', () => {
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
     await entry.locator('[data-toggle-food]').click();
     await entry.locator('[data-edit-food]').click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
     await expect(page.locator('#food-components-field .companion-portion-note')).toContainText('do not depend on the number of portions');
     const milkInput = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
     await expect(milkInput).toHaveValue('50');
@@ -420,6 +421,7 @@ test.describe('Smoke: product add-ons', () => {
     const entry = page.locator('#diary-meals .meal-item[data-food-id]').first();
     await entry.locator('[data-toggle-food]').click();
     await entry.locator('[data-edit-food]').click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
     await expect(page.locator('#food-components-field')).toBeVisible();
     const milkInput = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
     await expect(milkInput).toHaveValue('50');
@@ -470,6 +472,39 @@ test.describe('Smoke: product add-ons', () => {
     await expect(page.locator('#food-portions')).toHaveValue('3');
   });
 
+  test('add-ons are collapsed by default in the meal edit window and expand on demand', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+    await openView(page, 'diary');
+    const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
+    await editBtn.scrollIntoViewIfNeeded();
+    await editBtn.click();
+
+    const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
+    const toggle = card.locator('[data-companion-toggle]');
+    await expect(card).toBeVisible();
+    await expect(card).toHaveClass(/collapsed/);
+    await expect(card.locator('.companion-controls')).toBeHidden();
+    await expect(card.locator('[data-component-toggle]')).toBeChecked();
+    await expect(card.locator('.companion-nutrition')).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await toggle.click();
+    await expect(card).not.toHaveClass(/collapsed/);
+    await expect(card.locator('.companion-controls')).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await toggle.click();
+    await expect(card).toHaveClass(/collapsed/);
+
+    await page.click('#modal-close');
+    await editBtn.click();
+    await expect(page.locator(`#food-components-list [data-component-item="${MILK}"]`)).toHaveClass(/collapsed/);
+  });
+
   test('add-on portions and grams stay in sync in the edit modal, and main product and total are shown', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
@@ -486,6 +521,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(entry.locator('.food-components-detail .product-total-block')).toHaveCount(0);
     await expect(entry.locator('.food-components-detail .product-addon-item')).toHaveCount(1);
     await entry.locator('[data-edit-food]').click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
 
     const main = page.locator('#food-components-list [data-food-main]');
     await expect(main).toContainText('200 g');
@@ -522,6 +558,7 @@ test.describe('Smoke: product add-ons', () => {
     await editBtn.click();
     for (const id of [MILK, HONEY]) {
       const card = page.locator(`#food-components-list [data-component-item="${id}"]`);
+      await card.locator('[data-companion-toggle]').click();
       await expect(card).toBeVisible();
       const layout = await card.evaluate((el) => {
         const box = (sel) => el.querySelector(sel).getBoundingClientRect();
@@ -563,6 +600,7 @@ test.describe('Smoke: product add-ons', () => {
     const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
     await editBtn.scrollIntoViewIfNeeded();
     await editBtn.click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
 
     const card = page.locator(`#food-components-list [data-component-item="${MILK}"]`);
     const dd = card.locator('.dd');
@@ -602,6 +640,7 @@ test.describe('Smoke: product add-ons', () => {
     const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
     await editBtn.scrollIntoViewIfNeeded();
     await editBtn.click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.scrollIntoViewIfNeeded();
@@ -639,6 +678,7 @@ test.describe('Smoke: product add-ons', () => {
     const editBtn = page.locator('#diary-meals .meal-item[data-food-id] [data-edit-food]').first();
     await editBtn.scrollIntoViewIfNeeded();
     await editBtn.click();
+    await page.locator(`#food-components-list [data-component-item="${MILK}"] [data-companion-toggle]`).click();
 
     const dd = page.locator(`#food-components-list [data-component-item="${MILK}"] .dd`);
     await dd.evaluate((el) => el.scrollIntoView({ block: 'end' }));

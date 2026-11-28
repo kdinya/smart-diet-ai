@@ -8880,8 +8880,9 @@
             let enabled = foodComponentEnabled.has(c.id)
               ? foodComponentEnabled.get(c.id)
               : c.enabled !== false;
+            let isOpen = openCompanions.has(c.id);
             if (hasBase)
-              return `<div class="component-card is-addon${enabled ? "" : " is-disabled"}" data-component-item="${id}"><label class="companion-toggle-label"><input type="checkbox" data-component-toggle="${id}" ${enabled ? "checked" : ""}><span class="companion-name">${esc(c.name)}</span></label><div class="companion-controls"><div class="companion-field"><span class="companion-field-label">${t("portions")}</span><select class="companion-select" data-component-portions="${id}" ${enabled ? "" : "disabled"} aria-label="${t("portions")}">${(() => {
+              return `<div class="component-card is-addon${enabled ? "" : " is-disabled"}${isOpen ? "" : " collapsed"}" data-component-item="${id}"><div class="companion-top"><label class="companion-toggle-label"><input type="checkbox" data-component-toggle="${id}" ${enabled ? "checked" : ""}><span class="companion-name">${esc(c.name)}</span></label><div class="companion-actions"><button type="button" class="companion-toggle" data-companion-toggle="${id}" aria-expanded="${isOpen}" aria-label="${t(isOpen ? "companionCollapse" : "companionExpand")}" title="${t(isOpen ? "companionCollapse" : "companionExpand")}"><span class="product-chevron" aria-hidden="true"></span></button></div></div><div class="companion-controls"><div class="companion-field"><span class="companion-field-label">${t("portions")}</span><select class="companion-select" data-component-portions="${id}" ${enabled ? "" : "disabled"} aria-label="${t("portions")}">${(() => {
                 let u = foodAddonUnit(c),
                   pn = Math.round((g / u) * 100) / 100,
                   vals = PORTION_STEPS.includes(pn)
@@ -8894,7 +8895,6 @@
                   )
                   .join("");
               })()}</select></div><div class="companion-field"><span class="companion-field-label">${t("amountG")}</span><div class="companion-input-wrap"><input type="number" inputmode="decimal" min="0" step="any" data-component-grams="${id}" value="${Math.round(g * 10) / 10}" ${enabled ? "" : "disabled"} aria-label="${t("amountG")}"><span class="companion-unit">${t("g")}</span></div></div></div><div class="companion-nutrition" data-component-macros="${id}">${componentMacroText(c, g)}</div></div>`;
-            let isOpen = openCompanions.has(c.id);
             return `<div class="component-card${enabled ? "" : " is-disabled"}${isOpen ? "" : " collapsed"}" data-component-item="${id}"><div class="companion-top"><label class="companion-toggle-label"><input type="checkbox" data-component-toggle="${id}" ${enabled ? "checked" : ""}><span class="companion-name">${esc(c.name)}</span></label><div class="companion-actions"><button type="button" class="companion-toggle" data-companion-toggle="${id}" aria-expanded="${isOpen}" aria-label="${t(isOpen ? "companionCollapse" : "companionExpand")}" title="${t(isOpen ? "companionCollapse" : "companionExpand")}"><span class="product-chevron" aria-hidden="true"></span></button></div></div><div class="companion-controls is-single"><div class="companion-field"><span class="companion-field-label">${t("amountG")}</span><div class="companion-input-wrap"><input type="number" inputmode="decimal" min="0" step="any" data-component-grams="${id}" value="${Math.round(g * 10) / 10}" ${enabled ? "" : "disabled"} aria-label="${t("amountG")}"><span class="companion-unit">${t("g")}</span></div></div></div><div class="companion-nutrition" data-component-macros="${id}">${componentMacroText(c, g)}</div></div>`;
           })
           .join("");
