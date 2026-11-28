@@ -2976,12 +2976,20 @@ body.modal-open {
   align-items: center;
   flex-wrap: wrap;
 }
+.home-meals-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 .home-meals-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
-  min-width: 390px;
+  width: 100%;
+  min-width: 0;
 }
 .home-meals-actions .btn {
   width: 100%;
