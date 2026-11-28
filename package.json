@@ -15,7 +15,12 @@
     "test:smoke:weight": "playwright test tests/smoke.weight.spec.js",
     "test:smoke:settings": "playwright test tests/smoke.settings.spec.js",
     "test:smoke:social": "playwright test tests/smoke.social.spec.js",
-    "test:smoke:layout": "playwright test tests/smoke.layout.spec.js"
+    "test:smoke:layout": "playwright test tests/smoke.layout.spec.js",
+    "test:unit:calc": "node tests/unit/calc.test.mjs",
+    "test:unit:storage": "node tests/unit/storage.test.mjs",
+    "test:unit:ai": "node tests/unit/ai.test.mjs",
+    "test:unit:i18n": "node tests/unit/i18n.test.mjs",
+    "test:unit:ecobot": "node tests/unit/ecobot.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

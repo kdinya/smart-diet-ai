@@ -10,9 +10,26 @@ const errors = [];
 const fail = (msg) => errors.push(msg);
 const list = (dir, re) => fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).map((f) => `${dir}/${f}`);
 
-// 1. JSON files parse.
-for (const f of ['manifest.json', 'package.json']) {
-  try { JSON.parse(read(f)); } catch (e) { fail(`${f}: invalid JSON (${e.message})`); }
+function findFiles(dir, ext) {
+  const entries = fs.readdirSync(path.join(root, dir), { withFileTypes: true });
+  const res = [];
+  for (const ent of entries) {
+    if (ent.name === 'node_modules' || ent.name === '.git') continue;
+    const rel = dir ? `${dir}/${ent.name}` : ent.name;
+    if (ent.isDirectory()) res.push(...findFiles(rel, ext));
+    else if (ent.name.endsWith(ext)) res.push(rel);
+  }
+  return res;
+}
+
+// 1. All JSON files parse cleanly.
+const allJson = findFiles('', '.json');
+for (const f of allJson) {
+  try {
+    JSON.parse(read(f));
+  } catch (e) {
+    fail(`${f}: invalid JSON (${e.message})`);
+  }
 }
 
 // 2. Syntax of inline scripts and every JS file.
@@ -25,7 +42,7 @@ for (const f of ['sw.js', ...list('js', /\.js$/), ...list('tests', /\.js$/), ...
   if (r.status !== 0) fail(`${f}: syntax error\n${r.stderr.trim()}`);
 }
 
-// 3. Every local file the page loads must be precached by sw.js, and every precached file must exist.
+// 3. Every local file the page loads must exist on disk and be precached by sw.js.
 const sw = read('sw.js');
 const shellMatch = sw.match(/const SHELL=\[([\s\S]*?)\];/);
 const norm = (p) => p.replace(/^\.\//, '').replace(/[?#].*$/, '') || './';
@@ -37,7 +54,11 @@ else {
   for (const m of html.matchAll(/<link[^>]+href="([^"]+)"/g)) used.add(m[1]);
   for (const u of used) {
     if (/^(https?:)?\/\//.test(u) || u.startsWith('data:')) continue;
-    if (!shell.has(norm(u))) fail(`sw.js SHELL is missing "${u}" used by index.html`);
+    const cleanPath = norm(u);
+    if (!fs.existsSync(path.join(root, cleanPath))) {
+      fail(`index.html references "${u}" but file "${cleanPath}" does not exist on disk`);
+    }
+    if (!shell.has(cleanPath)) fail(`sw.js SHELL is missing "${u}" used by index.html`);
   }
   for (const f of shell) if (f !== './' && !fs.existsSync(path.join(root, f))) fail(`sw.js SHELL lists "${f}" but the file does not exist`);
 
@@ -60,6 +81,32 @@ else {
 for (const f of list('tests/unit', /\.test\.mjs$/)) {
   const r = spawnSync(process.execPath, [path.join(root, f)], { encoding: 'utf8' });
   if (r.status !== 0) fail(`${f}: failed\n${(r.stdout + r.stderr).trim().split('\n').slice(-12).join('\n')}`);
+}
+
+// 6. data-i18n attributes in index.html must exist in I.uk and I.en
+try {
+  const i18nCode = read('js/i18n.js');
+  const sandbox = { window: {} };
+  vm.createContext(sandbox);
+  vm.runInContext(i18nCode, sandbox);
+  const dict = sandbox.I || sandbox.window.I;
+  if (!dict || !dict.uk || !dict.en) {
+    fail('js/i18n.js: failed to extract dictionary I.uk/I.en');
+  } else {
+    const i18nMatches = [...html.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)];
+    const missingKeys = new Set();
+    for (const m of i18nMatches) {
+      const key = m[1];
+      if (!(key in dict.uk) || !(key in dict.en)) {
+        missingKeys.add(key);
+      }
+    }
+    if (missingKeys.size) {
+      fail(`index.html contains data-i18n keys missing in dictionary: ${[...missingKeys].join(', ')}`);
+    }
+  }
+} catch (e) {
+  fail(`Failed to validate data-i18n keys: ${e.message}`);
 }
 
 if (errors.length) {
