@@ -6192,9 +6192,11 @@
           fixed: {
             en: [
               "Add-ons of a product are counted exactly as entered and no longer change with the number of portions of the main product when adding or editing a meal.",
+              "Older entries of a product with add-ons logged for several portions open again with add-on editing.",
             ],
             uk: [
               "Додаткові продукти рахуються рівно в тій кількості, яку вказано, і більше не залежать від кількості порцій основного продукту під час додавання та редагування прийому їжі.",
+              "Старі записи продукту з додатками на кілька порцій знову відкриваються з редагуванням додатків.",
             ],
           },
           improved: {
@@ -7587,23 +7589,39 @@
         if (addons.length) {
           let baseG = +p.grams || 100,
             addonsG = addons.reduce((s, c) => s + (+c.grams || 0), 0),
-            totalG = baseG + addonsG;
-          if (
-            Math.abs((+f.grams || 0) - totalG) < 0.5 ||
-            Math.abs((+f.grams || 0) - baseG) < 0.5
-          ) {
-            let hasAddons = Math.abs((+f.grams || 0) - totalG) < 0.5,
-              fScale = (+p.grams || 0) > 0 ? baseG / p.grams : 1,
+            fg = +f.grams || 0,
+            candidates = [
+              +f.portions > 0 ? +f.portions : 0,
+              Math.round(((fg - addonsG) / baseG) * 100) / 100,
+              Math.round((fg / baseG) * 100) / 100,
+            ].filter((n) => n > 0),
+            n = 0,
+            hasAddons = false;
+          for (let cand of candidates) {
+            if (Math.abs(fg - (cand * baseG + addonsG)) < 0.5) {
+              n = cand;
+              hasAddons = true;
+              break;
+            }
+            if (Math.abs(fg - cand * baseG) < 0.5) {
+              n = cand;
+              break;
+            }
+          }
+          if (n > 0) {
+            let r1 = (v) => Math.round(v * 10) / 10,
               baseComp = {
                 id: "__base__",
                 name: p.name,
-                grams: baseG,
-                kcal: Math.round((+p.kcal || 0) * fScale),
-                protein: Math.round((+p.protein || 0) * fScale * 10) / 10,
-                fat: Math.round((+p.fat || 0) * fScale * 10) / 10,
-                carbs: Math.round((+p.carbs || 0) * fScale * 10) / 10,
+                grams: r1(baseG * n),
+                kcal: Math.round((+p.kcal || 0) * n * 10) / 10,
+                protein: r1((+p.protein || 0) * n),
+                fat: r1((+p.fat || 0) * n),
+                carbs: r1((+p.carbs || 0) * n),
                 enabled: true,
                 isBase: true,
+                portion: n,
+                baseGrams: baseG,
               },
               addonComps = addons.map((c) => {
                 let it = companionProduct(c.id),
