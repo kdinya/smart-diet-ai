@@ -1523,3 +1523,85 @@ test.describe('Smoke: food entry choice modal', () => {
     await expect(editNote).toContainText("всю страву");
   });
 });
+
+test.describe('Smoke: meal buttons in the food dialog', () => {
+  async function openManualFoodDialog(page, meal) {
+    await openView(page, 'diary');
+    await page.locator(`#diary-meals [data-action="add-food"][data-meal="${meal}"]`).click();
+    if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
+  }
+
+  async function fillAndSave(page, name) {
+    for (const [id, value] of [['#food-name', name], ['#food-grams', '100'], ['#food-kcal', '50'], ['#food-protein', '1'], ['#food-fat', '0'], ['#food-carbs', '12']]) await page.fill(id, value);
+    await page.click('#food-save');
+    await expect(page.locator('#diary-meals')).toContainText(name);
+  }
+
+  test('the meal is chosen with buttons, not a dropdown, and starts on the meal whose plus was tapped', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await openManualFoodDialog(page, 'lunch');
+    await expect(page.locator('#food-form select, #food-form .dd:has(#food-meal)').filter({ has: page.locator('#food-meal') })).toHaveCount(0);
+    await expect(page.locator('#food-meal-buttons [data-food-meal]')).toHaveText(['Breakfast', 'Lunch', 'Dinner', 'Snack']);
+    await expect(page.locator('#food-meal-buttons [aria-pressed="true"]')).toHaveText('Lunch');
+    await page.locator('#food-meal-buttons [data-food-meal="dinner"]').click();
+    await expect(page.locator('#food-meal-buttons [aria-pressed="true"]')).toHaveText('Dinner');
+    await expect(page.locator('#food-meal-buttons [aria-pressed="true"]')).toHaveCount(1);
+    await fillAndSave(page, 'Soup');
+    expect((await readStore(page)).foods.map((f) => [f.name, f.meal])).toEqual([['Soup', 'dinner']]);
+  });
+
+  test('every meal can be picked and is saved to that meal', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
+      await openView(page, 'diary');
+      await page.locator('#view-diary .toolbar [data-action="add-food"]').click();
+      if (await page.locator('#food-add-manual').isVisible()) await page.locator('#food-add-manual').click();
+      await page.locator(`#food-meal-buttons [data-food-meal="${meal}"]`).click();
+      await fillAndSave(page, `Item ${meal}`);
+    }
+    expect((await readStore(page)).foods.map((f) => [f.name, f.meal])).toEqual([
+      ['Item breakfast', 'breakfast'],
+      ['Item lunch', 'lunch'],
+      ['Item dinner', 'dinner'],
+      ['Item snack', 'snack'],
+    ]);
+  });
+
+  test('editing an entry shows its meal on the buttons and allows moving it', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, foods: [], weights: [] });
+    await openView(page, 'diary');
+    await addFood(page, 'Rice', 'lunch');
+    await page.locator('#diary-meals [data-edit-food]').first().click();
+    await expect(page.locator('#food-meal-buttons [aria-pressed="true"]')).toHaveText('Lunch');
+    await page.locator('#food-meal-buttons [data-food-meal="dinner"]').click();
+    await page.click('#food-save');
+    await expect.poll(async () => (await readStore(page)).foods.map((f) => f.meal)).toEqual(['dinner']);
+  });
+
+  test('buttons follow the interface language', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openManualFoodDialog(page, 'breakfast');
+    await expect(page.locator('#food-meal-buttons [data-food-meal]')).toHaveText(['Сніданок', 'Обід', 'Вечеря', 'Перекус']);
+    await expect(page.locator('#food-meal-buttons [aria-pressed="true"]')).toHaveText('Сніданок');
+  });
+
+  test('buttons fit the dialog at 360px without horizontal scroll', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openManualFoodDialog(page, 'dinner');
+    const fit = await page.evaluate(() => {
+      const modal = document.querySelector('#modal .modal').getBoundingClientRect();
+      const boxes = [...document.querySelectorAll('#food-meal-buttons [data-food-meal]')].map((b) => b.getBoundingClientRect());
+      return {
+        count: boxes.length,
+        inside: boxes.every((r) => r.left >= modal.left - 1 && r.right <= modal.right + 1),
+        tall: boxes.every((r) => r.height >= 36),
+        pageScroll: document.documentElement.scrollWidth,
+      };
+    });
+    expect(fit.count).toBe(4);
+    expect(fit.inside).toBe(true);
+    expect(fit.tall).toBe(true);
+    expect(fit.pageScroll).toBeLessThanOrEqual(360);
+  });
+});

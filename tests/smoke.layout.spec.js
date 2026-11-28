@@ -461,14 +461,14 @@ test.describe('Smoke: phone back button', () => {
 
   test('back closes an open dropdown list before the dialog under it', async ({ page }) => {
     await openApp(page, { prefs: BASE_PREFS, foods: [], weights: [] });
-    await openView(page, 'diary');
-    await page.locator('#diary-meals [data-action="add-food"][data-meal="lunch"]').click();
-    await page.locator('#food-add-manual').click();
-    await page.locator('#food-form .dd:has(#food-meal) .dd-btn').click();
-    await expect(page.locator('#food-form .dd.open')).toHaveCount(1);
+    const milk = { id: '22222222-2222-4222-8222-222222222222', name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 3.6, carbs: 4.8 };
+    await page.evaluate((product) => { state.products = [product]; openMealPicker(product); }, milk);
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
+    await page.locator('#pick-modal .dd:has(#pick-portions) .dd-btn').click();
+    await expect(page.locator('#pick-modal .dd.open')).toHaveCount(1);
     await page.goBack();
-    await expect(page.locator('#food-form .dd.open')).toHaveCount(0);
-    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#pick-modal .dd.open')).toHaveCount(0);
+    await expect(page.locator('#pick-modal')).toHaveClass(/open/);
   });
 
   test('back returns from manual entry to the choice screen before closing the dialog', async ({ page }) => {

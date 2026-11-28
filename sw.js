@@ -1,4 +1,4 @@
-const CACHE='smartdiet-shell-v312';
+const CACHE='smartdiet-shell-v313';
 const SHELL=['./','./index.html','./css/main.css','./css/responsive.css','./js/i18n.js','./js/calc-nutrition.js','./js/storage.js','./js/ai-service.js','./js/catalog.js','./js/sync.js','./js/ecobot.js','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./vendor/supabase-js-2.117.3.js','./vendor/spine-canvas-4.2.114.min.js','./assets/ecobot-spine/ecobot.json','./assets/ecobot-spine/ecobot.atlas','./assets/ecobot-spine/ecobot.webp'];
 
 self.addEventListener('install',event=>event.waitUntil(

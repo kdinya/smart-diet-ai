@@ -3594,15 +3594,14 @@
               </div>
             </div>
             <div class="field">
-              <label data-i18n="mealType">Meal</label
-              ><select id="food-meal">
-                <option value="breakfast" data-i18n="breakfast">
-                  Breakfast
-                </option>
-                <option value="lunch" data-i18n="lunch">Lunch</option>
-                <option value="dinner" data-i18n="dinner">Dinner</option>
-                <option value="snack" data-i18n="snack">Snack</option>
-              </select>
+              <label data-i18n="mealType" id="food-meal-label">Meal</label>
+              <input type="hidden" id="food-meal" value="breakfast" />
+              <div
+                class="pick-meals"
+                id="food-meal-buttons"
+                role="group"
+                aria-labelledby="food-meal-label"
+              ></div>
             </div>
             <div class="field hidden" id="portion-field">
               <label data-i18n="portions">Portions</label
@@ -7124,6 +7123,7 @@
       }
       function applyLang() {
         document.documentElement.lang = lang();
+        renderFoodMealButtons();
         syncProfilePaceOptions();
         syncMobilePageIntro();
         $$(".settings-info-btn").forEach((button) => {
@@ -11482,7 +11482,7 @@
             showFoodFields("edit");
             $("#food-back-choices")?.classList.add("hidden");
             $("#food-name").value = foodToEdit.name || "";
-            $("#food-meal").value = foodToEdit.meal || meal || "breakfast";
+            setFoodMeal(foodToEdit.meal || meal || "breakfast");
             $("#food-grams").value = foodToEdit.grams ?? "";
             $("#food-kcal").value = foodToEdit.kcal ?? "";
             $("#food-protein").value = foodToEdit.protein ?? "";
@@ -11610,7 +11610,7 @@
             let bEl = $("#food-companion-badge");
             if (bEl) bEl.innerHTML = "";
             $("#food-date").value = targetDate || iso();
-            $("#food-meal").value = meal || autoMeal();
+            setFoodMeal(meal || autoMeal());
             $("#food-date")
               .closest(".field")
               .classList.toggle("hidden", !!meal);
@@ -13551,6 +13551,26 @@
       function autoMeal(h = new Date().getHours()) {
         return h < 12 ? "breakfast" : h < 16 ? "lunch" : "dinner";
       }
+      function foodMealKeys() {
+        return ["breakfast", "lunch", "dinner", "snack"];
+      }
+      function renderFoodMealButtons() {
+        let box = $("#food-meal-buttons");
+        if (!box) return;
+        let current = $("#food-meal").value;
+        box.innerHTML = foodMealKeys().map(
+          (m) =>
+            `<button type="button" class="btn${m === current ? "" : " secondary"}" data-food-meal="${m}" aria-pressed="${m === current}">${t(m)}</button>`,
+        ).join("");
+      }
+      function setFoodMeal(meal) {
+        $("#food-meal").value = foodMealKeys().includes(meal) ? meal : "breakfast";
+        renderFoodMealButtons();
+      }
+      document.addEventListener("click", (e) => {
+        let b = e.target.closest && e.target.closest("[data-food-meal]");
+        if (b) setFoodMeal(b.dataset.foodMeal);
+      });
       function collapseChatFab(chatOpen = false) {
         let fab = $("#chat-fab"),
           botDisabled = $("#bot-peeker").classList.contains("hidden");
@@ -13723,7 +13743,6 @@
       }
       [
         "#product-sort",
-        "#food-meal",
         "#food-portions",
         "#pick-portions",
         "#pref-verbosity",
