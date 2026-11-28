@@ -121,6 +121,23 @@ test.describe('Smoke: mobile layout at 360px', () => {
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
+
+  test('home meals actions at 360px show analyze day, add food and all entries with equal widths', async ({ page }) => {
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+    await openView(page, 'home');
+    const actions = page.locator('#view-home .home-meals-actions');
+    await expect(actions).toBeVisible();
+    const buttons = actions.locator('button');
+    await expect(buttons).toHaveCount(3);
+    const b1 = await buttons.nth(0).boundingBox();
+    const b2 = await buttons.nth(1).boundingBox();
+    const b3 = await buttons.nth(2).boundingBox();
+    expect(b1.x).toBeLessThan(b2.x);
+    expect(b2.x).toBeLessThan(b3.x);
+    expect(Math.abs(b1.width - b2.width)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(b2.width - b3.width)).toBeLessThanOrEqual(1.5);
+    expect(b3.x + b3.width).toBeLessThanOrEqual(360);
+  });
 });
 
 test('progress statistics cards follow the two-column mobile order: trend/goal/forecast and daily/weekly/total', async ({ page }) => {
@@ -509,4 +526,40 @@ test.describe('Smoke: phone back button', () => {
     }
     expect(stuck).toEqual([]);
   });
+});
+
+
+test('home meals action buttons are placed in meals card between analyze day and all entries with equal widths', async ({ page }) => {
+  await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [] });
+  await openView(page, 'home');
+
+  const balanceAddBtn = page.locator('#view-home .card:has([data-i18n="todayBalance"]) [data-action="add-food"]');
+  await expect(balanceAddBtn).toHaveCount(0);
+
+  const actions = page.locator('#view-home .home-meals-actions');
+  await expect(actions).toBeVisible();
+
+  const buttons = actions.locator('button');
+  await expect(buttons).toHaveCount(3);
+
+  const analyzeBtn = buttons.nth(0);
+  const addFoodBtn = buttons.nth(1);
+  const allEntriesBtn = buttons.nth(2);
+
+  await expect(analyzeBtn).toHaveAttribute('data-analyze', 'day');
+  await expect(addFoodBtn).toHaveAttribute('data-action', 'add-food');
+  await expect(allEntriesBtn).toHaveAttribute('data-go', 'diary');
+
+  const b1 = await analyzeBtn.boundingBox();
+  const b2 = await addFoodBtn.boundingBox();
+  const b3 = await allEntriesBtn.boundingBox();
+
+  expect(b1.x).toBeLessThan(b2.x);
+  expect(b2.x).toBeLessThan(b3.x);
+
+  expect(Math.abs(b1.width - b2.width)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(b2.width - b3.width)).toBeLessThanOrEqual(1.5);
+
+  await addFoodBtn.click();
+  await expect(page.locator('#modal')).toHaveClass(/open/);
 });

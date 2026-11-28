@@ -799,7 +799,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#meal-plan-products .meal-plan-picker-item').first()).toHaveCSS('padding-bottom', '7px');
     await page.locator('[data-close-meal-plan]').first().click();
 
-    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
+    await page.locator('#view-home .home-meals-actions [data-action="add-food"]').click();
     await page.locator('#pick-product').click();
     const pickerNames = page.locator('#pick-body .pick-item b');
     await expect(pickerNames).toHaveText(['Apple', 'Buckwheat', 'Zucchini']);
@@ -855,7 +855,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(page.locator('#meal-plan-products .meal-plan-picker-item').nth(1).locator('.product-verified')).toHaveAttribute('aria-label', 'Verified product');
     await page.locator('[data-close-meal-plan]').first().click();
 
-    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
+    await page.locator('#view-home .home-meals-actions [data-action="add-food"]').click();
     await page.locator('#pick-product').click();
     await expect(page.locator('#pick-body .pick-item').nth(0).locator('.product-verified')).toHaveCount(0);
     await expect(page.locator('#pick-body .pick-item').nth(1).locator('.product-verified')).toHaveCount(1);
@@ -876,7 +876,7 @@ test.describe('Smoke: meals, balance layout and weight picker', () => {
     await expect(planMeta).toContainText('P 5.5 · F 3.2 · C 25.1 g');
     await page.locator('[data-close-meal-plan]').first().click();
 
-    await page.locator('#view-home .section-head > [data-action="add-food"]').click();
+    await page.locator('#view-home .home-meals-actions [data-action="add-food"]').click();
     await page.locator('#pick-product').click();
     const pickItemMuted = page.locator('#pick-body .pick-item .muted').first();
     await expect(pickItemMuted).toBeVisible();
