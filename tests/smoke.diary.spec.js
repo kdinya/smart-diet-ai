@@ -1407,6 +1407,8 @@ test.describe('Smoke: food entry choice modal', () => {
     await expect(page.locator('#food-add-manual')).toBeHidden();
     await expect(page.locator('#food-back-choices')).toBeVisible();
     await expect(page.locator('#food-name')).toHaveValue('Гречка відварена');
+    await expect(page.locator('#product-calc-search')).toBeHidden();
+    await expect(page.locator('#product-import-clipboard')).toBeHidden();
 
     // Click back to choices
     await page.locator('#food-back-choices').click();
@@ -1416,7 +1418,8 @@ test.describe('Smoke: food entry choice modal', () => {
     await expect(page.locator('#food-back-choices')).toBeHidden();
   });
 
-  test('manual entry opens form with calorie search, clipboard, and option to save to products', async ({ page }) => {
+  test('manual entry opens form without calorie search or clipboard, and shows option to save to products', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'uk' }, foods: [], weights: [], products: [] });
 
     await openView(page, 'diary');
@@ -1424,9 +1427,8 @@ test.describe('Smoke: food entry choice modal', () => {
     await page.locator('#food-add-manual').click();
 
     await expect(page.locator('#food-fields')).toBeVisible();
-    await expect(page.locator('#product-calc-field')).toBeVisible();
-    await expect(page.locator('#product-calc-search')).toBeVisible();
-    await expect(page.locator('#product-import-clipboard')).toBeVisible();
+    await expect(page.locator('#product-calc-search')).toBeHidden();
+    await expect(page.locator('#product-import-clipboard')).toBeHidden();
 
     // Type a new product name and check "Also save to My products" option
     await page.fill('#food-name', 'Омлет із зеленню');
@@ -1435,6 +1437,11 @@ test.describe('Smoke: food entry choice modal', () => {
     const saveProdLabel = page.locator('#food-save-product-label');
     await expect(saveProdLabel).toBeVisible();
     await expect(saveProdLabel).toContainText('Також зберегти в Мої продукти');
+    await expect(page.locator('#product-calc-search')).toBeHidden();
+    await expect(page.locator('#product-import-clipboard')).toBeHidden();
+
+    const modal = await page.locator('#modal .modal').boundingBox();
+    expect(modal.width).toBeLessThanOrEqual(360);
 
     await page.locator('#food-save-product').check();
     await page.fill('#food-grams', '180');

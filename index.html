@@ -3502,7 +3502,7 @@
               /><datalist id="my-products-list"></datalist>
             </div>
             <div class="field hidden" id="product-calc-field">
-              <div class="form-row" style="gap: 8px">
+              <div class="form-row" id="product-calc-buttons" style="gap: 8px">
                 <button
                   type="button"
                   class="btn small secondary"
@@ -7722,6 +7722,10 @@
           !findProduct(name);
         label.classList.toggle("hidden", !show);
         if (!show) checkbox.checked = false;
+        let c = $("#product-calc-field");
+        if (c && modalMode === "food") {
+          c.classList.toggle("hidden", !show);
+        }
       }
       function showFoodFields(context = "manual") {
         let f = $("#food-fields");
@@ -7735,6 +7739,8 @@
           b.classList.toggle("hidden", modalMode !== "food" || !!editingFoodId);
         let c = $("#product-calc-field");
         if (c) c.classList.remove("hidden");
+        let btns = $("#product-calc-buttons");
+        if (btns) btns.classList.toggle("hidden", modalMode === "food");
         syncFoodProductOption();
       }
       function hideFoodFields() {
@@ -7771,6 +7777,7 @@
         $("#product-note-input").value = "";
         $("#pick-product").classList.remove("hidden");
         $("#product-calc-field").classList.remove("hidden");
+        $("#product-calc-buttons")?.classList.remove("hidden");
         $("#product-verified-label").classList.add("hidden");
         $("#ingredient-save-product").checked = false;
         $("#food-meal").closest(".field").classList.add("hidden");
@@ -11009,6 +11016,7 @@
         $("#food-back-choices")?.classList.add("hidden");
         $("#food-save-product-label")?.classList.add("hidden");
         $("#product-calc-field").classList.remove("hidden");
+        $("#product-calc-buttons")?.classList.remove("hidden");
         $("#product-verified-label").classList.remove("hidden");
         $("#ingredient-save-product-label").classList.add("hidden");
         $("#ingredient-save-product").checked = false;
@@ -11415,6 +11423,7 @@
         $("#food-auto").checked = true;
         $("#food-form").classList.toggle("hidden", !food);
         $("#product-calc-field").classList.add("hidden");
+        $("#product-calc-buttons")?.classList.add("hidden");
         $("#product-note-field").classList.add("hidden");
         $("#product-note-toggle").classList.add("hidden");
         $("#product-note-input").value = "";
