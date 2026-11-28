@@ -2976,6 +2976,25 @@ body.modal-open {
   align-items: center;
   flex-wrap: wrap;
 }
+.home-meals-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-width: 390px;
+}
+.home-meals-actions .btn {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  justify-content: center;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .del-weight svg,
 .meal-item .del svg {
   display: block;

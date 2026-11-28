@@ -658,13 +658,6 @@
               <div class="card">
                 <div class="section-head">
                   <h2 data-i18n="todayBalance">Today's Balance</h2>
-                  <button
-                    class="btn small secondary"
-                    data-action="add-food"
-                    data-i18n="addFood"
-                  >
-                    + Add food
-                  </button>
                 </div>
                 <div class="stats">
                   <div class="metric" data-nutrition-key="kcal">
@@ -814,7 +807,7 @@
               <div class="card">
                 <div class="section-head">
                   <h2 data-i18n="mealsToday">Meals today</h2>
-                  <div class="section-actions">
+                  <div class="section-actions home-meals-actions">
                     <button
                       type="button"
                       class="btn small secondary"
@@ -823,6 +816,14 @@
                     >
                       Analyze day</button
                     ><button
+                      type="button"
+                      class="btn small secondary"
+                      data-action="add-food"
+                      data-i18n="addFood"
+                    >
+                      + Add food</button
+                    ><button
+                      type="button"
                       class="btn small ghost"
                       data-go="diary"
                       data-i18n="allEntries"

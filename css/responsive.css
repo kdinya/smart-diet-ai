@@ -11,6 +11,14 @@
     gap: 10px;
     font-size: 10.5px;
   }
+  .home-meals-actions {
+    gap: 6px;
+  }
+  .home-meals-actions .btn {
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: 12px;
+  }
 }
 @media (max-width: 380px) {
   .weight-goal-modal .modal-head {
@@ -25,6 +33,11 @@
   .weight-goal-modal .weight-goal-grid input {
     padding: 10px 8px;
     font-size: 14px;
+  }
+  .home-meals-actions .btn {
+    padding-left: 3px;
+    padding-right: 3px;
+    font-size: 11px;
   }
 }
 @media (max-width: 680px) {
@@ -369,6 +382,10 @@
   .section-head {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+  .home-meals-actions {
+    min-width: 0;
+    width: 100%;
   }
   .mobilebar button {
     min-width: 0;
