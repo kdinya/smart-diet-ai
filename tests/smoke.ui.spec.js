@@ -409,6 +409,74 @@ test.describe('Smoke: first-run setup', () => {
     await expect(page.locator('#onboard-auth-status')).toHaveText('Enter a username to create an account.');
     expect(backend.authEvents).toEqual([]);
   });
+
+  async function openSignup(page, backend) {
+    await mockSupabase(page, backend);
+    await openApp(page, { prefs: { ...BASE_PREFS, setupComplete: false, setupDismissed: false }, foods: [], weights: [] });
+    await page.locator('#onboarding-choice-signup').click();
+    await page.fill('#onboard-username', 'Alice');
+  }
+
+  test('the password can be shown and the signup form states the minimum length with a live counter', async ({ page }) => {
+    await openSignup(page, createBackend());
+    const hint = page.locator('#onboarding-auth .password-hint');
+    await expect(hint).toHaveText('Minimum 6 characters');
+    await page.fill('#onboard-auth-password', 'abc');
+    await expect(hint).toHaveText('Minimum 6 characters · 3/6');
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'password');
+    await page.locator('#onboarding-auth .password-toggle').click();
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'text');
+    await page.locator('#onboarding-auth .password-toggle').click();
+    await expect(page.locator('#onboard-auth-password')).toHaveAttribute('type', 'password');
+  });
+
+  test('a too short password is blocked before Supabase and an unsent email is trimmed and lowercased', async ({ page }) => {
+    const backend = createBackend();
+    await openSignup(page, backend);
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', '12345');
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toHaveText('The password must be at least 6 characters long.');
+    expect(backend.authEvents).toEqual([]);
+    await page.fill('#onboard-auth-email', '  New@Example.TEST ');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.locator('#onboard-auth-submit').click();
+    await expect.poll(async () => backend.authEvents).toEqual([{ action: 'signup', email: 'new@example.test' }]);
+  });
+
+  test('signup errors from Supabase explain the real reason', async ({ page }) => {
+    await openSignup(page, createBackend());
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    const reply = async (status, body) => {
+      await page.unroute('**/auth/v1/signup*');
+      await page.route('**/auth/v1/signup*', (route) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) }));
+      await page.locator('#onboard-auth-submit').click();
+    };
+    await reply(422, { code: 'weak_password', msg: 'Password should be at least 8 characters.' });
+    await expect(page.locator('#onboard-auth-status')).toHaveText('The password must be at least 8 characters long.');
+    await reply(429, { code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' });
+    await expect(page.locator('#onboard-auth-status')).toContainText('Too many attempts');
+    await reply(422, { code: 'email_address_invalid', msg: 'Email address is invalid' });
+    await expect(page.locator('#onboard-auth-status')).toContainText('valid email address');
+    await reply(500, { code: 'unexpected_failure', msg: 'Database error saving new user' });
+    await expect(page.locator('#onboard-auth-status')).toContainText('could not create the account');
+    await reply(200, { id: 'x', email: 'new@example.test', identities: [] });
+    await expect(page.locator('#onboard-auth-status')).toContainText('already registered');
+    await expect(page.locator('#onboarding-profile')).toBeHidden();
+  });
+
+  test('signup that needs email confirmation stays on the auth screen instead of opening the profile', async ({ page }) => {
+    await openSignup(page, createBackend());
+    await page.fill('#onboard-auth-email', 'new@example.test');
+    await page.fill('#onboard-auth-password', PASSWORD);
+    await page.unroute('**/auth/v1/signup*');
+    await page.route('**/auth/v1/signup*', (route) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ id: 'x', email: 'new@example.test', identities: [{ id: 'i' }] }) }));
+    await page.locator('#onboard-auth-submit').click();
+    await expect(page.locator('#onboard-auth-status')).toContainText('Check your email');
+    await expect(page.locator('#onboarding-profile')).toBeHidden();
+    await expect(page.locator('#onboarding-auth')).toBeVisible();
+  });
 });
 
 test.describe('Smoke: accessibility', () => {
