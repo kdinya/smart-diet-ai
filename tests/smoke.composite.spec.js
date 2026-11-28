@@ -469,7 +469,7 @@ test.describe('Smoke: composite dish display and ingredient editing', () => {
     await expect(page.locator('#food-components-field')).toBeVisible();
     await expect(page.locator('#food-components-list [data-component-item]')).toHaveCount(2);
 
-    await expect(page.locator('#portion-field')).toHaveClass(/hidden/);
+    await expect(page.locator('#portion-field')).toBeVisible();
     await page.locator('[data-companion-toggle="c-oats"]').click();
     await page.locator('[data-companion-toggle="c-milk"]').click();
     await expect(page.locator('#food-components-list [data-component-grams="c-oats"]')).toHaveValue('120');

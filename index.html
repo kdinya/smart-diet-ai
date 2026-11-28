@@ -3749,9 +3749,10 @@
               class="btn"
               id="food-save"
               style="width: 100%"
-              data-label-key="saveEntry"
+              data-label-key="addConfirm"
+              data-i18n="addConfirm"
             >
-              Save entry
+              Додати 🚀
             </button>
           </div>
         </div>
@@ -8905,7 +8906,7 @@
             fillPortionSelect(ps, g > 0 ? Math.round((g / u) * 100) / 100 : 1);
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
@@ -8964,7 +8965,7 @@
             ps.closest(".dd")?._sync?.();
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
@@ -10824,15 +10825,6 @@
         return 0;
       };
       function syncPortions(forceVal = null) {
-        if (
-          modalMode === "food" &&
-          foodComponents.length &&
-          !foodEntryHasBase() &&
-          editingFoodId
-        ) {
-          $("#portion-field").classList.add("hidden");
-          return;
-        }
         let base = modalMode === "food" ? portionBase() : 0;
         $("#portion-field").classList.toggle("hidden", !base);
         if (!base) return;
@@ -10858,7 +10850,6 @@
           let v = o[CALC_KEYS[i]];
           $("#" + id).value = v == null ? "" : v;
         });
-        syncPortions();
         syncFoodCompanions();
         if (modalMode === "ingredient") syncIngredientProductOption();
         if (modalMode === "food") {
@@ -10895,6 +10886,7 @@
             renderFoodComponents();
           }
         }
+        syncPortions();
       }
       function prefillFromProduct() {
         if (modalMode !== "food" || editingFoodId) return;
@@ -10922,7 +10914,7 @@
         }),
       );
       $("#food-grams").addEventListener("input", () => {
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
         if (isCompEntry) {
           let base = portionBase();
           let g = +$("#food-grams").value;
@@ -10967,7 +10959,7 @@
         let n = +$("#food-portions").value;
         if (!n || n <= 0) return;
         modalFoodPortions = n;
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
         if (isCompEntry) {
           let base = portionBase();
           let targetG = Math.round(base * n * 10) / 10;
@@ -11457,24 +11449,30 @@
                 (x) => x.isBase || x.id === "__base__",
               );
               if (!entryHasBase) {
-                $("#portion-field").classList.add("hidden");
-                modalFoodPortions = 1;
-                foodComponents = comps.map((c) => ({
-                  id: c.id,
-                  name: c.name,
-                  grams: Math.round(Math.max(0.1, +c.grams || 0) * 10) / 10,
-                  kcal: Math.round((+c.kcal || 0) * 10) / 10,
-                  protein: Math.round((+c.protein || 0) * 10) / 10,
-                  fat: Math.round((+c.fat || 0) * 10) / 10,
-                  carbs: Math.round((+c.carbs || 0) * 10) / 10,
-                  enabled: c.enabled !== false,
-                }));
+                $("#portion-field").classList.remove("hidden");
+                foodComponents = comps.map((c) => {
+                  let bowlG = +c.baseGrams > 0 ? +c.baseGrams : (+c.bowlGrams > 0 ? +c.bowlGrams : (+c.grams || 0));
+                  return {
+                    id: c.id,
+                    name: c.name,
+                    grams: Math.round(Math.max(0.1, bowlG) * 10) / 10,
+                    baseGrams: bowlG,
+                    baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+                    baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+                    baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+                    baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+                    enabled: c.enabled !== false,
+                  };
+                });
                 foodComponentGrams = new Map(
                   foodComponents.map((c) => [c.id, c.grams]),
                 );
                 foodComponentEnabled = new Map(
                   foodComponents.map((c) => [c.id, c.enabled !== false]),
                 );
+                let base = portionBase();
+                modalFoodPortions = foodPortions(foodToEdit) || (base > 0 && +foodToEdit.grams > 0 ? Math.round((+foodToEdit.grams / base) * 100) / 100 : 1);
+                fillPortionSelect($("#food-portions"), modalFoodPortions);
               } else {
                 foodComponents = comps.map((c) => {
                   if (!(c.isBase || c.id === "__base__"))
@@ -11557,7 +11555,7 @@
             $("#food-date")
               .closest(".field")
               .classList.toggle("hidden", !!meal);
-            setLabelKey($("#food-save"), "saveEntry");
+            setLabelKey($("#food-save"), "addConfirm");
             calcSnapshot();
             foodComponents = [];
             foodComponentGrams = new Map();
@@ -16792,7 +16790,13 @@
           )
         )
           return toast(t("compositeNeedEnabledIngredient"));
-        if (!p || !(n > 0)) return toast(t("badNumber"));
+        if (!p) return toast(t("badNumber"));
+        let base = pickPortionBase(p);
+        let pickTargetG = +$("#pick-grams").value || (base * n);
+        if (pickTargetG > 0 && !(n > 0) && base > 0) {
+          n = Math.round((pickTargetG / base) * 100) / 100;
+        }
+        if (!(n > 0)) n = 1;
         let r = (v) => Math.round((+v || 0) * n * 10) / 10;
         let dStr = (() => {
           let d = new Date();
@@ -16997,6 +17001,7 @@
       };
       $("#modal-close").onclick = () => {
         clearClipboardPreviousValues();
+        editingFoodId = null;
         foodComponents = [];
         foodComponentGrams = new Map();
         foodComponentEnabled = new Map();
@@ -17011,6 +17016,7 @@
       $("#modal").onclick = (e) => {
         if (e.target === $("#modal")) {
           clearClipboardPreviousValues();
+          editingFoodId = null;
           foodComponents = [];
           foodComponentGrams = new Map();
           foodComponentEnabled = new Map();
@@ -17067,37 +17073,27 @@
               sameEvent =
                 previous.meal === data.meal && previous.date === data.date;
             let isCompEntry = foodComponents.length && !foodEntryHasBase();
-            let portions = modalFoodPortions > 0 ? modalFoodPortions : 1;
+            let portions = modalFoodPortions > 0 ? modalFoodPortions : (foodPortions(previous) || 1);
+            let targetG = +data.grams || 0;
+            let currentComps = foodComponents.map((c) => ({
+              ...c,
+              baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+              baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+              baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+              baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+              baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+              grams: foodComponentGrams.has(c.id)
+                ? foodComponentGrams.get(c.id)
+                : c.grams,
+              enabled: foodComponentEnabled.has(c.id)
+                ? foodComponentEnabled.get(c.id)
+                : c.enabled !== false,
+            }));
             let savedComponents = foodComponents.length
               ? isCompEntry
-                ? foodComponents.map((c) => {
-                    let g = foodComponentGrams.has(c.id)
-                        ? foodComponentGrams.get(c.id)
-                        : c.grams,
-                      f = (+c.grams || 0) > 0 ? g / c.grams : 1;
-                    return {
-                      id: c.id,
-                      name: c.name,
-                      grams: Math.round(g * 10) / 10,
-                      kcal: Math.round((+c.kcal || 0) * f * 10) / 10,
-                      protein: Math.round((+c.protein || 0) * f * 10) / 10,
-                      fat: Math.round((+c.fat || 0) * f * 10) / 10,
-                      carbs: Math.round((+c.carbs || 0) * f * 10) / 10,
-                      enabled: foodComponentEnabled.has(c.id)
-                        ? foodComponentEnabled.get(c.id)
-                        : c.enabled !== false,
-                    };
-                  })
+                ? scaleCompositeComponents(currentComps, targetG)
                 : normalizeFoodComponentsForEntry(
-                    foodComponents.map((c) => ({
-                      ...c,
-                      grams: foodComponentGrams.has(c.id)
-                        ? foodComponentGrams.get(c.id)
-                        : c.grams,
-                      enabled: foodComponentEnabled.has(c.id)
-                        ? foodComponentEnabled.get(c.id)
-                        : c.enabled !== false,
-                    })),
+                    currentComps,
                     portions,
                     portionBase() || (+data.grams || 0) / portions,
                     false,
@@ -17115,7 +17111,7 @@
               fat: +data.fat || 0,
               carbs: +data.carbs || 0,
               date: data.date,
-              ...(isCompEntry ? {} : { portions }),
+              portions,
               ...(savedComponents ? { components: savedComponents } : {}),
               ...(sameEvent
                 ? {}
@@ -17127,7 +17123,6 @@
                         : nextMealOrder(data.date),
                   }),
             };
-            if (isCompEntry) delete entryUpdate.portions;
             state.foods[idx] = entryUpdate;
             addActivity("food_updated", data.name, foodLogDetails({ ...data }));
             enqueue("foods", editingFoodId);
@@ -17136,6 +17131,12 @@
             editingFoodId = null;
           }
           clearClipboardPreviousValues();
+          foodComponents = [];
+          foodComponentGrams = new Map();
+          foodComponentEnabled = new Map();
+          renderFoodComponents();
+          hideFoodFields();
+          editingFoodId = null;
           $("#modal").classList.remove("open");
           updateScrollLock();
           [
@@ -17262,6 +17263,12 @@
             putProduct(savedProduct);
           }
           clearClipboardPreviousValues();
+          foodComponents = [];
+          foodComponentGrams = new Map();
+          foodComponentEnabled = new Map();
+          renderFoodComponents();
+          hideFoodFields();
+          editingFoodId = null;
           $("#modal").classList.remove("open");
           updateScrollLock();
           [
