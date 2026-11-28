@@ -392,3 +392,54 @@ test('calcMacrosFor distributes calories correctly across low, normal and high i
   assert.ok(low.fat > 0);
   assert.ok(low.carbs >= 0);
 });
+
+
+test("compositeDishBaseGrams returns product grams or sum of components", () => {
+  assert.equal(calc.compositeDishBaseGrams({ grams: 250 }), 250);
+  assert.equal(calc.compositeDishBaseGrams({ components: [{ grams: 60 }, { grams: 40 }] }), 100);
+  assert.equal(calc.compositeDishBaseGrams({}), 100);
+});
+
+test("calcCompositeNutrients distributes portion grams and nutrients based on active ingredient ratio", () => {
+  const comps = [
+    { id: "beet", name: "Beet", grams: 60, kcal: 26, protein: 1, fat: 0.1, carbs: 5.8, enabled: true },
+    { id: "mayo", name: "Mayonnaise", grams: 20, kcal: 136, protein: 0.2, fat: 15, carbs: 0.5, enabled: true },
+    { id: "sauce", name: "Sauce", grams: 20, kcal: 20, protein: 0.5, fat: 1, carbs: 2, enabled: true },
+  ];
+
+  // 100g portion with all 3: 60%, 20%, 20%
+  const res100 = calc.calcCompositeNutrients(comps, 100);
+  assert.equal(res100.grams, 100);
+  assert.equal(res100.kcal, 182);
+
+  // 200g portion with all 3: exactly double
+  const res200 = calc.calcCompositeNutrients(comps, 200);
+  assert.equal(res200.grams, 200);
+  assert.equal(res200.kcal, 364);
+
+  // When only Beet is enabled: occupies 100% of portion
+  comps[1].enabled = false;
+  comps[2].enabled = false;
+  const resOnlyBeet100 = calc.calcCompositeNutrients(comps, 100);
+  assert.equal(resOnlyBeet100.grams, 100);
+  // 60g beet = 26 kcal -> 100g = 26 * 100 / 60 = 43.33 -> 43 kcal
+  assert.equal(resOnlyBeet100.kcal, 43);
+
+  const resOnlyBeet200 = calc.calcCompositeNutrients(comps, 200);
+  assert.equal(resOnlyBeet200.grams, 200);
+  // 200g = 26 * 200 / 60 = 86.67 -> 87 kcal
+  assert.equal(resOnlyBeet200.kcal, 87);
+});
+
+test("scaleCompositeComponents returns scaled component entries for saving", () => {
+  const comps = [
+    { id: "beet", name: "Beet", grams: 60, kcal: 26, protein: 1, fat: 0.1, carbs: 5.8, enabled: true },
+    { id: "mayo", name: "Mayonnaise", grams: 20, kcal: 136, protein: 0.2, fat: 15, carbs: 0.5, enabled: false },
+  ];
+  const scaled = calc.scaleCompositeComponents(comps, 200);
+  assert.equal(scaled[0].grams, 200);
+  assert.equal(scaled[0].bowlGrams, 60);
+  assert.equal(Math.round(scaled[0].kcal), 87);
+  assert.equal(scaled[1].grams, 0);
+  assert.equal(scaled[1].bowlGrams, 20);
+});

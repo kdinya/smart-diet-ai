@@ -4451,6 +4451,50 @@
             id="pick-hint"
             style="font-size: 13px; margin: 0 0 12px"
           ></p>
+          <div class="form-row" id="pick-macros-row-kcal" style="margin-bottom: 8px">
+            <div class="field">
+              <label for="pick-kcal" class="field-label-wrap"
+                ><span data-i18n="caloriesKcal">Calories, kcal</span></label
+              ><input
+                id="pick-kcal"
+                type="number"
+                min="0"
+                max="10000"
+              />
+            </div>
+          </div>
+          <div class="form-row" id="pick-macros-row-macros" style="margin-bottom: 12px">
+            <div class="field">
+              <label for="pick-protein" class="field-label-wrap"
+                ><span data-i18n="proteinG">Protein, g</span></label
+              ><input
+                id="pick-protein"
+                type="number"
+                min="0"
+                max="1000"
+              />
+            </div>
+            <div class="field">
+              <label for="pick-fat" class="field-label-wrap"
+                ><span data-i18n="fatG">Fat, g</span></label
+              ><input
+                id="pick-fat"
+                type="number"
+                min="0"
+                max="1000"
+              />
+            </div>
+            <div class="field">
+              <label for="pick-carbs" class="field-label-wrap"
+                ><span data-i18n="carbsG">Carbs, g</span></label
+              ><input
+                id="pick-carbs"
+                type="number"
+                min="0"
+                max="1000"
+              />
+            </div>
+          </div>
           <div class="field">
             <label data-i18n="date">Date</label>
             <div class="pick-meals" id="pick-dates"></div>
@@ -8470,6 +8514,48 @@
         let rm = e.target.closest("[data-companion-remove]");
         if (rm) removePickCompanion(rm.dataset.companionRemove);
       });
+      function updatePickNutrientFields(s) {
+        if (!s) return;
+        if ($("#pick-kcal")) $("#pick-kcal").value = calcFmt("kcal", s.kcal || 0);
+        if ($("#pick-protein")) $("#pick-protein").value = calcFmt("protein", s.protein || 0);
+        if ($("#pick-fat")) $("#pick-fat").value = calcFmt("fat", s.fat || 0);
+        if ($("#pick-carbs")) $("#pick-carbs").value = calcFmt("carbs", s.carbs || 0);
+      }
+      function pickPortionBase(p) {
+        if (!p) return 100;
+        if (typeof window.compositeDishBaseGrams === "function") {
+          return window.compositeDishBaseGrams(p);
+        }
+        if (+p.grams > 0) return +p.grams;
+        let comps = productComponents(p);
+        if (comps.length) {
+          let s = comps.reduce((acc, c) => acc + (+c.baseGrams || +c.grams || 0), 0);
+          if (s > 0) return s;
+        }
+        return 100;
+      }
+      function getPickActiveComps() {
+        let comps =
+          pickActiveComponents && pickActiveComponents.length
+            ? pickActiveComponents
+            : pickProductSource
+              ? productComponents(pickProductSource)
+              : [];
+        return comps.map((c) => ({
+          ...c,
+          baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+          baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+          baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+          baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+          baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+          grams: pickComponentGrams.has(c.id)
+            ? pickComponentGrams.get(c.id)
+            : c.grams,
+          enabled: pickComponentEnabled.has(c.id)
+            ? pickComponentEnabled.get(c.id)
+            : c.enabled !== false,
+        }));
+      }
       let pickProductSource = null,
         pickActiveComponents = [],
         pickComponentGrams = new Map(),
@@ -8556,13 +8642,25 @@
           g = +e.target.value;
         if (!c || !(g >= 0 && g <= 9999999)) return;
         pickComponentGrams.set(id, g);
+        c.grams = g;
+        c.baseGrams = g;
         let card = e.target.closest("[data-component-item]");
         if (card) {
           let macroEl = card.querySelector("[data-component-macros]");
           if (macroEl) macroEl.innerHTML = componentMacroText(c, g);
         }
-        pickProduct = compositePickProduct(pickProductSource);
-        $("#pick-grams").value = pickProduct.grams;
+        let isCompDish = Boolean(
+          pickProductSource &&
+            productComponents(pickProductSource).length &&
+            !productCompanions(pickProductSource).length,
+        );
+        if (isCompDish) {
+          let base = pickPortionBase(pickProductSource);
+          let targetG = +$("#pick-grams").value || (base * pickN) || base;
+          let currentComps = getPickActiveComps();
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          updatePickNutrientFields(nutrients);
+        }
         pickHint();
       });
       $("#pick-components-list").addEventListener("change", (e) => {
@@ -8576,8 +8674,18 @@
           let input = card.querySelector("[data-component-grams]");
           if (input) input.disabled = !enabled;
         }
-        pickProduct = compositePickProduct(pickProductSource);
-        $("#pick-grams").value = pickProduct.grams;
+        let isCompDish = Boolean(
+          pickProductSource &&
+            productComponents(pickProductSource).length &&
+            !productCompanions(pickProductSource).length,
+        );
+        if (isCompDish) {
+          let base = pickPortionBase(pickProductSource);
+          let targetG = +$("#pick-grams").value || (base * pickN) || base;
+          let currentComps = getPickActiveComps();
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          updatePickNutrientFields(nutrients);
+        }
         pickHint();
       });
       $("#pick-components-list").addEventListener("click", (e) => {
@@ -8785,6 +8893,8 @@
           g = +e.target.value;
         if (!c || !(g >= 0 && g <= 9999999)) return;
         foodComponentGrams.set(id, g);
+        c.grams = g;
+        c.baseGrams = g;
         let card = e.target.closest("[data-component-item]");
         if (card) {
           let macroEl = card.querySelector("[data-component-macros]");
@@ -8794,6 +8904,29 @@
             let u = foodAddonUnit(c);
             fillPortionSelect(ps, g > 0 ? Math.round((g / u) * 100) / 100 : 1);
           }
+        }
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        if (isCompEntry) {
+          let base = portionBase();
+          let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
+          let currentComps = foodComponents.map((item) => ({
+            ...item,
+            baseGrams: +item.baseGrams > 0 ? +item.baseGrams : (+item.grams > 0 ? +item.grams : 0),
+            baseKcal: Number.isFinite(+item.baseKcal) ? +item.baseKcal : (+item.kcal || 0),
+            baseProtein: Number.isFinite(+item.baseProtein) ? +item.baseProtein : (+item.protein || 0),
+            baseFat: Number.isFinite(+item.baseFat) ? +item.baseFat : (+item.fat || 0),
+            baseCarbs: Number.isFinite(+item.baseCarbs) ? +item.baseCarbs : (+item.carbs || 0),
+            grams: foodComponentGrams.has(item.id) ? foodComponentGrams.get(item.id) : item.grams,
+            enabled: foodComponentEnabled.has(item.id) ? foodComponentEnabled.get(item.id) : item.enabled !== false,
+          }));
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          $("#food-kcal").value = calcFmt("kcal", nutrients.kcal);
+          $("#food-protein").value = calcFmt("protein", nutrients.protein);
+          $("#food-fat").value = calcFmt("fat", nutrients.fat);
+          $("#food-carbs").value = calcFmt("carbs", nutrients.carbs);
+          refreshFoodMainTotal();
+          calcSnapshot();
+          return;
         }
         updateFoodComponentsCalc();
       });
@@ -8830,6 +8963,29 @@
             ps.disabled = !enabled;
             ps.closest(".dd")?._sync?.();
           }
+        }
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        if (isCompEntry) {
+          let base = portionBase();
+          let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
+          let currentComps = foodComponents.map((item) => ({
+            ...item,
+            baseGrams: +item.baseGrams > 0 ? +item.baseGrams : (+item.grams > 0 ? +item.grams : 0),
+            baseKcal: Number.isFinite(+item.baseKcal) ? +item.baseKcal : (+item.kcal || 0),
+            baseProtein: Number.isFinite(+item.baseProtein) ? +item.baseProtein : (+item.protein || 0),
+            baseFat: Number.isFinite(+item.baseFat) ? +item.baseFat : (+item.fat || 0),
+            baseCarbs: Number.isFinite(+item.baseCarbs) ? +item.baseCarbs : (+item.carbs || 0),
+            grams: foodComponentGrams.has(item.id) ? foodComponentGrams.get(item.id) : item.grams,
+            enabled: foodComponentEnabled.has(item.id) ? foodComponentEnabled.get(item.id) : item.enabled !== false,
+          }));
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          $("#food-kcal").value = calcFmt("kcal", nutrients.kcal);
+          $("#food-protein").value = calcFmt("protein", nutrients.protein);
+          $("#food-fat").value = calcFmt("fat", nutrients.fat);
+          $("#food-carbs").value = calcFmt("carbs", nutrients.carbs);
+          refreshFoodMainTotal();
+          calcSnapshot();
+          return;
         }
         updateFoodComponentsCalc();
       });
@@ -10653,13 +10809,26 @@
       let modalFoodPortions = 1;
       const portionBase = () => {
         let p = findProduct($("#food-name").value);
-        return p && +p.grams > 0 ? +p.grams : 0;
+        if (p) {
+          if (+p.grams > 0) return +p.grams;
+          let comps = productComponents(p);
+          if (comps.length) {
+            let s = comps.reduce((acc, c) => acc + (+c.baseGrams || +c.grams || 0), 0);
+            if (s > 0) return s;
+          }
+        }
+        if (foodComponents.length) {
+          let s = foodComponents.reduce((acc, c) => acc + (+c.baseGrams || +c.grams || 0), 0);
+          if (s > 0) return s;
+        }
+        return 0;
       };
       function syncPortions(forceVal = null) {
         if (
           modalMode === "food" &&
           foodComponents.length &&
-          !foodEntryHasBase()
+          !foodEntryHasBase() &&
+          editingFoodId
         ) {
           $("#portion-field").classList.add("hidden");
           return;
@@ -10700,11 +10869,16 @@
             foodComponents = comps.map((c) => ({
               id: c.id,
               name: c.name,
-              grams: c.grams,
-              kcal: c.kcal,
-              protein: c.protein,
-              fat: c.fat,
-              carbs: c.carbs,
+              grams: +c.grams || 0,
+              kcal: +c.kcal || 0,
+              protein: +c.protein || 0,
+              fat: +c.fat || 0,
+              carbs: +c.carbs || 0,
+              baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+              baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+              baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+              baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+              baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
               enabled: c.enabled !== false,
             }));
             foodComponentGrams = new Map(
@@ -10748,6 +10922,33 @@
         }),
       );
       $("#food-grams").addEventListener("input", () => {
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        if (isCompEntry) {
+          let base = portionBase();
+          let g = +$("#food-grams").value;
+          if (base > 0 && g > 0) {
+            modalFoodPortions = Math.round((g / base) * 100) / 100;
+            fillPortionSelect($("#food-portions"), modalFoodPortions);
+          }
+          let currentComps = foodComponents.map((c) => ({
+            ...c,
+            baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+            baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+            baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+            baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+            baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+            grams: foodComponentGrams.has(c.id) ? foodComponentGrams.get(c.id) : c.grams,
+            enabled: foodComponentEnabled.has(c.id) ? foodComponentEnabled.get(c.id) : c.enabled !== false,
+          }));
+          let nutrients = calcCompositeNutrients(currentComps, g);
+          $("#food-kcal").value = calcFmt("kcal", nutrients.kcal);
+          $("#food-protein").value = calcFmt("protein", nutrients.protein);
+          $("#food-fat").value = calcFmt("fat", nutrients.fat);
+          $("#food-carbs").value = calcFmt("carbs", nutrients.carbs);
+          refreshFoodMainTotal();
+          calcSnapshot();
+          return;
+        }
         if (!foodComponents.length) syncPortions();
         if (foodComponents.length && foodEntryHasBase()) {
           if ($("#food-auto").checked) {
@@ -10761,34 +10962,35 @@
           }
           return;
         }
-        if (foodComponents.length && $("#food-auto").checked) {
-          let currentTotalG = foodComponents
-            .filter((c) => foodComponentEnabled.get(c.id) !== false)
-            .reduce(
-              (sum, c) => sum + (foodComponentGrams.get(c.id) ?? c.grams),
-              0,
-            );
-          let newG = +$("#food-grams").value;
-          if (currentTotalG > 0 && newG > 0) {
-            let scale = newG / currentTotalG;
-            foodComponents.forEach((c) => {
-              if (foodComponentEnabled.get(c.id) !== false) {
-                let updatedG =
-                  Math.round(
-                    (foodComponentGrams.get(c.id) ?? c.grams) * scale * 10,
-                  ) / 10;
-                foodComponentGrams.set(c.id, updatedG);
-              }
-            });
-            updateFoodComponentsCalc(true);
-            renderFoodComponents();
-          }
-        }
       });
       $("#food-portions").addEventListener("change", () => {
         let n = +$("#food-portions").value;
         if (!n || n <= 0) return;
         modalFoodPortions = n;
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
+        if (isCompEntry) {
+          let base = portionBase();
+          let targetG = Math.round(base * n * 10) / 10;
+          $("#food-grams").value = calcFmt("grams", targetG);
+          let currentComps = foodComponents.map((c) => ({
+            ...c,
+            baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+            baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+            baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+            baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+            baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+            grams: foodComponentGrams.has(c.id) ? foodComponentGrams.get(c.id) : c.grams,
+            enabled: foodComponentEnabled.has(c.id) ? foodComponentEnabled.get(c.id) : c.enabled !== false,
+          }));
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          $("#food-kcal").value = calcFmt("kcal", nutrients.kcal);
+          $("#food-protein").value = calcFmt("protein", nutrients.protein);
+          $("#food-fat").value = calcFmt("fat", nutrients.fat);
+          $("#food-carbs").value = calcFmt("carbs", nutrients.carbs);
+          refreshFoodMainTotal();
+          calcSnapshot();
+          return;
+        }
         if (foodComponents.length) {
           updateFoodComponentsCalc();
         } else {
@@ -10888,8 +11090,22 @@
       function setPickPortions(n) {
         pickN = n;
         fillPortionSelect($("#pick-portions"), n);
-        let base = +(pickProduct && pickProduct.grams) || 0;
-        $("#pick-grams").value = base > 0 ? calcFmt("grams", base * n) : "";
+        let base = pickPortionBase(pickProductSource);
+        let targetG = Math.round(base * n * 10) / 10;
+        $("#pick-grams").value = targetG > 0 ? calcFmt("grams", targetG) : "";
+        let isCompDish = Boolean(
+          pickProductSource &&
+            productComponents(pickProductSource).length &&
+            !productCompanions(pickProductSource).length,
+        );
+        if (isCompDish) {
+          let currentComps = getPickActiveComps();
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          updatePickNutrientFields(nutrients);
+        } else if (pickProductSource) {
+          let nutrients = scaleNutrients(pickProductSource, base, targetG);
+          updatePickNutrientFields(nutrients);
+        }
         pickHint();
       }
       function openMealPicker(p) {
@@ -10932,13 +11148,13 @@
               `<button type="button" class="btn${m === pickMeal ? "" : " secondary"}" data-pick-meal="${m}">${t(m)}</button>`,
           )
           .join("");
-        let isCompDish = Boolean(p && productComponents(p).length);
+        let isCompDish = Boolean(p && productComponents(p).length && !productCompanions(p).length);
         $("#pick-portions")
           .closest(".field")
-          .classList.toggle("hidden", isCompDish);
+          .classList.remove("hidden");
         $("#pick-grams")
           .closest(".field")
-          .classList.toggle("hidden", !(+p.grams > 0));
+          .classList.remove("hidden");
         setPickPortions(1);
         renderPickCompanions();
         renderPickComponents();
@@ -16537,36 +16753,29 @@
         setPickPortions(+$("#pick-portions").value || 1),
       );
       $("#pick-grams").addEventListener("input", () => {
-        let base = +(pickProduct && pickProduct.grams) || 0,
+        let base = pickPortionBase(pickProductSource),
           g = +$("#pick-grams").value;
-        if (!(base > 0) || !(g > 0)) return;
-        if (pickActiveComponents && pickActiveComponents.length) {
-          let activeComps = pickActiveComponents.filter(
-            (c) => pickComponentEnabled.get(c.id) !== false,
-          );
-          let currentTotalG = activeComps.reduce(
-            (sum, c) => sum + (pickComponentGrams.get(c.id) ?? c.grams),
-            0,
-          );
-          if (currentTotalG > 0) {
-            let scale = g / currentTotalG;
-            activeComps.forEach((c) => {
-              let curG = pickComponentGrams.get(c.id) ?? c.grams;
-              pickComponentGrams.set(c.id, Math.round(curG * scale * 10) / 10);
-            });
-            pickProduct = compositePickProduct(pickProductSource);
-            pickProduct.grams = g;
-            renderPickComponents();
-            pickHint();
-            return;
-          }
+        if (base > 0 && g > 0) {
+          pickN = Math.round((g / base) * 100) / 100;
+          fillPortionSelect($("#pick-portions"), pickN);
         }
-        pickN = Math.round((g / base) * 100) / 100;
-        fillPortionSelect($("#pick-portions"), pickN);
+        let isCompDish = Boolean(
+          pickProductSource &&
+            productComponents(pickProductSource).length &&
+            !productCompanions(pickProductSource).length,
+        );
+        if (isCompDish) {
+          let currentComps = getPickActiveComps();
+          let nutrients = calcCompositeNutrients(currentComps, g);
+          updatePickNutrientFields(nutrients);
+        } else if (pickProductSource && g > 0) {
+          let nutrients = scaleNutrients(pickProductSource, base, g);
+          updatePickNutrientFields(nutrients);
+        }
         pickHint();
       });
       $("#pick-add").onclick = async () => {
-        let p = pickProduct,
+        let p = pickProductSource || pickProduct,
           n = pickN,
           selectedComps =
             pickActiveComponents && pickActiveComponents.length
@@ -16596,6 +16805,41 @@
             : p
               ? productComponents(p)
               : [];
+        let isCompDish = Boolean(
+          p &&
+            comps.length &&
+            !productCompanions(p).length,
+        );
+        if (isCompDish) {
+          let currentComps = getPickActiveComps();
+          let activeComps = currentComps.filter((c) => c.enabled !== false);
+          if (!activeComps.length) return toast(t("compositeNeedEnabledIngredient"));
+          let base = pickPortionBase(p);
+          let targetG = +$("#pick-grams").value || (base * n);
+          let scaledComps = scaleCompositeComponents(currentComps, targetG);
+          let nutrients = calcCompositeNutrients(currentComps, targetG);
+          let main = await addFood({
+            name: p.name,
+            meal: pickMeal,
+            grams: targetG,
+            kcal: Math.round(+$("#pick-kcal")?.value || nutrients.kcal),
+            protein: Math.round((+$("#pick-protein")?.value || nutrients.protein) * 10) / 10,
+            fat: Math.round((+$("#pick-fat")?.value || nutrients.fat) * 10) / 10,
+            carbs: Math.round((+$("#pick-carbs")?.value || nutrients.carbs) * 10) / 10,
+            date: dStr,
+            portions: n,
+            components: scaledComps,
+          });
+          if (!main) return;
+          closePick();
+          toast(
+            toastT("addedToMealDate")
+              .replace("{name}", String(p.name || "").slice(0, 120))
+              .replace("{meal}", t(pickMeal))
+              .replace("{date}", formatFoodDateLabel(dStr)),
+          );
+          return;
+        }
         let componentSources = comps.map((c) => ({
           ...c,
           grams: pickComponentGrams.has(c.id)
@@ -16905,22 +17149,32 @@
           window.nutritionBot?.success();
           toast(toastT("saved"));
         } else {
+          let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
           let portions = modalFoodPortions > 0 ? modalFoodPortions : 1;
+          let targetG = +data.grams || 0;
+          let currentComps = foodComponents.map((c) => ({
+            ...c,
+            baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
+            baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+            baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+            baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+            baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+            grams: foodComponentGrams.has(c.id)
+              ? foodComponentGrams.get(c.id)
+              : c.grams,
+            enabled: foodComponentEnabled.has(c.id)
+              ? foodComponentEnabled.get(c.id)
+              : c.enabled !== false,
+          }));
           let savedComponents = foodComponents.length
-            ? normalizeFoodComponentsForEntry(
-                foodComponents.map((c) => ({
-                  ...c,
-                  grams: foodComponentGrams.has(c.id)
-                    ? foodComponentGrams.get(c.id)
-                    : c.grams,
-                  enabled: foodComponentEnabled.has(c.id)
-                    ? foodComponentEnabled.get(c.id)
-                    : c.enabled !== false,
-                })),
-                portions,
-                portionBase() || (+data.grams || 0) / portions,
-                false,
-              )
+            ? isCompEntry
+              ? scaleCompositeComponents(currentComps, targetG)
+              : normalizeFoodComponentsForEntry(
+                  currentComps,
+                  portions,
+                  portionBase() || (+data.grams || 0) / portions,
+                  false,
+                )
             : null;
           let p = findProduct(data.name),
             addons = p ? productCompanions(p) : [];

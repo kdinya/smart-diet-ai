@@ -10,7 +10,7 @@ const milk = { id: MILK, name: 'Milk', grams: 100, kcal: 64, protein: 3.3, fat: 
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [soup, milk, coffee], foods: [], weights: [] });
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Soup')));
     await expect(page.locator('#pick-components-field .companion-portion-note')).toContainText('whole dish (bowl)');
-    await expect(page.locator('#pick-portions')).toBeHidden();
+    await expect(page.locator('#pick-portions')).toBeVisible();
     await page.fill('#pick-grams', '400');
     await page.click('#pick-add');
     await expect.poll(() => page.evaluate(() => state.foods[0]?.grams)).toBe(400);

@@ -68,6 +68,111 @@ function nutrientState(used, need) {
   return r < 0.9 ? 'under' : r <= 1.1 ? 'ok' : r <= 1.25 ? 'high' : 'over';
 }
 
+
+function compositeDishBaseGrams(product) {
+  if (product && +product.grams > 0) return +product.grams;
+  let comps = product && Array.isArray(product.components) ? product.components : [];
+  let sum = comps.reduce((acc, c) => acc + (+c.baseGrams || +c.grams || 0), 0);
+  return sum > 0 ? sum : 100;
+}
+
+function calcCompositeNutrients(components, targetGrams) {
+  let active = (components || []).filter(c => c.enabled !== false);
+  let tg = Math.max(0, +targetGrams || 0);
+  if (!active.length || tg <= 0) {
+    return { grams: tg, kcal: 0, protein: 0, fat: 0, carbs: 0 };
+  }
+  let activeBowlSum = active.reduce((sum, c) => sum + (+c.baseGrams || +c.grams || 0), 0);
+  if (activeBowlSum <= 0) {
+    return { grams: tg, kcal: 0, protein: 0, fat: 0, carbs: 0 };
+  }
+  let totalKcal = 0, totalProtein = 0, totalFat = 0, totalCarbs = 0;
+  active.forEach(c => {
+    let bowlG = +c.baseGrams || +c.grams || 0;
+    let ratio = bowlG / activeBowlSum;
+    let portionG = tg * ratio;
+    let factor = bowlG > 0 ? portionG / bowlG : 0;
+    let bKcal = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0);
+    let bProtein = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0);
+    let bFat = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0);
+    let bCarbs = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
+    totalKcal += bKcal * factor;
+    totalProtein += bProtein * factor;
+    totalFat += bFat * factor;
+    totalCarbs += bCarbs * factor;
+  });
+  return {
+    grams: Math.round(tg * 10) / 10,
+    kcal: Math.round(totalKcal),
+    protein: Math.round(totalProtein * 10) / 10,
+    fat: Math.round(totalFat * 10) / 10,
+    carbs: Math.round(totalCarbs * 10) / 10
+  };
+}
+
+function scaleCompositeComponents(components, targetGrams) {
+  let list = (components || []).map(c => {
+    let bowlG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0);
+    return {
+      id: c.id,
+      name: c.name,
+      baseGrams: bowlG,
+      baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+      baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+      baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+      baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+      enabled: c.enabled !== false,
+      bowlGrams: bowlG,
+      grams: 0,
+      kcal: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      ...(c.portion ? { portion: c.portion } : {}),
+      ...(c.isBase ? { isBase: true } : {})
+    };
+  });
+
+  let active = list.filter(c => c.enabled);
+  let tg = Math.max(0, +targetGrams || 0);
+  if (!active.length) {
+    return list;
+  }
+
+  let activeBowlSum = active.reduce((acc, c) => acc + c.bowlGrams, 0);
+  let allocated = 0;
+  active.forEach(c => {
+    let ratio = activeBowlSum > 0 ? c.bowlGrams / activeBowlSum : (1 / active.length);
+    let g = Math.round(tg * ratio * 10) / 10;
+    c.grams = g;
+    allocated += g;
+  });
+
+  let diff = Math.round((tg - allocated) * 10) / 10;
+  if (Math.abs(diff) > 0.01 && active.length > 0) {
+    let largest = active.reduce((prev, curr) => (curr.grams > prev.grams ? curr : prev), active[0]);
+    largest.grams = Math.round((largest.grams + diff) * 10) / 10;
+  }
+
+  list.forEach(c => {
+    if (!c.enabled) {
+      c.grams = 0;
+      c.kcal = 0;
+      c.protein = 0;
+      c.fat = 0;
+      c.carbs = 0;
+      return;
+    }
+    let factor = c.bowlGrams > 0 ? c.grams / c.bowlGrams : 1;
+    c.kcal = Math.round(c.baseKcal * factor * 10) / 10;
+    c.protein = Math.round(c.baseProtein * factor * 10) / 10;
+    c.fat = Math.round(c.baseFat * factor * 10) / 10;
+    c.carbs = Math.round(c.baseCarbs * factor * 10) / 10;
+  });
+
+  return list;
+}
+
 function compositeTotals(components) {
   let total = { grams: 0, kcal: 0, protein: 0, fat: 0, carbs: 0 };
   (components || []).filter(c => c.enabled !== false).forEach(c => {
@@ -188,6 +293,9 @@ if (typeof window !== 'undefined') {
   window.calcFmt = calcFmt;
   window.nutrientState = nutrientState;
   window.compositeTotals = compositeTotals;
+  window.compositeDishBaseGrams = compositeDishBaseGrams;
+  window.calcCompositeNutrients = calcCompositeNutrients;
+  window.scaleCompositeComponents = scaleCompositeComponents;
   window.calcCompanionTotals = calcCompanionTotals;
   window.normalizeFoodComponentsForEntry = normalizeFoodComponentsForEntry;
   window.scaleNutrients = scaleNutrients;
@@ -204,6 +312,9 @@ if (typeof module !== 'undefined' && module.exports) {
     calcFmt,
     nutrientState,
     compositeTotals,
+    compositeDishBaseGrams,
+    calcCompositeNutrients,
+    scaleCompositeComponents,
     calcCompanionTotals,
     normalizeFoodComponentsForEntry,
     scaleNutrients,
