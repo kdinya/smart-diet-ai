@@ -77,6 +77,16 @@ Detailed architecture, module roles, AI provider integrations, dietary guardrail
    - **DOM / views / flow:** `index.html`. Read targeted sections only; avoid reading the full file.
    - **Service worker:** `sw.js`. Increment `CACHE` version whenever assets are added or modified.
 
+4. **Task Scope & Verification Fast-Path:**
+   - **Local Domain Tasks** (changes strictly inside `js/calc-nutrition.js`, `js/ai-service.js`, `js/storage.js`, `js/i18n.js`):
+     - Do not touch `index.html` or `css/*`.
+     - Verify with `npm run check` and relevant unit tests (`npm run test:unit:<target>` or `npm run test:unit`).
+     - Do not run the full Playwright smoke suite for pure domain logic.
+   - **Integration Tasks** (UI, DOM, modal workflows, view routing, state mutations):
+     - Edit `index.html` and relevant stylesheets using targeted search.
+     - Bump `sw.js` cache version.
+     - Verify with `npm run check` and targeted smoke shards (`npm run test:smoke:<target>`).
+
 ## 3. Pre-Flight Verification Checklist
 
 ### Test Requirements

@@ -38,9 +38,10 @@
   - [x] `tests/smoke.catalog.spec.js` — спільний каталог продуктів, навігація та публікація (17 тестів, 30 КБ).
   - [x] Granular npm-команди: `test:smoke:products:basic`, `test:smoke:composite`, `test:smoke:addons`, `test:smoke:catalog`.
 
-- [ ] **Етап 5: Уточнення та оновлення документації (`AGENTS.md` та `docs/ARCHITECTURE.md`)**
-  - [ ] Чітке розмежування задач: **Local domain task** (лише чистий модуль + unit-тест) проти **Integration task** (модуль + `index.html` + UI-тест).
-  - [ ] Документування карти глобальних залежностей (`window`, `state`, `I`, `$`, `t`, `save`).
+- [x] **Етап 5: Уточнення та оновлення документації (`AGENTS.md` та `docs/ARCHITECTURE.md`)**
+  - [x] Чітке розмежування задач: **Local domain task** (лише чистий модуль + unit-тест) проти **Integration task** (модуль + `index.html` + UI-тест) у `docs/ARCHITECTURE.md`.
+  - [x] Документування карти глобальних залежностей (`window`, `state`, `I`, `$`, `t`, `save`, `enqueue`) у `docs/ARCHITECTURE.md`.
+  - [x] Оновлення `AGENTS.md`: додано регламент Task Scope & Verification Fast-Path (Local Domain Tasks проти Integration Tasks) за погодженням з власником репозиторію.
 
 - [ ] **Етап 6: Обережне винесення оркестрації з `index.html`**
   - [ ] Винесення суто бізнес-оркестрації (каталог, синхронізація) в окремі модулі без зміни HTML-розмітки.
