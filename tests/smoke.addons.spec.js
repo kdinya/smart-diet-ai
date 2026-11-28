@@ -407,6 +407,34 @@ test.describe('Smoke: product add-ons', () => {
     expect(saved.components.find((c) => c.id === '__base__').grams).toBe(400);
   });
 
+  test('an older entry without stored components still opens with its add-ons when several portions were logged', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    const today = new Date().toLocaleDateString('en-CA');
+    await openApp(page, {
+      prefs: { ...BASE_PREFS, lang: 'en' },
+      products: [coffee, milk],
+      foods: [{ id: 'old-1', name: 'Coffee', meal: 'breakfast', date: today, createdAt: Date.now(), grams: 250, kcal: 36, protein: 2.3, fat: 1.8, carbs: 2.4, portions: 2 }],
+      weights: [],
+    });
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').first();
+    await entry.locator('[data-toggle-food]').click();
+    await entry.locator('[data-edit-food]').click();
+    await expect(page.locator('#food-components-field')).toBeVisible();
+    const milkInput = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
+    await expect(milkInput).toHaveValue('50');
+    await expect(page.locator('#food-portions')).toHaveValue('2');
+    await expect(page.locator('#food-components-list [data-food-main]')).toContainText('200 g');
+    await milkInput.fill('100');
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    const saved = await page.evaluate(() => state.foods[0]);
+    expect(saved.grams).toBe(300);
+    expect(saved.components.find((c) => c.id === MILK).grams).toBe(100);
+    expect(saved.components.find((c) => c.id === '__base__').grams).toBe(200);
+  });
+
   test('toggling an add-on and saving again never rescales the add-on amounts', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
