@@ -3502,7 +3502,7 @@
               /><datalist id="my-products-list"></datalist>
             </div>
             <div class="field hidden" id="product-calc-field">
-              <div class="form-row" style="gap: 8px">
+              <div class="form-row" id="product-calc-buttons" style="gap: 8px">
                 <button
                   type="button"
                   class="btn small secondary"
@@ -7722,6 +7722,10 @@
           !findProduct(name);
         label.classList.toggle("hidden", !show);
         if (!show) checkbox.checked = false;
+        let c = $("#product-calc-field");
+        if (c && modalMode === "food") {
+          c.classList.toggle("hidden", !show);
+        }
       }
       function showFoodFields(context = "manual") {
         let f = $("#food-fields");
@@ -7735,6 +7739,8 @@
           b.classList.toggle("hidden", modalMode !== "food" || !!editingFoodId);
         let c = $("#product-calc-field");
         if (c) c.classList.remove("hidden");
+        let btns = $("#product-calc-buttons");
+        if (btns) btns.classList.toggle("hidden", modalMode === "food");
         syncFoodProductOption();
       }
       function hideFoodFields() {
@@ -7771,6 +7777,7 @@
         $("#product-note-input").value = "";
         $("#pick-product").classList.remove("hidden");
         $("#product-calc-field").classList.remove("hidden");
+        $("#product-calc-buttons")?.classList.remove("hidden");
         $("#product-verified-label").classList.add("hidden");
         $("#ingredient-save-product").checked = false;
         $("#food-meal").closest(".field").classList.add("hidden");
@@ -8562,9 +8569,14 @@
         pickComponentGrams = new Map(),
         pickComponentEnabled = new Map();
       function componentMacroText(c, g) {
-        let f = (+c.grams || 0) > 0 ? g / c.grams : 1,
-          r = (v) => Math.round(v * 10) / 10;
-        return `<span class="companion-kcal"><strong>${Math.round((+c.kcal || 0) * f)}</strong> ${t("kcal")}</span> · <span class="companion-macros">${t("proteinShort")} ${r((+c.protein || 0) * f)} · ${t("fatShort")} ${r((+c.fat || 0) * f)} · ${t("carbsShort")} ${r((+c.carbs || 0) * f)} ${t("g")}</span>`;
+        let baseG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams || 0),
+          f = baseG > 0 ? g / baseG : 1,
+          r = (v) => Math.round(v * 10) / 10,
+          k = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+          p = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+          fat = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+          carb = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
+        return `<span class="companion-kcal"><strong>${Math.round(k * f)}</strong> ${t("kcal")}</span> · <span class="companion-macros">${t("proteinShort")} ${r(p * f)} · ${t("fatShort")} ${r(fat * f)} · ${t("carbsShort")} ${r(carb * f)} ${t("g")}</span>`;
       }
       function compositePickProduct(src) {
         let comps =
@@ -8696,10 +8708,16 @@
           (prodId) => {
             let p = myProducts().find((x) => x.id === prodId);
             if (!p) return;
+            let addG = Math.round(Math.max(0.1, +p.grams || 100) * 10) / 10;
             let newComp = {
               id: crypto.randomUUID(),
               name: p.name,
-              grams: Math.round(Math.max(0.1, +p.grams || 100) * 10) / 10,
+              grams: addG,
+              baseGrams: addG,
+              baseKcal: +p.kcal || 0,
+              baseProtein: +p.protein || 0,
+              baseFat: +p.fat || 0,
+              baseCarbs: +p.carbs || 0,
               kcal: +p.kcal || 0,
               protein: +p.protein || 0,
               fat: +p.fat || 0,
@@ -8775,12 +8793,17 @@
           let g = foodComponentGrams.has(c.id)
               ? foodComponentGrams.get(c.id)
               : c.grams,
-            f = (+c.grams || 0) > 0 ? g / c.grams : 1;
+            baseG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams || 0),
+            f = baseG > 0 ? g / baseG : 1,
+            cK = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
+            cP = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
+            cF = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
+            cC = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
           tg += g * n;
-          tk += (+c.kcal || 0) * f * n;
-          tp += (+c.protein || 0) * f * n;
-          tf += (+c.fat || 0) * f * n;
-          tc += (+c.carbs || 0) * f * n;
+          tk += cK * f * n;
+          tp += cP * f * n;
+          tf += cF * f * n;
+          tc += cC * f * n;
         });
         if (!skipGrams) $("#food-grams").value = calcFmt("grams", tg);
         $("#food-kcal").value = calcFmt("kcal", tk);
@@ -8894,8 +8917,22 @@
           g = +e.target.value;
         if (!c || !(g >= 0 && g <= 9999999)) return;
         foodComponentGrams.set(id, g);
+        let oldG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0);
+        let factor = oldG > 0 ? g / oldG : 1;
         c.grams = g;
         c.baseGrams = g;
+        if (Number.isFinite(+c.baseKcal)) c.baseKcal = Math.round(+c.baseKcal * factor * 10) / 10;
+        else if (Number.isFinite(+c.kcal)) c.baseKcal = Math.round(+c.kcal * factor * 10) / 10;
+        if (Number.isFinite(+c.baseProtein)) c.baseProtein = Math.round(+c.baseProtein * factor * 10) / 10;
+        else if (Number.isFinite(+c.protein)) c.baseProtein = Math.round(+c.protein * factor * 10) / 10;
+        if (Number.isFinite(+c.baseFat)) c.baseFat = Math.round(+c.baseFat * factor * 10) / 10;
+        else if (Number.isFinite(+c.fat)) c.baseFat = Math.round(+c.fat * factor * 10) / 10;
+        if (Number.isFinite(+c.baseCarbs)) c.baseCarbs = Math.round(+c.baseCarbs * factor * 10) / 10;
+        else if (Number.isFinite(+c.carbs)) c.baseCarbs = Math.round(+c.carbs * factor * 10) / 10;
+        c.kcal = c.baseKcal;
+        c.protein = c.baseProtein;
+        c.fat = c.baseFat;
+        c.carbs = c.baseCarbs;
         let card = e.target.closest("[data-component-item]");
         if (card) {
           let macroEl = card.querySelector("[data-component-macros]");
@@ -8906,7 +8943,7 @@
             fillPortionSelect(ps, g > 0 ? Math.round((g / u) * 100) / 100 : 1);
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
@@ -8965,7 +9002,7 @@
             ps.closest(".dd")?._sync?.();
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
@@ -11009,6 +11046,7 @@
         $("#food-back-choices")?.classList.add("hidden");
         $("#food-save-product-label")?.classList.add("hidden");
         $("#product-calc-field").classList.remove("hidden");
+        $("#product-calc-buttons")?.classList.remove("hidden");
         $("#product-verified-label").classList.remove("hidden");
         $("#ingredient-save-product-label").classList.add("hidden");
         $("#ingredient-save-product").checked = false;
@@ -11415,6 +11453,7 @@
         $("#food-auto").checked = true;
         $("#food-form").classList.toggle("hidden", !food);
         $("#product-calc-field").classList.add("hidden");
+        $("#product-calc-buttons")?.classList.add("hidden");
         $("#product-note-field").classList.add("hidden");
         $("#product-note-toggle").classList.add("hidden");
         $("#product-note-input").value = "";
@@ -11452,15 +11491,23 @@
                 $("#portion-field").classList.remove("hidden");
                 foodComponents = comps.map((c) => {
                   let bowlG = +c.baseGrams > 0 ? +c.baseGrams : (+c.bowlGrams > 0 ? +c.bowlGrams : (+c.grams || 0));
+                  let bK = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0);
+                  let bP = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0);
+                  let bF = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0);
+                  let bC = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
                   return {
                     id: c.id,
                     name: c.name,
                     grams: Math.round(Math.max(0.1, bowlG) * 10) / 10,
                     baseGrams: bowlG,
-                    baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
-                    baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
-                    baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
-                    baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
+                    baseKcal: bK,
+                    baseProtein: bP,
+                    baseFat: bF,
+                    baseCarbs: bC,
+                    kcal: bK,
+                    protein: bP,
+                    fat: bF,
+                    carbs: bC,
                     enabled: c.enabled !== false,
                   };
                 });
@@ -17075,20 +17122,27 @@
             let isCompEntry = foodComponents.length && !foodEntryHasBase();
             let portions = modalFoodPortions > 0 ? modalFoodPortions : (foodPortions(previous) || 1);
             let targetG = +data.grams || 0;
-            let currentComps = foodComponents.map((c) => ({
-              ...c,
-              baseGrams: +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0),
-              baseKcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
-              baseProtein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
-              baseFat: Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
-              baseCarbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0),
-              grams: foodComponentGrams.has(c.id)
-                ? foodComponentGrams.get(c.id)
-                : c.grams,
-              enabled: foodComponentEnabled.has(c.id)
-                ? foodComponentEnabled.get(c.id)
-                : c.enabled !== false,
-            }));
+            let currentComps = foodComponents.map((c) => {
+              let g = foodComponentGrams.has(c.id) ? foodComponentGrams.get(c.id) : c.grams;
+              let baseG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0);
+              let factor = baseG > 0 ? g / baseG : 1;
+              let bK = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0);
+              let bP = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0);
+              let bF = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0);
+              let bC = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
+              return {
+                ...c,
+                baseGrams: g,
+                baseKcal: Math.round(bK * factor * 10) / 10,
+                baseProtein: Math.round(bP * factor * 10) / 10,
+                baseFat: Math.round(bF * factor * 10) / 10,
+                baseCarbs: Math.round(bC * factor * 10) / 10,
+                grams: g,
+                enabled: foodComponentEnabled.has(c.id)
+                  ? foodComponentEnabled.get(c.id)
+                  : c.enabled !== false,
+              };
+            });
             let savedComponents = foodComponents.length
               ? isCompEntry
                 ? scaleCompositeComponents(currentComps, targetG)

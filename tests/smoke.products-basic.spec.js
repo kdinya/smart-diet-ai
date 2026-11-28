@@ -46,6 +46,7 @@ const { test, expect, SUPABASE_URL, PASSWORD, USERS, BASE_PREFS, CORS, base64url
   });
 
   test('simple product choice opens traditional product editor without composite fields', async ({ page }) => {
+    const pita = { id: 'p-pita', name: 'Pita', grams: 100, kcal: 250, protein: 8, fat: 1, carbs: 50 };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [pita], foods: [], weights: [] });
     await openView(page, 'products');
 
