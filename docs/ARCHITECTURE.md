@@ -103,3 +103,58 @@
    - Informational toasts and notifications (`.toast`): topmost layer (`z-index: 10000`), always visible above all windows and dialogs.
 
 ---
+
+## 3. Task Classification & Verification Guidelines
+
+To preserve token context, maximize agent execution speed, and eliminate regressions, tasks are classified into two distinct operational scopes:
+
+### A. Local Domain Task (Pure Modules & Unit Tests)
+- **Scope**: Changes confined strictly to pure domain calculation logic, AI prompt templates/parsers, data transformations, or dictionary translations (`js/calc-nutrition.js`, `js/ai-service.js`, `js/storage.js`, `js/i18n.js`).
+- **Characteristics**:
+  - No DOM manipulation, no browser APIs (`document`, `window.localStorage`, Canvas, WebGL, Spine).
+  - Operates purely on input arguments and returns deterministic outputs.
+  - Requires **zero edits** to `index.html` or `css/*`.
+- **Verification Protocol**:
+  - Run fast syntax and integrity check: `npm run check`.
+  - Run the dedicated unit test suite:
+    - Calculations: `npm run test:unit:calc` (~100 ms).
+    - AI Service: `npm run test:unit:ai` (~80 ms).
+    - Storage logic: `npm run test:unit:storage` (~90 ms).
+    - Translations: `npm run test:unit:i18n` (~30 ms).
+    - Assistant pure helpers: `npm run test:unit:ecobot` (~50 ms).
+    - All unit tests: `npm run test:unit` (< 500 ms).
+  - *Browser-based Playwright smoke suite is unnecessary and should be skipped for pure domain tasks.*
+
+### B. Integration Task (DOM, Views, Modals & UI Orchestration)
+- **Scope**: Features, UI enhancements, event listeners, modal lifecycles, or state mutations that connect user interactions in the DOM with domain logic and cloud persistence (`index.html`, `css/*`, `sw.js`).
+- **Characteristics**:
+  - Involves DOM element querying, event delegation, modal open/close states, animations, or view switching.
+  - Modifies application state (`state`), triggers storage saves (`save()`), or enqueues cloud sync operations (`enqueue()`).
+- **Verification Protocol**:
+  - Run static sanity checks: `npm run check`.
+  - Run targeted smoke test shard:
+    - Simple products & CRUD: `npm run test:smoke:products:basic`
+    - Composite meals & normalization: `npm run test:smoke:composite`
+    - Addons & companion products: `npm run test:smoke:addons`
+    - Shared catalog & publication: `npm run test:smoke:catalog`
+    - Full smoke suite: `npm run test:smoke`
+  - Update `sw.js` cache version (`CACHE = 'smartdiet-shell-v...'`) whenever assets or HTML change.
+
+---
+
+## 4. Global Dependency Map (Core Orchestration)
+
+In the vanilla architecture without bundlers, `index.html` acts as the primary runtime coordinator. The following global primitives form the core contract across modules:
+
+| Global Symbol | Defining Module / Location | Type / Role | Description & Usage Invariants |
+| :--- | :--- | :--- | :--- |
+| `state` | `index.html` (loaded via `js/storage.js`) | `Object` (Singleton) | Single source of truth for runtime data (`state.user`, `state.profile`, `state.foods`, `state.weights`, `state.products`, `state.companions`, `state.ai`, `state.prefs`). Must never be reassigned directly; mutate properties or use helper functions. |
+| `window` | Browser Runtime | `Global Object` | Shared bus where standalone modules export their APIs (`window.calcNutrition`, `window.aiService`, `window.i18n`, `window.storage`, `window.nutritionBot`). |
+| `I` | `js/i18n.js` | `Object` (`{ uk: {...}, en: {...} }`) | Bilingual translation dictionaries. Must maintain 100% exact key parity between `uk` and `en` at all times. |
+| `t(key)` | `index.html` | `Function(string) -> string` | Primary translation helper. Retrieves localized string from `I[currentLang][key]`. Falls back gracefully if key is missing. |
+| `$` / `$$` | `index.html` | `Function(selector) -> Element/NodeList` | Convenience wrappers for `document.querySelector` and `document.querySelectorAll`. Used across UI handlers. |
+| `save()` | `index.html` | `Function() -> void` | Serializes current `state` to `localStorage` under `smartdiet-v1` via `serializeState()`. Triggers UI updates for affected views. |
+| `enqueue(table, id)` | `index.html` | `Function(string, string) -> void` | Adds record mutation or deletion to `smartdiet-sync-queue` for background cloud synchronization. |
+| `runSync(force)` | `index.html` | `Async Function(boolean) -> Promise<void>` | Flushes pending queue items to Supabase via authenticated REST/PostgREST when online. |
+| `toast(msg)` | `index.html` | `Function(string) -> void` | Dispatches styled transient notifications positioned on topmost stacking layer (`z-index: 10000`). |
+| `askConfirm(opts)` | `index.html` | `Async Function(object) -> Promise<boolean>` | In-app styled confirmation modal (`#confirm-modal`). Native `window.confirm` is strictly prohibited. |

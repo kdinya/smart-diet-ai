@@ -39,8 +39,9 @@
   - [x] Granular npm-команди: `test:smoke:products:basic`, `test:smoke:composite`, `test:smoke:addons`, `test:smoke:catalog`.
 
 - [ ] **Етап 5: Уточнення та оновлення документації (`AGENTS.md` та `docs/ARCHITECTURE.md`)**
-  - [ ] Чітке розмежування задач: **Local domain task** (лише чистий модуль + unit-тест) проти **Integration task** (модуль + `index.html` + UI-тест).
-  - [ ] Документування карти глобальних залежностей (`window`, `state`, `I`, `$`, `t`, `save`).
+  - [x] Чітке розмежування задач: **Local domain task** (лише чистий модуль + unit-тест) проти **Integration task** (модуль + `index.html` + UI-тест) у `docs/ARCHITECTURE.md`.
+  - [x] Документування карти глобальних залежностей (`window`, `state`, `I`, `$`, `t`, `save`, `enqueue`) у `docs/ARCHITECTURE.md`.
+  - [ ] Оновлення `AGENTS.md` (очікує прямого узгодження точного тексту з власником репозиторію).
 
 - [ ] **Етап 6: Обережне винесення оркестрації з `index.html`**
   - [ ] Винесення суто бізнес-оркестрації (каталог, синхронізація) в окремі модулі без зміни HTML-розмітки.
