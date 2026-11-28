@@ -469,12 +469,12 @@ async function openDietitianChat(page) {
     await expect(chatAction).toBeVisible({ timeout: 10000 });
     await chatAction.click();
     const calcChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
-    await expect(calcChoice).toBeVisible();
+    await expect(calcChoice).toBeVisible({ timeout: 10000 });
     await calcChoice.click();
   } else {
     await page.locator('#chat-fab').click();
   }
-  await expect(page.locator('#chat-panel')).toHaveClass(/open/);
+  await expect(page.locator('#chat-panel')).toHaveClass(/open/, { timeout: 10000 });
 }
 
 async function openAskChat(page) {

@@ -8901,8 +8901,22 @@
           g = +e.target.value;
         if (!c || !(g >= 0 && g <= 9999999)) return;
         foodComponentGrams.set(id, g);
+        let oldG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams > 0 ? +c.grams : 0);
+        let factor = oldG > 0 ? g / oldG : 1;
         c.grams = g;
         c.baseGrams = g;
+        if (Number.isFinite(+c.baseKcal)) c.baseKcal = Math.round(+c.baseKcal * factor * 10) / 10;
+        else if (Number.isFinite(+c.kcal)) c.baseKcal = Math.round(+c.kcal * factor * 10) / 10;
+        if (Number.isFinite(+c.baseProtein)) c.baseProtein = Math.round(+c.baseProtein * factor * 10) / 10;
+        else if (Number.isFinite(+c.protein)) c.baseProtein = Math.round(+c.protein * factor * 10) / 10;
+        if (Number.isFinite(+c.baseFat)) c.baseFat = Math.round(+c.baseFat * factor * 10) / 10;
+        else if (Number.isFinite(+c.fat)) c.baseFat = Math.round(+c.fat * factor * 10) / 10;
+        if (Number.isFinite(+c.baseCarbs)) c.baseCarbs = Math.round(+c.baseCarbs * factor * 10) / 10;
+        else if (Number.isFinite(+c.carbs)) c.baseCarbs = Math.round(+c.carbs * factor * 10) / 10;
+        c.kcal = c.baseKcal;
+        c.protein = c.baseProtein;
+        c.fat = c.baseFat;
+        c.carbs = c.baseCarbs;
         let card = e.target.closest("[data-component-item]");
         if (card) {
           let macroEl = card.querySelector("[data-component-macros]");
@@ -8913,7 +8927,7 @@
             fillPortionSelect(ps, g > 0 ? Math.round((g / u) * 100) / 100 : 1);
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
@@ -8972,7 +8986,7 @@
             ps.closest(".dd")?._sync?.();
           }
         }
-        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase();
+        let isCompEntry = modalMode === "food" && foodComponents.length && !foodEntryHasBase() && !editingFoodId;
         if (isCompEntry) {
           let base = portionBase();
           let targetG = +$("#food-grams").value || (base * modalFoodPortions) || base;
