@@ -278,7 +278,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect(page.locator('#food-grams')).toHaveValue('100');
   });
 
-  test.skip('product with multiple add-ons displays and edits like composite dishes in diary', async ({ page }) => {
+  test('product with multiple add-ons displays and edits like composite dishes in diary', async ({ page }) => {
     const SUGAR = '88888888-8888-4888-8888-888888888888';
     const sugar = { id: SUGAR, name: 'Sugar', grams: 10, kcal: 40, protein: 0, fat: 0, carbs: 10 };
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }, { id: SUGAR, grams: 10 }] };
@@ -369,7 +369,7 @@ test.describe('Smoke: product add-ons', () => {
     await expect.poll(() => page.evaluate(() => state.foods.map((f) => [f.grams, f.kcal]))).toEqual([[350, 38], [100, 33]]);
   });
 
-  test.skip('editing an entry with add-ons edits the main product and the add-ons separately', async ({ page }) => {
+  test('editing an entry with add-ons edits the main product and the add-ons separately', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
     await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
@@ -407,7 +407,42 @@ test.describe('Smoke: product add-ons', () => {
     expect(saved.components.find((c) => c.id === '__base__').grams).toBe(400);
   });
 
-  test.skip('add-on portions and grams stay in sync in the edit modal, and main product and total are shown', async ({ page }) => {
+  test('toggling an add-on and saving again never rescales the add-on amounts', async ({ page }) => {
+    const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
+    await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
+    await page.evaluate(() => openMealPicker(state.products.find((p) => p.name === 'Coffee')));
+    await page.selectOption('#pick-portions', '3');
+    await page.click('#pick-add');
+    await expect.poll(() => page.evaluate(() => state.foods.length)).toBe(1);
+    const before = await page.evaluate(() => state.foods[0]);
+    expect(before.grams).toBe(350);
+    expect(before.components.find((c) => c.id === MILK).grams).toBe(50);
+
+    await openView(page, 'diary');
+    const entry = page.locator('#diary-meals .meal-item[data-food-id]').filter({ has: page.locator('b', { hasText: 'Coffee' }) });
+    await entry.locator('[data-toggle-food]').click();
+    await entry.locator('[data-edit-food]').click();
+    const milkInput = page.locator(`#food-components-list [data-component-grams="${MILK}"]`);
+    const toggle = page.locator(`#food-components-list [data-component-toggle="${MILK}"]`);
+    await toggle.uncheck();
+    await expect(page.locator('#food-grams')).toHaveValue('300');
+    await toggle.check();
+    await expect(milkInput).toHaveValue('50');
+    await expect(page.locator('#food-grams')).toHaveValue('350');
+    await page.click('#food-save');
+    await expect(page.locator('#modal')).not.toHaveClass(/open/);
+    const after = await page.evaluate(() => state.foods[0]);
+    expect(after.grams).toBe(350);
+    expect(after.kcal).toBe(before.kcal);
+    expect(after.components.find((c) => c.id === MILK).grams).toBe(50);
+    expect(after.components.find((c) => c.id === '__base__').grams).toBe(300);
+
+    await entry.locator('[data-edit-food]').click();
+    await expect(milkInput).toHaveValue('50');
+    await expect(page.locator('#food-portions')).toHaveValue('3');
+  });
+
+  test('add-on portions and grams stay in sync in the edit modal, and main product and total are shown', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [coffee, milk], foods: [], weights: [] });
@@ -596,7 +631,7 @@ test.describe('Smoke: product add-ons', () => {
     expect(geo.listTop).toBeGreaterThanOrEqual(0);
   });
 
-  test.skip('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
+  test('an entry saved before this change keeps its totals when it is opened and saved again', async ({ page }) => {
     const coffee = { id: COFFEE, name: 'Coffee', grams: 100, kcal: 2, protein: 0.3, fat: 0, carbs: 0, companions: [{ id: MILK, grams: 50 }] };
     const today = new Date().toLocaleDateString('en-CA');
     const legacy = { id: '55555555-5555-4555-8555-555555555555', name: 'Coffee', meal: 'breakfast', grams: 300, kcal: 68, protein: 6.9, fat: 3.6, carbs: 4.8, date: today, createdAt: Date.now(), portions: 2,
@@ -618,7 +653,7 @@ test.describe('Smoke: product add-ons', () => {
     expect([saved.grams, saved.kcal, saved.portions]).toEqual([300, 68, 2]);
     expect(saved.components.find((c) => c.id === MILK).grams).toBe(100);
   });
-  test.skip('an empty add-ons list in main diary modal hides the field without add button, adding add-ons is only in product editor', async ({ page }) => {
+  test('an empty add-ons list in main diary modal hides the field without add button, adding add-ons is only in product editor', async ({ page }) => {
     const borsch = { id: '33333333-3333-4333-8333-333333333333', name: 'Borsch', grams: 300, kcal: 180, protein: 6, fat: 8, carbs: 20 };
     await openApp(page, { prefs: { ...BASE_PREFS, lang: 'en' }, products: [borsch, milk], foods: [], weights: [] });
 
