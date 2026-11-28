@@ -466,6 +466,10 @@ async function openDietitianChat(page) {
   if (await mascot.isVisible()) {
     await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await mascot.click();
+    const wakeAction = page.locator('#bot-comic .bot-comic-actions button');
+    if (await wakeAction.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await wakeAction.click();
+    }
     await expect(chatAction).toBeVisible({ timeout: 10000 });
     await chatAction.click();
     const calcChoice = page.locator('.bot-comic-actions [data-action="open-calc"]');
@@ -483,15 +487,19 @@ async function openAskChat(page) {
   if (await mascot.isVisible()) {
     await expect(mascot).toHaveClass(/is-arrived/, { timeout: 10000 });
     await mascot.click();
+    const wakeAction = page.locator('#bot-comic .bot-comic-actions button');
+    if (await wakeAction.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await wakeAction.click();
+    }
     await expect(chatAction).toBeVisible({ timeout: 10000 });
     await chatAction.click();
     const askChoice = page.locator('.bot-comic-actions [data-action="open-ask"]');
-    await expect(askChoice).toBeVisible();
+    await expect(askChoice).toBeVisible({ timeout: 10000 });
     await askChoice.click();
   } else {
     await page.evaluate(() => { if (typeof openAsk === 'function') openAsk(); });
   }
-  await expect(page.locator('#ask-panel')).toHaveClass(/open/);
+  await expect(page.locator('#ask-panel')).toHaveClass(/open/, { timeout: 10000 });
 }
 
 async function openView(page, view) {
