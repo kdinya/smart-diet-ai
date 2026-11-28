@@ -150,7 +150,7 @@
 
 1. **Завдання щодо складних страв, додатків та каталогу:**
    - Читати: `docs/DATA_CONTRACTS.md`
-   - Тести: `tests/smoke.products.spec.js` (запуск: `npm run test:smoke:products`)
+   - Тести: `tests/smoke.products-basic.spec.js`, `tests/smoke.composite.spec.js`, `tests/smoke.addons.spec.js`, `tests/smoke.catalog.spec.js` (запуск: `npm run test:smoke:products` або цільові `npm run test:smoke:composite`, `npm run test:smoke:addons`, `npm run test:smoke:catalog`)
    - Не зачіпати: анімацію Spine, логіку авторизації, AI-дієтолога, графіки ваги.
 
 2. **Завдання щодо щоденника та прийомів їжі:**

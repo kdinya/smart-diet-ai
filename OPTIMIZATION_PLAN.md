@@ -31,11 +31,12 @@
   - [x] Граничні випадки додатків (addons): чиста функція `calcCompanionTotals`, збереження `isBase`, масштабування бази при вимкненому додатку, фіксовані додатки.
   - [x] Тестування дробових та нестандартних порцій без запуску важкого браузера (0.5, 0.25, 0.33, 1.5, absolute mode, захист при некоректних порціях).
 
-- [ ] **Етап 4: Декомпозиція гігантського `tests/smoke.products.spec.js` (~155 КБ)**
-  - [ ] `tests/smoke.products-basic.spec.js` — прості продукти та CRUD.
-  - [ ] `tests/smoke.composite.spec.js` — складні страви та інгредієнти.
-  - [ ] `tests/smoke.addons.spec.js` — додатки до страв.
-  - [ ] `tests/smoke.catalog.spec.js` — каталог продуктів та публікація.
+- [x] **Етап 4: Декомпозиція гігантського `tests/smoke.products.spec.js` (~155 КБ)**
+  - [x] `tests/smoke.products-basic.spec.js` — прості продукти та CRUD, налаштування та контроли (12 тестів, 27 КБ).
+  - [x] `tests/smoke.composite.spec.js` — складні страви, нормалізація порцій та інгредієнти (21 тест, 40 КБ).
+  - [x] `tests/smoke.addons.spec.js` — додатки до страв у продуктах та щоденнику (25 тестів, 56 КБ).
+  - [x] `tests/smoke.catalog.spec.js` — спільний каталог продуктів, навігація та публікація (17 тестів, 30 КБ).
+  - [x] Granular npm-команди: `test:smoke:products:basic`, `test:smoke:composite`, `test:smoke:addons`, `test:smoke:catalog`.
 
 - [ ] **Етап 5: Уточнення та оновлення документації (`AGENTS.md` та `docs/ARCHITECTURE.md`)**
   - [ ] Чітке розмежування задач: **Local domain task** (лише чистий модуль + unit-тест) проти **Integration task** (модуль + `index.html` + UI-тест).
