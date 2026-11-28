@@ -247,6 +247,98 @@ function normalizeFoodComponentsForEntry(components, portions, targetGrams, abso
   });
 }
 
+// --- Product with add-ons: entry components ---
+// Invariant: in an entry that has a main-product component (isBase), the main product
+// scales with the number of portions, while every add-on keeps exactly the amount the
+// user entered, no matter how many portions of the main product are logged.
+// Composite dishes (no main-product component) scale every ingredient with the portions.
+function isBaseComponent(c) {
+  return !!c && (c.isBase === true || c.id === '__base__');
+}
+
+function entryHasBaseComponent(components) {
+  return (components || []).some(isBaseComponent);
+}
+
+function entryComponentMultiplier(component, hasBase, portions) {
+  let n = +portions > 0 ? +portions : 1;
+  return hasBase && !isBaseComponent(component) ? 1 : n;
+}
+
+function roundToTenth(v) {
+  return Math.round(v * 10) / 10;
+}
+
+// items: [{ id, isBase, enabled, grams (current amount), refGrams (amount the nutrients are given for),
+//           kcal, protein, fat, carbs }]
+function calcEntryComponentTotals(items, portions) {
+  let list = items || [],
+      hasBase = entryHasBaseComponent(list),
+      total = { grams: 0, kcal: 0, protein: 0, fat: 0, carbs: 0 };
+  list.forEach(c => {
+    if (!c || c.enabled === false) return;
+    let m = entryComponentMultiplier(c, hasBase, portions),
+        g = +c.grams || 0,
+        ref = +c.refGrams > 0 ? +c.refGrams : g,
+        f = ref > 0 ? g / ref : 1;
+    total.grams += g * m;
+    total.kcal += (+c.kcal || 0) * f * m;
+    total.protein += (+c.protein || 0) * f * m;
+    total.fat += (+c.fat || 0) * f * m;
+    total.carbs += (+c.carbs || 0) * f * m;
+  });
+  return total;
+}
+
+// Components as stored in a diary entry that has a main product.
+function buildEntryComponentsForSave(items, portions) {
+  let list = items || [],
+      hasBase = entryHasBaseComponent(list),
+      n = +portions > 0 ? +portions : 1;
+  return list.map(c => {
+    let m = entryComponentMultiplier(c, hasBase, n),
+        g = +c.grams || 0,
+        ref = +c.refGrams > 0 ? +c.refGrams : g,
+        f = ref > 0 ? g / ref : 1,
+        base = isBaseComponent(c);
+    return {
+      id: c.id,
+      name: c.name,
+      grams: roundToTenth(g * m),
+      kcal: roundToTenth((+c.kcal || 0) * f * m),
+      protein: roundToTenth((+c.protein || 0) * f * m),
+      fat: roundToTenth((+c.fat || 0) * f * m),
+      carbs: roundToTenth((+c.carbs || 0) * f * m),
+      enabled: c.enabled !== false,
+      ...(hasBase && !base ? {} : { portion: n }),
+      baseGrams: roundToTenth(g),
+      ...(base ? { isBase: true } : {})
+    };
+  });
+}
+
+// A stored add-on is an absolute amount (entries saved by older versions already hold
+// the amount multiplied by the portions, so the stored value is used as is).
+function addonComponentFromEntry(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    grams: roundToTenth(Math.max(0.1, +c.grams || 0)),
+    kcal: +c.kcal || 0,
+    protein: +c.protein || 0,
+    fat: +c.fat || 0,
+    carbs: +c.carbs || 0,
+    enabled: c.enabled !== false
+  };
+}
+
+// Portions of the main product implied by an entered total weight of the whole entry.
+function calcPortionsFromTotalGrams(totalGrams, addonsGrams, portionGrams) {
+  let per = +portionGrams;
+  if (!(per > 0) || !(+totalGrams > 0)) return 0;
+  return Math.round((Math.max(0, +totalGrams - (+addonsGrams || 0)) / per) * 100) / 100;
+}
+
 function scaleNutrients(nutrients, baseGrams, targetGrams) {
   let base = +baseGrams > 0 ? +baseGrams : 100,
       target = +targetGrams >= 0 ? +targetGrams : base,
@@ -298,6 +390,13 @@ if (typeof window !== 'undefined') {
   window.scaleCompositeComponents = scaleCompositeComponents;
   window.calcCompanionTotals = calcCompanionTotals;
   window.normalizeFoodComponentsForEntry = normalizeFoodComponentsForEntry;
+  window.isBaseComponent = isBaseComponent;
+  window.entryHasBaseComponent = entryHasBaseComponent;
+  window.entryComponentMultiplier = entryComponentMultiplier;
+  window.calcEntryComponentTotals = calcEntryComponentTotals;
+  window.buildEntryComponentsForSave = buildEntryComponentsForSave;
+  window.addonComponentFromEntry = addonComponentFromEntry;
+  window.calcPortionsFromTotalGrams = calcPortionsFromTotalGrams;
   window.scaleNutrients = scaleNutrients;
   window.scaleComponentGrams = scaleComponentGrams;
   window.planFloor = planFloor;
@@ -317,6 +416,13 @@ if (typeof module !== 'undefined' && module.exports) {
     scaleCompositeComponents,
     calcCompanionTotals,
     normalizeFoodComponentsForEntry,
+    isBaseComponent,
+    entryHasBaseComponent,
+    entryComponentMultiplier,
+    calcEntryComponentTotals,
+    buildEntryComponentsForSave,
+    addonComponentFromEntry,
+    calcPortionsFromTotalGrams,
     scaleNutrients,
     scaleComponentGrams,
     planFloor,

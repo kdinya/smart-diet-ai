@@ -443,3 +443,94 @@ test("scaleCompositeComponents returns scaled component entries for saving", () 
   assert.equal(scaled[1].grams, 0);
   assert.equal(scaled[1].bowlGrams, 20);
 });
+
+// --- Product with add-ons: add-ons never scale with the portions of the main product ---
+
+const addonItems = () => [
+  { id: '__base__', isBase: true, name: 'Borscht', enabled: true, grams: 100, refGrams: 100, kcal: 40, protein: 2, fat: 1, carbs: 5 },
+  { id: 'bread', name: 'Bread', enabled: true, grams: 30, refGrams: 30, kcal: 75, protein: 2.4, fat: 0.9, carbs: 14 },
+  { id: 'cream', name: 'Sour cream', enabled: false, grams: 20, refGrams: 20, kcal: 40, protein: 0.6, fat: 4, carbs: 0.8 },
+];
+
+test('entry totals scale only the main product with the portions', () => {
+  for (const [n, kcal, grams] of [[1, 115, 130], [2, 155, 230], [0.5, 95, 80], [3, 195, 330]]) {
+    const t = calc.calcEntryComponentTotals(addonItems(), n);
+    assert.equal(Math.round(t.kcal), kcal, `kcal for ${n} portions`);
+    assert.equal(Math.round(t.grams * 10) / 10, grams, `grams for ${n} portions`);
+  }
+});
+
+test('add-on amounts entered by the user are counted exactly, in any number of portions', () => {
+  const items = addonItems();
+  items[1].grams = 60;
+  const one = calc.calcEntryComponentTotals(items, 1);
+  const four = calc.calcEntryComponentTotals(items, 4);
+  assert.equal(Math.round(one.kcal), 190);
+  assert.equal(Math.round(four.kcal), 310);
+  assert.equal(Math.round((four.kcal - one.kcal)), 120);
+});
+
+test('a disabled add-on is not counted and an enabled one is', () => {
+  const items = addonItems();
+  items[2].enabled = true;
+  assert.equal(Math.round(calc.calcEntryComponentTotals(items, 2).kcal), 195);
+});
+
+test('saved components keep add-ons absolute and multiply only the main product', () => {
+  const saved = calc.buildEntryComponentsForSave(addonItems(), 2);
+  const base = saved.find(c => c.isBase), bread = saved.find(c => c.id === 'bread');
+  assert.equal(base.grams, 200);
+  assert.equal(base.kcal, 80);
+  assert.equal(base.portion, 2);
+  assert.equal(bread.grams, 30);
+  assert.equal(bread.kcal, 75);
+  assert.equal('portion' in bread, false);
+  assert.equal(bread.baseGrams, 30);
+});
+
+test('saved components are not changed by saving again with another number of portions', () => {
+  const items = addonItems();
+  const saved = calc.buildEntryComponentsForSave(items, 3);
+  const loaded = saved.map(c => c.isBase
+    ? { ...items[0], grams: 100, refGrams: 100 }
+    : { ...calc.addonComponentFromEntry(c), refGrams: c.grams });
+  const again = calc.buildEntryComponentsForSave(loaded, 3);
+  assert.deepEqual(again.map(c => [c.id, c.grams, c.kcal]), saved.map(c => [c.id, c.grams, c.kcal]));
+});
+
+test('an add-on of an entry saved by an older version keeps its stored amount', () => {
+  const legacy = { id: 'bread', name: 'Bread', grams: 60, kcal: 150, protein: 4.8, fat: 1.8, carbs: 28, enabled: true, portion: 2, baseGrams: 30 };
+  const loaded = calc.addonComponentFromEntry(legacy);
+  assert.equal(loaded.grams, 60);
+  assert.equal(loaded.kcal, 150);
+});
+
+test('portions are derived from the entered total weight without the add-ons', () => {
+  assert.equal(calc.calcPortionsFromTotalGrams(230, 30, 100), 2);
+  assert.equal(calc.calcPortionsFromTotalGrams(130, 30, 100), 1);
+  assert.equal(calc.calcPortionsFromTotalGrams(0, 30, 100), 0);
+  assert.equal(calc.calcPortionsFromTotalGrams(50, 80, 100), 0);
+});
+
+test('composite dish ingredients all scale with the portions', () => {
+  const dish = [
+    { id: 'a', name: 'Beet', enabled: true, grams: 60, refGrams: 60, kcal: 26, protein: 1, fat: 0.1, carbs: 5.8 },
+    { id: 'b', name: 'Mayo', enabled: true, grams: 20, refGrams: 20, kcal: 136, protein: 0.2, fat: 15, carbs: 0.5 },
+  ];
+  assert.equal(calc.entryHasBaseComponent(dish), false);
+  const one = calc.calcEntryComponentTotals(dish, 1), two = calc.calcEntryComponentTotals(dish, 2);
+  assert.equal(Math.round(two.kcal), Math.round(one.kcal * 2));
+  const saved = calc.buildEntryComponentsForSave(dish, 2);
+  assert.deepEqual(saved.map(c => c.grams), [120, 40]);
+  assert.deepEqual(saved.map(c => c.portion), [2, 2]);
+});
+
+test('composite normalization keeps scaling every ingredient with the portions', () => {
+  const comps = [
+    { id: 'a', name: 'Beet', grams: 60, kcal: 26, protein: 1, fat: 0.1, carbs: 5.8, enabled: true },
+    { id: 'b', name: 'Mayo', grams: 20, kcal: 136, protein: 0.2, fat: 15, carbs: 0.5, enabled: true },
+  ];
+  const out = calc.normalizeFoodComponentsForEntry(comps, 2, 80, false);
+  assert.deepEqual(out.map(c => c.grams), [120, 40]);
+  assert.deepEqual(out.map(c => c.portion), [2, 2]);
+});

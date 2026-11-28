@@ -6189,6 +6189,14 @@
               "Оновлено кеш офлайн-оболонки для миттєвого завантаження.",
             ],
           },
+          fixed: {
+            en: [
+              "Add-ons of a product are counted exactly as entered and no longer change with the number of portions of the main product when adding or editing a meal.",
+            ],
+            uk: [
+              "Додаткові продукти рахуються рівно в тій кількості, яку вказано, і більше не залежать від кількості порцій основного продукту під час додавання та редагування прийому їжі.",
+            ],
+          },
           improved: {
             en: ["Improved minor interface details"],
             uk: ["Покращено дрібні деталі інтерфейсу."],
@@ -8747,67 +8755,38 @@
       function foodEntryHasBase() {
         return foodComponents.some((c) => c.isBase || c.id === "__base__");
       }
-      function foodTargetGrams() {
-        let p = portionBase();
-        if (p > 0) return p;
-        return foodComponents.reduce(
-          (sum, c) => sum + (foodComponentGrams.get(c.id) ?? c.grams),
-          0,
-        );
-      }
-      function rebalanceFoodComponents() {
-        if (!foodComponents.length) return;
-        let target = foodTargetGrams(),
-          active = foodComponents.filter(
-            (c) => foodComponentEnabled.get(c.id) !== false,
-          ),
-          sum = active.reduce(
-            (n, c) => n + (foodComponentGrams.get(c.id) ?? c.grams),
-            0,
-          );
-        if (!(target > 0 && sum > 0)) return;
-        let scale = target / sum;
-        active.forEach((c) => {
-          let oldG = foodComponentGrams.get(c.id) ?? c.grams,
-            newG = Math.round(oldG * scale * 10) / 10,
-            ratio = oldG > 0 ? newG / oldG : 1;
-          c.grams = newG;
-          for (let k of ["kcal", "protein", "fat", "carbs"])
-            c[k] = Math.round((+c[k] || 0) * ratio * 10) / 10;
-          foodComponentGrams.set(c.id, newG);
+      function foodComponentItems() {
+        return foodComponents.map((c) => {
+          let g = foodComponentGrams.has(c.id)
+            ? foodComponentGrams.get(c.id)
+            : c.grams;
+          return {
+            id: c.id,
+            name: c.name,
+            isBase: !!c.isBase,
+            enabled: foodComponentEnabled.has(c.id)
+              ? foodComponentEnabled.get(c.id)
+              : c.enabled !== false,
+            grams: g,
+            refGrams: +c.baseGrams > 0 ? +c.baseGrams : +c.grams || 0,
+            kcal: Number.isFinite(+c.baseKcal) ? +c.baseKcal : +c.kcal || 0,
+            protein: Number.isFinite(+c.baseProtein) ? +c.baseProtein : +c.protein || 0,
+            fat: Number.isFinite(+c.baseFat) ? +c.baseFat : +c.fat || 0,
+            carbs: Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : +c.carbs || 0,
+          };
         });
       }
       function updateFoodComponentsCalc(skipGrams = false) {
-        let tg = 0,
-          tk = 0,
-          tp = 0,
-          tf = 0,
-          tc = 0,
-          hasBase = foodEntryHasBase(),
-          n =
-            hasBase && modalMode === "food" && modalFoodPortions > 0
+        let n =
+            modalMode === "food" && modalFoodPortions > 0
               ? modalFoodPortions
-              : 1;
-        foodComponents.forEach((c) => {
-          let enabled = foodComponentEnabled.has(c.id)
-            ? foodComponentEnabled.get(c.id)
-            : c.enabled !== false;
-          if (!enabled) return;
-          let g = foodComponentGrams.has(c.id)
-              ? foodComponentGrams.get(c.id)
-              : c.grams,
-            baseG = +c.baseGrams > 0 ? +c.baseGrams : (+c.grams || 0),
-            f = baseG > 0 ? g / baseG : 1,
-            cK = Number.isFinite(+c.baseKcal) ? +c.baseKcal : (+c.kcal || 0),
-            cP = Number.isFinite(+c.baseProtein) ? +c.baseProtein : (+c.protein || 0),
-            cF = Number.isFinite(+c.baseFat) ? +c.baseFat : (+c.fat || 0),
-            cC = Number.isFinite(+c.baseCarbs) ? +c.baseCarbs : (+c.carbs || 0);
-          tg += g * n;
-          tk += cK * f * n;
-          tp += cP * f * n;
-          tf += cF * f * n;
-          tc += cC * f * n;
-        });
+              : 1,
+          tot = calcEntryComponentTotals(foodComponentItems(), n),
+          tg = tot.grams,
+          tk = tot.kcal,
+          tp = tot.protein,
+          tf = tot.fat,
+          tc = tot.carbs;
         if (!skipGrams) $("#food-grams").value = calcFmt("grams", tg);
         $("#food-kcal").value = calcFmt("kcal", tk);
         $("#food-protein").value = calcFmt("protein", tp);
@@ -8993,7 +8972,6 @@
         if (!id) return;
         let enabled = e.target.checked;
         foodComponentEnabled.set(id, enabled);
-        if (foodEntryHasBase()) rebalanceFoodComponents();
         let card = e.target.closest("[data-component-item]");
         if (card) {
           card.classList.toggle("is-disabled", !enabled);
@@ -10994,10 +10972,17 @@
         if (!foodComponents.length) syncPortions();
         if (foodComponents.length && foodEntryHasBase()) {
           if ($("#food-auto").checked) {
-            let target = foodTargetGrams(),
-              newG = +$("#food-grams").value;
-            if (target > 0 && newG > 0) {
-              modalFoodPortions = Math.round((newG / target) * 100) / 100;
+            let main = foodComponentItems().find((c) => c.isBase),
+              addonsG = foodComponentItems()
+                .filter((c) => !c.isBase && c.enabled !== false)
+                .reduce((sum, c) => sum + (+c.grams || 0), 0),
+              np = calcPortionsFromTotalGrams(
+                +$("#food-grams").value,
+                addonsG,
+                main ? main.grams : 0,
+              );
+            if (np > 0) {
+              modalFoodPortions = np;
               fillPortionSelect($("#food-portions"), modalFoodPortions);
               updateFoodComponentsCalc(true);
             }
@@ -11536,20 +11521,7 @@
               } else {
                 foodComponents = comps.map((c) => {
                   if (!(c.isBase || c.id === "__base__"))
-                    return {
-                      id: c.id,
-                      name: c.name,
-                      grams:
-                        Math.round(
-                          Math.max(0.1, (+c.grams || 0) / portions) * 10,
-                        ) / 10,
-                      kcal: Math.round(((+c.kcal || 0) / portions) * 10) / 10,
-                      protein:
-                        Math.round(((+c.protein || 0) / portions) * 10) / 10,
-                      fat: Math.round(((+c.fat || 0) / portions) * 10) / 10,
-                      carbs: Math.round(((+c.carbs || 0) / portions) * 10) / 10,
-                      enabled: c.enabled !== false,
-                    };
+                    return addonComponentFromEntry(c);
                   let savedRef =
                     savedProduct &&
                     (savedProduct.components?.find((x) => x.id === c.id) ||
@@ -17178,12 +17150,14 @@
             let savedComponents = foodComponents.length
               ? isCompEntry
                 ? scaleCompositeComponents(currentComps, targetG)
-                : normalizeFoodComponentsForEntry(
-                    currentComps,
-                    portions,
-                    portionBase() || (+data.grams || 0) / portions,
-                    false,
-                  )
+                : foodEntryHasBase()
+                  ? buildEntryComponentsForSave(foodComponentItems(), portions)
+                  : normalizeFoodComponentsForEntry(
+                      currentComps,
+                      portions,
+                      portionBase() || (+data.grams || 0) / portions,
+                      false,
+                    )
               : previous.components
                 ? previous.components
                 : null;
@@ -17256,12 +17230,14 @@
           let savedComponents = foodComponents.length
             ? isCompEntry
               ? scaleCompositeComponents(currentComps, targetG)
-              : normalizeFoodComponentsForEntry(
-                  currentComps,
-                  portions,
-                  portionBase() || (+data.grams || 0) / portions,
-                  false,
-                )
+              : foodEntryHasBase()
+                ? buildEntryComponentsForSave(foodComponentItems(), portions)
+                : normalizeFoodComponentsForEntry(
+                    currentComps,
+                    portions,
+                    portionBase() || (+data.grams || 0) / portions,
+                    false,
+                  )
             : null;
           let p = findProduct(data.name),
             addons = p ? productCompanions(p) : [];
