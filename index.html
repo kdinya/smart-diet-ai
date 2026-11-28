@@ -6193,10 +6193,12 @@
             en: [
               "Add-ons of a product are counted exactly as entered and no longer change with the number of portions of the main product when adding or editing a meal.",
               "Older entries of a product with add-ons logged for several portions open again with add-on editing.",
+              "Add-ons are collapsed by default when editing a meal entry.",
             ],
             uk: [
               "Додаткові продукти рахуються рівно в тій кількості, яку вказано, і більше не залежать від кількості порцій основного продукту під час додавання та редагування прийому їжі.",
               "Старі записи продукту з додатками на кілька порцій знову відкриваються з редагуванням додатків.",
+              "Додаткові продукти за замовчуванням згорнуті у вікні редагування прийому їжі.",
             ],
           },
           improved: {
@@ -8881,7 +8883,7 @@
               ? foodComponentEnabled.get(c.id)
               : c.enabled !== false;
             if (hasBase)
-              return `<div class="component-card is-addon${enabled ? "" : " is-disabled"}" data-component-item="${id}"><label class="companion-toggle-label"><input type="checkbox" data-component-toggle="${id}" ${enabled ? "checked" : ""}><span class="companion-name">${esc(c.name)}</span></label><div class="companion-controls"><div class="companion-field"><span class="companion-field-label">${t("portions")}</span><select class="companion-select" data-component-portions="${id}" ${enabled ? "" : "disabled"} aria-label="${t("portions")}">${(() => {
+              return `<div class="component-card is-addon${enabled ? "" : " is-disabled"}${openCompanions.has(c.id) ? "" : " collapsed"}" data-component-item="${id}"><div class="companion-top"><label class="companion-toggle-label"><input type="checkbox" data-component-toggle="${id}" ${enabled ? "checked" : ""}><span class="companion-name">${esc(c.name)}</span></label><div class="companion-actions"><button type="button" class="companion-toggle" data-companion-toggle="${id}" aria-expanded="${openCompanions.has(c.id)}" aria-label="${t(openCompanions.has(c.id) ? "companionCollapse" : "companionExpand")}" title="${t(openCompanions.has(c.id) ? "companionCollapse" : "companionExpand")}"><span class="product-chevron" aria-hidden="true"></span></button></div></div><div class="companion-controls"><div class="companion-field"><span class="companion-field-label">${t("portions")}</span><select class="companion-select" data-component-portions="${id}" ${enabled ? "" : "disabled"} aria-label="${t("portions")}">${(() => {
                 let u = foodAddonUnit(c),
                   pn = Math.round((g / u) * 100) / 100,
                   vals = PORTION_STEPS.includes(pn)
