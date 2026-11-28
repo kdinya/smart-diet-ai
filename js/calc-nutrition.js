@@ -84,6 +84,35 @@ function compositeTotals(components) {
   };
 }
 
+function calcCompanionTotals(baseProduct, companions) {
+  let total = {
+    grams: +baseProduct?.grams || 0,
+    kcal: +baseProduct?.kcal || 0,
+    protein: +baseProduct?.protein || 0,
+    fat: +baseProduct?.fat || 0,
+    carbs: +baseProduct?.carbs || 0
+  };
+  (companions || []).forEach(c => {
+    if (!c || c.enabled === false || c.on === false) return;
+    let item = c.item || c,
+        base = +item?.grams > 0 ? +item.grams : 100,
+        g = +c.grams > 0 ? +c.grams : base,
+        f = base > 0 ? g / base : 1;
+    total.grams += g;
+    total.kcal += (+item?.kcal || 0) * f;
+    total.protein += (+item?.protein || 0) * f;
+    total.fat += (+item?.fat || 0) * f;
+    total.carbs += (+item?.carbs || 0) * f;
+  });
+  return {
+    grams: Math.round(total.grams * 10) / 10,
+    kcal: Math.round(total.kcal),
+    protein: Math.round(total.protein * 10) / 10,
+    fat: Math.round(total.fat * 10) / 10,
+    carbs: Math.round(total.carbs * 10) / 10
+  };
+}
+
 function normalizeFoodComponentsForEntry(components, portions, targetGrams, absolute = false) {
   let n = portions > 0 ? portions : 1,
       items = (components || []).map(c => {
@@ -159,6 +188,7 @@ if (typeof window !== 'undefined') {
   window.calcFmt = calcFmt;
   window.nutrientState = nutrientState;
   window.compositeTotals = compositeTotals;
+  window.calcCompanionTotals = calcCompanionTotals;
   window.normalizeFoodComponentsForEntry = normalizeFoodComponentsForEntry;
   window.scaleNutrients = scaleNutrients;
   window.scaleComponentGrams = scaleComponentGrams;
@@ -174,6 +204,7 @@ if (typeof module !== 'undefined' && module.exports) {
     calcFmt,
     nutrientState,
     compositeTotals,
+    calcCompanionTotals,
     normalizeFoodComponentsForEntry,
     scaleNutrients,
     scaleComponentGrams,
